@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
 
             $table->foreignId('branch_id')->constrained(config('branch.table_prefix') . 'branches');
-            $table->string('locale')->index('locale');
+            $table->string('locale')->index();
             $table->string('name');
             $table->text('description')->nullable();
             $table->text('address')->nullable();

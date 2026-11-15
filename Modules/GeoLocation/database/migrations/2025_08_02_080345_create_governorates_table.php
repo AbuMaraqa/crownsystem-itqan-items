@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
 
             $table->string('code',10)->nullable();
-            $table->foreignId('country_id')->index('country_id')->constrained(config('geolocation.table_prefix').'countries')->onDelete('cascade');
+            $table->foreignId('country_id')->index()->constrained(config('geolocation.table_prefix').'countries')->onDelete('cascade');
             $table->index(['code', 'country_id']);
 
             $table->softDeletes();

@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
 
             $table->string('slug')->unique();
-            $table->foreignId('created_by')->index('created_by')->constrained('users')->cascadeOnDelete();
+            $table->foreignId('created_by')->index()->constrained('users')->cascadeOnDelete();
 
             $table->softDeletes();
             $table->timestamps();

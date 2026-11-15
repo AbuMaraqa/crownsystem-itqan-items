@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table(config('items.table_prefix') . 'orders', function (Blueprint $table) {
-            $table->foreignId('branch_id')->index('branch_id')->nullable()->constrained(config('branch.table_prefix') . 'branches')->onDelete('set null');
+            $table->foreignId('branch_id')->index()->nullable()->constrained(config('branch.table_prefix') . 'branches')->onDelete('set null');
         });
     }
 
@@ -24,7 +24,8 @@ return new class extends Migration
         Schema::table(config('items.table_prefix') . 'orders', function (Blueprint $table) {
             $table->dropForeign(['branch_id']);
 
-            $table->dropIndex('branch_id');
+            // قواعد قديمة سمّت الفهرس 'branch_id'، والجديدة تأخذ الاسم الافتراضي.
+            $table->dropIndex(Schema::hasIndex(config('items.table_prefix') . 'orders', 'branch_id') ? 'branch_id' : ['branch_id']);
 
             $table->dropColumn('branch_id');
         });

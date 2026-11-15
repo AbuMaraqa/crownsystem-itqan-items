@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create(config('items.table_prefix') . 'addon_translations', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignId('addon_id')->index('addon_id')->constrained(config('items.table_prefix') . 'addons')->cascadeOnDelete();
+            $table->foreignId('addon_id')->index()->constrained(config('items.table_prefix') . 'addons')->cascadeOnDelete();
             $table->string('locale',5)->index();
             $table->string('name');
             $table->text('description')->nullable();

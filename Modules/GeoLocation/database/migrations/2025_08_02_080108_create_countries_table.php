@@ -16,7 +16,7 @@ return new class extends Migration
 
             $table->string('code',2)->unique();
             $table->string('phone_code',10)->nullable();
-            $table->foreignId('currency_id')->index('currency_id')->constrained('currencies')->onDelete('cascade');
+            $table->foreignId('currency_id')->index()->constrained('currencies')->onDelete('cascade');
 
             $table->softDeletes();
             $table->timestamps();

@@ -16,7 +16,7 @@ return new class extends Migration
             $table->id();
 
             $table->string('slug')->unique();
-            $table->string('barcode')->index('barcode')->nullable()->uniqid();
+            $table->string('barcode')->index()->nullable()->uniqid();
             $table->string('sku')->unique();
             $table->float('discount')->default(0);
 
@@ -46,7 +46,7 @@ return new class extends Migration
             $table->boolean('is_featured')->default(false);
             $table->boolean('is_digital')->default(false);
             $table->json('meta_data')->nullable();
-            $table->foreignId('created_by')->index('created_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('created_by')->index()->nullable()->constrained('users')->nullOnDelete();
 
             $table->softDeletes();
             $table->timestamps();

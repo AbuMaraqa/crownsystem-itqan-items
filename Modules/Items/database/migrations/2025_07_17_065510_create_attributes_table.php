@@ -17,7 +17,7 @@ return new class extends Migration
 
             $table->string('slug');
             $table->integer('type')->default(AttributeType::SELECT->value);
-            $table->foreignId('created_by')->index('created_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('created_by')->index()->nullable()->constrained('users')->nullOnDelete();
 
             $table->softDeletes();
             $table->timestamps();

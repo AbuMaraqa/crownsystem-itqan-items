@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('description')->nullable();
             $table->string('locale', 5)->index();
             $table->foreignId('attribute_value_id')
-                ->index('attribute_value_id')
+                ->index()
                 ->constrained(config('items.table_prefix') . 'attribute_values')
                 ->cascadeOnDelete();
 

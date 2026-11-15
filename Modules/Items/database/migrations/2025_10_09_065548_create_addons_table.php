@@ -16,7 +16,7 @@ return new class extends Migration
             $table->id();
 
             $table->integer('type')->default(AddonType::RADIO);
-            $table->foreignId('created_by')->index('created_by')->constrained('users')->cascadeOnDelete();
+            $table->foreignId('created_by')->index()->constrained('users')->cascadeOnDelete();
 
             $table->softDeletes();
             $table->timestamps();

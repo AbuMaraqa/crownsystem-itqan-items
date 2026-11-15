@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table(config('items.table_prefix') . 'offers', function (Blueprint $table) {
-            $table->foreignId('branch_id')->after('id')->index('branch_id')->nullable()->constrained(config('branch.table_prefix') . 'branches')->cascadeOnDelete();
+            $table->foreignId('branch_id')->after('id')->index()->nullable()->constrained(config('branch.table_prefix') . 'branches')->cascadeOnDelete();
         });
     }
 

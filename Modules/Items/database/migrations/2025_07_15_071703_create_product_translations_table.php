@@ -19,7 +19,7 @@ return new class extends Migration
             $table->longText('description')->nullable();
             $table->string('locale', 5)->index();
             $table->foreignId('product_id')
-                ->index('product_id')
+                ->index()
                 ->constrained(config('items.table_prefix') . 'products')
                 ->cascadeOnDelete();
 

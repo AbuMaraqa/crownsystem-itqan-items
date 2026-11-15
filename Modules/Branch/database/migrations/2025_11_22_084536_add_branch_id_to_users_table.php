@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->foreignId('branch_id')->index('branch_id')->nullable()->constrained(config('branch.table_prefix') . 'branches')->cascadeOnDelete();
+            $table->foreignId('branch_id')->index()->nullable()->constrained(config('branch.table_prefix') . 'branches')->cascadeOnDelete();
         });
     }
 
@@ -23,7 +23,8 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
             $table->dropForeign(['branch_id']);
-            $table->dropIndex('branch_id');
+            // قواعد قديمة سمّت الفهرس 'branch_id'، والجديدة تأخذ الاسم الافتراضي (users_branch_id_index).
+            $table->dropIndex(Schema::hasIndex('users', 'branch_id') ? 'branch_id' : ['branch_id']);
             $table->dropColumn('branch_id');
         });
     }

@@ -16,7 +16,7 @@ return new class extends Migration
 
             $table->string('name');
             $table->string('locale' , 5)->index();
-            $table->foreignId('governorate_id')->index('governorate_id')->constrained(config('geolocation.table_prefix') . 'governorates')->onDelete('cascade');
+            $table->foreignId('governorate_id')->index()->constrained(config('geolocation.table_prefix') . 'governorates')->onDelete('cascade');
 
             $table->timestamps();
         });

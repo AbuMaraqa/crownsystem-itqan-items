@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
 
             $table->foreignId('category_id')
-                ->index('category_id')
+                ->index()
                 ->constrained(config('items.table_prefix') . 'categories')
                 ->cascadeOnDelete();
             $table->string('locale', 5)->index();

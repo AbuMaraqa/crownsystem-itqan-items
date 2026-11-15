@@ -15,10 +15,10 @@ return new class extends Migration
         Schema::create(config('geolocation.table_prefix') . 'districts', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignId('city_id')->index('city_id')->constrained(config('geolocation.table_prefix') . 'cities');
+            $table->foreignId('city_id')->index()->constrained(config('geolocation.table_prefix') . 'cities');
             $table->decimal('latitude', 10, 8)->nullable();
             $table->decimal('longitude', 11, 8)->nullable();
-            $table->integer('type')->index('type')->default(DistrictType::DISTRICT->value());
+            $table->integer('type')->index()->default(DistrictType::DISTRICT->value());
 
             $table->softDeletes();
             $table->timestamps();

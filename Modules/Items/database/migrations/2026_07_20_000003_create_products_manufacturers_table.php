@@ -15,11 +15,11 @@ return new class extends Migration
 
             $table->id();
             $table->foreignId('product_id')
-                ->index('product_id')
+                ->index()
                 ->constrained(config('items.table_prefix') . 'products')
                 ->cascadeOnDelete();
             $table->foreignId('manufacturer_id')
-                ->index('manufacturer_id')
+                ->index()
                 ->constrained(config('items.table_prefix') . 'manufacturers')
                 ->cascadeOnDelete();
             $table->timestamps();

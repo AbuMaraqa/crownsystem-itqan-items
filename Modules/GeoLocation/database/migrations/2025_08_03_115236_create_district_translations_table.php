@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create(config('geolocation.table_prefix') . 'district_translations', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignId('district_id')->index('district_id')->constrained(config('geolocation.table_prefix') . 'districts');
+            $table->foreignId('district_id')->index()->constrained(config('geolocation.table_prefix') . 'districts');
             $table->string('locale', 5)->index();
             $table->string('name');
 

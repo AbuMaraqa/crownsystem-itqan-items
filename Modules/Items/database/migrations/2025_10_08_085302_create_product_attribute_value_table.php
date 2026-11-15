@@ -14,8 +14,8 @@ return new class extends Migration
         Schema::create(config('items.table_prefix') . 'product_attribute_value', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignId('product_id')->index('product_id') ->constrained(config('items.table_prefix') . 'products')->cascadeOnDelete();
-            $table->foreignId('attribute_id')->index('attribute_id') ->constrained(config('items.table_prefix') . 'attribute_values')->cascadeOnDelete();
+            $table->foreignId('product_id')->index() ->constrained(config('items.table_prefix') . 'products')->cascadeOnDelete();
+            $table->foreignId('attribute_id')->index() ->constrained(config('items.table_prefix') . 'attribute_values')->cascadeOnDelete();
 
             $table->unique(['product_id', 'attribute_id']);
 

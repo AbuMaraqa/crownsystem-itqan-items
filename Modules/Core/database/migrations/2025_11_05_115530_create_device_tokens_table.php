@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('device_tokens', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignId('user_id')->index('user_id')->constrained('users')->onDelete('cascade');
+            $table->foreignId('user_id')->index()->constrained('users')->onDelete('cascade');
 
             // 2. الـ Token نفسه، ويجب أن يكون فريداً (unique)
             $table->string('token')->unique();

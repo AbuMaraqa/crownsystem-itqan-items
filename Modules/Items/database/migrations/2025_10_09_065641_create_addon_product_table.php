@@ -14,13 +14,13 @@ return new class extends Migration
         Schema::create(config('items.table_prefix') . 'addon_product', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignId('addon_id')->index('addon_id')->constrained(config('items.table_prefix') . 'addons')->cascadeOnDelete();
-            $table->foreignId('product_id')->index('product_id')->constrained(config('items.table_prefix') . 'products')->cascadeOnDelete();
+            $table->foreignId('addon_id')->index()->constrained(config('items.table_prefix') . 'addons')->cascadeOnDelete();
+            $table->foreignId('product_id')->index()->constrained(config('items.table_prefix') . 'products')->cascadeOnDelete();
             $table->boolean('is_required')->default(false);
             $table->unsignedInteger('min_selection')->default(1);
             $table->unsignedInteger('max_selection')->nullable();
             $table->unsignedInteger('max_quantity_per_option')->default(1);
-            $table->foreignId('created_by')->index('created_by')->constrained('users')->cascadeOnDelete();
+            $table->foreignId('created_by')->index()->constrained('users')->cascadeOnDelete();
 
             $table->softDeletes();
             $table->timestamps();

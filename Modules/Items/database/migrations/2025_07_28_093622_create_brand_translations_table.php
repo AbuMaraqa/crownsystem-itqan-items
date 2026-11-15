@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('locale')->index();
             $table->string('name');
             $table->string('description')->nullable();
-            $table->foreignId('brand_id')->index('brand_id')->constrained(config('items.table_prefix') . 'brands')->onDelete('cascade');
+            $table->foreignId('brand_id')->index()->constrained(config('items.table_prefix') . 'brands')->onDelete('cascade');
 
             $table->timestamps();
         });

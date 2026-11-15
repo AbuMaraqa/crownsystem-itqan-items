@@ -29,11 +29,12 @@ return new class extends Migration
         $balances = config('accounting.table_prefix', 'accounting_').'stock_balances';
 
         if (Schema::hasTable($balances)) {
+            // صيغة قياسية (بلا UPDATE ... JOIN الخاصة بـ MySQL) لتعمل على MySQL وPostgreSQL.
             DB::statement("
-                UPDATE {$products} p
-                JOIN (SELECT product_id, SUM(quantity) AS quantity, SUM(weight) AS weight FROM {$balances} GROUP BY product_id) b
-                    ON b.product_id = p.id
-                SET p.stock_quantity = b.quantity, p.stock_weight = b.weight
+                UPDATE {$products}
+                SET stock_quantity = (SELECT SUM(b.quantity) FROM {$balances} b WHERE b.product_id = {$products}.id),
+                    stock_weight = (SELECT SUM(b.weight) FROM {$balances} b WHERE b.product_id = {$products}.id)
+                WHERE id IN (SELECT product_id FROM {$balances})
             ");
         }
 
@@ -41,12 +42,17 @@ return new class extends Migration
 
         if (Schema::hasTable($recipes)) {
             DB::statement("
-                UPDATE {$products} p
-                SET p.length = p.min_limit_1, p.min_limit_1 = NULL
-                WHERE p.min_limit_1 > 0
-                    AND (p.length IS NULL OR p.length = 0)
-                    AND p.id IN (SELECT output_product_id FROM {$recipes})
+                UPDATE {$products}
+                SET length = min_limit_1, min_limit_1 = NULL
+                WHERE min_limit_1 > 0
+                    AND (length IS NULL OR length = 0)
+                    AND id IN (SELECT output_product_id FROM {$recipes})
             ");
+        }
+
+        // الحدود القديمة داخل meta_data (JSON) لا توجد الا في قواعد MySQL القديمة، ودوال JSON هنا خاصة بـ MySQL.
+        if (! in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
+            return;
         }
 
         foreach (['max_limit' => 'item_max', 'min_limit_1' => 'item_min1', 'min_limit_2' => 'item_min2'] as $column => $legacyKey) {

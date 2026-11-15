@@ -14,14 +14,33 @@ return new class extends Migration
             $table->index(['parent_id', 'barcode'], 'items_products_parent_barcode_idx');
         });
 
-        DB::statement('CREATE FULLTEXT INDEX items_product_translations_name_fulltext ON ' . config('items.table_prefix') . 'product_translations (`name`)');
-        DB::statement('CREATE INDEX items_product_translations_locale_name_idx ON ' . config('items.table_prefix') . 'product_translations (`locale`, `name`(191))');
+        $translations = config('items.table_prefix') . 'product_translations';
+
+        // FULLTEXT وطول البادئة name(191) خاصان بـ MySQL؛ على غيره يكفي فهرس عادي (البحث يرجع الى LIKE).
+        if (in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
+            DB::statement('CREATE FULLTEXT INDEX items_product_translations_name_fulltext ON ' . $translations . ' (`name`)');
+            DB::statement('CREATE INDEX items_product_translations_locale_name_idx ON ' . $translations . ' (`locale`, `name`(191))');
+
+            return;
+        }
+
+        Schema::table($translations, function (Blueprint $table) {
+            $table->index(['locale', 'name'], 'items_product_translations_locale_name_idx');
+        });
     }
 
     public function down(): void
     {
-        DB::statement('DROP INDEX items_product_translations_locale_name_idx ON ' . config('items.table_prefix') . 'product_translations');
-        DB::statement('DROP INDEX items_product_translations_name_fulltext ON ' . config('items.table_prefix') . 'product_translations');
+        $translations = config('items.table_prefix') . 'product_translations';
+
+        if (in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
+            DB::statement('DROP INDEX items_product_translations_locale_name_idx ON ' . $translations);
+            DB::statement('DROP INDEX items_product_translations_name_fulltext ON ' . $translations);
+        } else {
+            Schema::table($translations, function (Blueprint $table) {
+                $table->dropIndex('items_product_translations_locale_name_idx');
+            });
+        }
 
         Schema::table(config('items.table_prefix') . 'products', function (Blueprint $table) {
             $table->dropIndex('items_products_parent_barcode_idx');

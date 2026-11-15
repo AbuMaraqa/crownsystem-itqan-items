@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create(config('items.table_prefix') . 'offerables', function (Blueprint $table) {
 
-            $table->foreignId('offer_id')->index('offer_id')->constrained(config('items.table_prefix') . 'offers')->cascadeOnDelete();
+            $table->foreignId('offer_id')->index()->constrained(config('items.table_prefix') . 'offers')->cascadeOnDelete();
             $table->morphs('offerable');
             $table->primary(['offer_id', 'offerable_id', 'offerable_type'] , 'offerables_primary_key');
 

@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('locale')->index();
             $table->string('name');
             $table->string('description')->nullable();
-            $table->foreignId('manufacturer_id')->index('manufacturer_id')->constrained(config('items.table_prefix') . 'manufacturers')->onDelete('cascade');
+            $table->foreignId('manufacturer_id')->index()->constrained(config('items.table_prefix') . 'manufacturers')->onDelete('cascade');
 
             $table->timestamps();
         });

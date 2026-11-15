@@ -33,7 +33,7 @@ return new class extends Migration
             // فهارس لتحسين تقارير الدخل اليومي والبحث
             $table->index(['transaction_date', 'flow', 'source_module']);
 
-            $table->foreignId('created_by')->index('created_by')->constrained('users')->onDelete('cascade')->onUpdate('cascade');
+            $table->foreignId('created_by')->index()->constrained('users')->onDelete('cascade')->onUpdate('cascade');
             $table->softDeletes();
             $table->timestamps();
         });

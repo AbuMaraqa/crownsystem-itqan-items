@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('locale')->index();
             $table->string('name');
             $table->string('description')->nullable();
-            $table->foreignId('unit_id')->index('unit_id')->constrained(config('items.table_prefix') . 'units')->onDelete('cascade');
+            $table->foreignId('unit_id')->index()->constrained(config('items.table_prefix') . 'units')->onDelete('cascade');
 
             $table->timestamps();
         });

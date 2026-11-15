@@ -25,7 +25,7 @@ return new class extends Migration
             $table->timestamp('end_date')->nullable();
             $table->boolean('is_active')->default(true);
 
-            $table->foreignId('created_by')->index('created_by')->constrained('users')->cascadeOnDelete();
+            $table->foreignId('created_by')->index()->constrained('users')->cascadeOnDelete();
             $table->timestamps();
         });
     }

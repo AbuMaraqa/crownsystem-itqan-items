@@ -19,9 +19,10 @@ return new class extends Migration
             return;
         }
 
-        DB::statement("UPDATE {$products} p
-            JOIN (SELECT product_id, SUM(weight) AS weight FROM {$balances} GROUP BY product_id) b ON b.product_id = p.id
-            SET p.stock_weight = b.weight");
+        // صيغة قياسية (بلا UPDATE ... JOIN الخاصة بـ MySQL) لتعمل على MySQL وPostgreSQL.
+        DB::statement("UPDATE {$products}
+            SET stock_weight = (SELECT SUM(b.weight) FROM {$balances} b WHERE b.product_id = {$products}.id)
+            WHERE id IN (SELECT product_id FROM {$balances})");
     }
 
     public function down(): void

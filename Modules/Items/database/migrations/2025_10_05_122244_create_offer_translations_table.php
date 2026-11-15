@@ -14,8 +14,8 @@ return new class extends Migration
         Schema::create(config('items.table_prefix') . 'offer_translations', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignId('offer_id')->index('offer_id')->constrained(config('items.table_prefix') . 'offers')->cascadeOnDelete();
-            $table->string('locale')->index('locale');
+            $table->foreignId('offer_id')->index()->constrained(config('items.table_prefix') . 'offers')->cascadeOnDelete();
+            $table->string('locale')->index();
             $table->string('name');
             $table->string('description')->nullable();
 

@@ -15,11 +15,11 @@ return new class extends Migration
             $table->id();
 
             $table->foreignId('product_id')
-                ->index('product_id')
+                ->index()
                 ->constrained(config('items.table_prefix') . 'products')
                 ->cascadeOnDelete();
             $table->foreignId('attribute_value_id')
-                ->index('attribute_value_id')
+                ->index()
                 ->constrained(config('items.table_prefix') . 'attribute_values')
                 ->cascadeOnDelete();
 

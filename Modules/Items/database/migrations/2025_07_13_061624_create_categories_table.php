@@ -17,8 +17,8 @@ return new class extends Migration
             $table->string('slug')->unique();
             $table->integer('status')->default(1);
             $table->integer('sort_order')->default(0);
-            $table->foreignId('parent_id')->index('parent_id')->nullable()->constrained(config('items.table_prefix') . 'categories')->nullOnDelete();
-            $table->foreignId('created_by')->index('created_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('parent_id')->index()->nullable()->constrained(config('items.table_prefix') . 'categories')->nullOnDelete();
+            $table->foreignId('created_by')->index()->nullable()->constrained('users')->nullOnDelete();
 
             $table->softDeletes();
             $table->timestamps();

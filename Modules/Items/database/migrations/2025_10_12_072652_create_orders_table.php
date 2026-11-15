@@ -17,7 +17,7 @@ return new class extends Migration
         Schema::create(config('items.table_prefix') . 'orders', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignId('user_id')->index('user_id')->nullable()->constrained('users')->onDelete('set null');
+            $table->foreignId('user_id')->index()->nullable()->constrained('users')->onDelete('set null');
             $table->string('order_number')->unique();
             $table->decimal('sub_total', 10, 2);
             $table->decimal('discount', 10, 2)->default(0);
@@ -29,7 +29,7 @@ return new class extends Migration
             $table->text('notes')->nullable();
             $table->text('delivery_address');
             $table->text('contact_phone');
-            $table->foreignId('created_by')->index('created_by')->constrained('users')->cascadeOnDelete();
+            $table->foreignId('created_by')->index()->constrained('users')->cascadeOnDelete();
 
             $table->softDeletes();
             $table->timestamps();

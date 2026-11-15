@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table(config('items.table_prefix') . 'products', function (Blueprint $table) {
-            $table->integer('parent_id')->index('parent_id')->nullable()->constrained(config('items.table_prefix') . 'products')->nullOnDelete();
+            $table->integer('parent_id')->index()->nullable()->constrained(config('items.table_prefix') . 'products')->nullOnDelete();
         });
     }
 

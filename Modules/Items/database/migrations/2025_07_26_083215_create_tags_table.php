@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('slug')->unique();
             $table->string('text_color')->default('#000000');
             $table->string('background_color')->default('#ffffff');
-            $table->foreignId('created_by')->index('created_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('created_by')->index()->nullable()->constrained('users')->nullOnDelete();
 
             $table->softDeletes();
             $table->timestamps();

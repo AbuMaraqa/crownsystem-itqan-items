@@ -21,10 +21,10 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->json('meta_data')->nullable();
             $table->foreignId('attribute_id')
-            ->index('attribute_id')
+            ->index()
             ->constrained(config('items.table_prefix') . 'attributes')
             ->cascadeOnDelete();
-            $table->foreignId('created_by')->index('created_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('created_by')->index()->nullable()->constrained('users')->nullOnDelete();
 
             $table->softDeletes();
             $table->timestamps();
