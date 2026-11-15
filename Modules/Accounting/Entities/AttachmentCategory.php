@@ -1,0 +1,62 @@
+<?php
+
+namespace Modules\Accounting\Entities;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Entities\User;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
+
+/**
+ * تصنيف المرفق (مثل: فاتورة، بوليصة شحن، شهادة منشأ) يُضاف من اعدادات النظام
+ * ويُختار عند اضافة مرفق الى طلبية شراء تجميعية.
+ */
+class AttachmentCategory extends Model
+{
+    use HasFactory;
+    use LogsActivity;
+    use SoftDeletes;
+
+    protected $fillable = [
+        'name',
+        'created_by',
+    ];
+
+    public function __construct(array $attributes = [])
+    {
+        parent::__construct($attributes);
+
+        $this->setTable(config('accounting.table_prefix').'attachment_categories');
+    }
+
+    /**
+     * خيارات القائمة المنسدلة: المعرّف مقابل الاسم.
+     *
+     * @return array<int, string>
+     */
+    public static function options(): array
+    {
+        return static::query()
+            ->orderBy('name')
+            ->pluck('name', 'id')
+            ->toArray();
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly($this->getFillable())
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn (string $eventName) => "This model has been {$eventName} and value ")
+            ->useLogName(class_basename($this));
+    }
+
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+}

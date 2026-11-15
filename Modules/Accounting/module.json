@@ -1,0 +1,16 @@
+{
+    "name": "Accounting",
+    "alias": "accounting",
+    "description": "Accounting core module with chart of accounts, journals, periods, balances, mappings, and reports.",
+    "keywords": [
+        "accounting",
+        "finance",
+        "ledger"
+    ],
+    "priority": 0,
+    "providers": [
+        "Modules\\Accounting\\Providers\\AccountingServiceProvider",
+        "Modules\\Accounting\\Providers\\InventoryServiceProvider"
+    ],
+    "files": []
+}
