@@ -8,6 +8,7 @@ use Illuminate\Support\Collection;
 use Modules\Branch\Entities\Branch;
 use Modules\Core\Entities\User;
 use Modules\Core\Repositories\Contracts\DashboardRepositoryInterface;
+use Modules\Core\Support\SqlDialect;
 use Modules\Items\Entities\Order;
 use Modules\Items\Entities\Product;
 use Modules\Items\Enums\OrderStatus;
@@ -87,9 +88,7 @@ class DashboardRepository implements DashboardRepositoryInterface
      */
     private function countByMonth(Builder $query, Carbon $from): Collection
     {
-        $month = $query->getConnection()->getDriverName() === 'sqlite'
-            ? "strftime('%Y-%m', created_at)"
-            : "DATE_FORMAT(created_at, '%Y-%m')";
+        $month = SqlDialect::yearMonth('created_at', $query->getConnection());
 
         return $query
             ->where('created_at', '>=', $from)

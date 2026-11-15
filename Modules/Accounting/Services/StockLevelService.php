@@ -148,12 +148,14 @@ class StockLevelService
         $subIds = Product::query()->where('main_product_id', $product->id)->pluck('id')->all();
 
         // بلا فروع: رصيد الصنف نفسه. بفروع: الكمية من الفروع والوزن من صف الصنف الرئيسي.
+        // الشرط المنطقي يُكتب تعبيراً لا ربطاً رقمياً، لأن PostgreSQL لا يقبل عدداً بعد AND/NOT.
+        $hasSubs = $subIds !== [] ? '1 = 1' : '1 = 0';
         $balances = StockBalance::query()
             ->whereIn('product_id', [...$subIds, $product->id])
             ->groupBy('warehouse_id')
             ->selectRaw(
-                'warehouse_id, SUM(CASE WHEN product_id = ? AND ? THEN 0 ELSE quantity END) as quantity, SUM(CASE WHEN product_id = ? OR NOT ? THEN weight ELSE 0 END) as weight',
-                [$product->id, $subIds !== [] ? 1 : 0, $product->id, $subIds !== [] ? 1 : 0]
+                "warehouse_id, SUM(CASE WHEN product_id = ? AND ({$hasSubs}) THEN 0 ELSE quantity END) as quantity, SUM(CASE WHEN product_id = ? OR NOT ({$hasSubs}) THEN weight ELSE 0 END) as weight",
+                [$product->id, $product->id]
             )
             ->get()
             ->keyBy('warehouse_id');

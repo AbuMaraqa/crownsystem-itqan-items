@@ -3,6 +3,7 @@
 namespace Modules\Items\Support;
 
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Support\SqlDialect;
 use Modules\Items\Entities\Category;
 use Modules\Items\Entities\Product;
 
@@ -35,11 +36,11 @@ class ItemCode
 
         $codes = Product::withTrashed()
             ->where('sku', 'like', $prefix)
-            ->whereRaw('CHAR_LENGTH(sku) = ?', [$length])
+            ->whereRaw(SqlDialect::charLength('sku').' = ?', [$length])
             ->pluck('sku')
             ->merge(Category::withTrashed()
                 ->where('code', 'like', $prefix)
-                ->whereRaw('CHAR_LENGTH(code) = ?', [$length])
+                ->whereRaw(SqlDialect::charLength('code').' = ?', [$length])
                 ->pluck('code'));
 
         $last = $codes
@@ -62,8 +63,8 @@ class ItemCode
 
         $length = (int) (DB::table($categories)
             ->whereNull('parent_id')
-            ->whereRaw("code REGEXP '^[0-9]+$'")
-            ->selectRaw('CHAR_LENGTH(code) as code_length, COUNT(*) as total')
+            ->whereRaw(SqlDialect::regexp('code'), ['^[0-9]+$'])
+            ->selectRaw(SqlDialect::charLength('code').' as code_length, COUNT(*) as total')
             ->groupBy('code_length')
             ->orderByDesc('total')
             ->orderByDesc('code_length')
@@ -72,8 +73,8 @@ class ItemCode
         $pattern = '^[0-9]{'.$length.'}$';
 
         $last = max(
-            (int) DB::table($categories)->whereRaw('code REGEXP ?', [$pattern])->max(DB::raw('CAST(code AS UNSIGNED)')),
-            (int) DB::table($products)->whereRaw('sku REGEXP ?', [$pattern])->max(DB::raw('CAST(sku AS UNSIGNED)')),
+            (int) DB::table($categories)->whereRaw(SqlDialect::regexp('code'), [$pattern])->max(DB::raw(SqlDialect::castInteger('code'))),
+            (int) DB::table($products)->whereRaw(SqlDialect::regexp('sku'), [$pattern])->max(DB::raw(SqlDialect::castInteger('sku'))),
         );
 
         return str_pad((string) ($last + 1), $length, '0', STR_PAD_LEFT);
