@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Schema;
  *
  * MySQL يسمح بعدة NULL في الفهرس الفريد، فيكون القيد على عمود مولَّد يجعل
  * "بلا وحدة" صفراً. ويلزم ان يكون VIRTUAL: العمود STORED يرفض قيداً اجنبياً
- * بحذف متتالٍ على عموده الاساسي (product_unit_id).
+ * بحذف متتالٍ على عموده الاساسي (product_unit_id). على PostgreSQL يكون STORED.
  */
 return new class extends Migration
 {
@@ -23,7 +23,11 @@ return new class extends Migration
             $table->foreignId('price_list_id')->constrained($prefix.'price_lists')->cascadeOnDelete();
             $table->foreignId('product_id')->constrained($prefix.'products')->cascadeOnDelete();
             $table->foreignId('product_unit_id')->nullable()->constrained($prefix.'product_units')->cascadeOnDelete();
-            $table->unsignedBigInteger('unit_key')->virtualAs('COALESCE(`product_unit_id`, 0)');
+            // PostgreSQL (قبل 18) لا يعرف الا STORED، ولا يمنع فيه القيد الاجنبي على العمود الاساسي.
+            $unitKey = $table->unsignedBigInteger('unit_key');
+            in_array(Schema::getConnection()->getDriverName(), ['mysql', 'mariadb'], true)
+                ? $unitKey->virtualAs('COALESCE(`product_unit_id`, 0)')
+                : $unitKey->storedAs('COALESCE(product_unit_id, 0)');
             $table->decimal('sell_price', 18, 4)->default(0);
             $table->decimal('buy_price', 18, 4)->default(0);
             $table->foreignId('source_price_list_id')->nullable()->constrained($prefix.'price_lists')->nullOnDelete();

@@ -349,15 +349,31 @@ final class ItemsSearchIndex
 
         $rows = [];
         $bindings = [];
+        $mysql = in_array(DB::getDriverName(), ['mysql', 'mariadb'], true);
 
         foreach ($documents as $id => $document) {
-            $rows[] = $rows === [] ? 'SELECT ? AS `id`, ? AS `document`' : 'SELECT ?, ?';
+            $rows[] = match (true) {
+                ! $mysql => 'SELECT CAST(? AS BIGINT), CAST(? AS TEXT)',
+                $rows === [] => 'SELECT ? AS `id`, ? AS `document`',
+                default => 'SELECT ?, ?',
+            };
             $bindings[] = $id;
             $bindings[] = $document;
         }
 
         $table = DB::getTablePrefix().config('items.table_prefix').'categories';
         $column = SearchCapabilities::CATEGORY_COLUMN;
+
+        if (! $mysql) {
+            // صيغة PostgreSQL: UPDATE ... FROM بدل UPDATE ... JOIN.
+            DB::update(
+                "UPDATE \"{$table}\" AS target SET \"{$column}\" = documents.document FROM ("
+                .implode(' UNION ALL ', $rows).') AS documents (id, document) WHERE documents.id = target.id',
+                $bindings
+            );
+
+            return;
+        }
 
         DB::update(
             "UPDATE `{$table}` AS `target` JOIN (".implode(' UNION ALL ', $rows).') AS `documents` ON `documents`.`id` = `target`.`id` '
