@@ -2,7 +2,7 @@
 
 namespace Modules\Items\Enums;
 
-use Filament\Support\Contracts\HasLabel;
+use Modules\Core\Contracts\HasLabel;
 
 /**
  * اساس تسعير بند الخدمة. الحساب واحد في كل الحالات (الكمية × السعر)، ويحدد

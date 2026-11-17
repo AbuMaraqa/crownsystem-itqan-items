@@ -2,7 +2,7 @@
 
 namespace Modules\Core\Enums;
 
-use Filament\Support\Contracts\HasLabel;
+use Modules\Core\Contracts\HasLabel;
 
 enum EmailStatus: int implements HasLabel
 {

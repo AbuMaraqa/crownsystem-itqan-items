@@ -212,10 +212,7 @@ class PurchaseOrder extends Model implements HasMedia
 
         try {
             foreach ($files as $file) {
-                if (
-                    ! $file instanceof \Illuminate\Http\UploadedFile &&
-                    ! ($file instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile)
-                ) {
+                if (! $file instanceof \Illuminate\Http\UploadedFile) {
                     continue;
                 }
 

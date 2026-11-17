@@ -95,7 +95,7 @@ class Brand extends Model implements TranslatableContract , HasMedia
     /**
      * Upload a brand image.
      *
-     * @param array|\Illuminate\Http\UploadedFile|\Livewire\Features\SupportFileUploads\TemporaryUploadedFile $file
+     * @param array|\Illuminate\Http\UploadedFile $file
      * @return \Spatie\MediaLibrary\MediaCollections\Models\Media|null
      */
 /*******  70a8a3b8-825d-4a6c-8087-cf20646cda83  *******/    public function addImage($file)
@@ -105,10 +105,7 @@ class Brand extends Model implements TranslatableContract , HasMedia
         }
 
         // التحقق من نوع الملف
-        if (
-            !$file instanceof \Illuminate\Http\UploadedFile &&
-            !($file instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile)
-        ) {
+        if (! $file instanceof \Illuminate\Http\UploadedFile) {
             return null;
         }
 

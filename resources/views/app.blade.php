@@ -14,7 +14,7 @@
         @if ($faviconUrl)
             <link rel="icon" href="{{ $faviconUrl }}">
         @endif
-        {{-- نسخة مستقلة من Vite: صفحات Livewire تبقى على البناء الافتراضي (مهم مع Octane) --}}
+        {{-- نسخة مستقلة من Vite حتى لا يتغير مُعِدّ Vite المشترك بين الطلبات (مهم مع Octane) --}}
         {{ (clone app(\Illuminate\Foundation\Vite::class))->useHotFile(public_path('admin.hot'))->useBuildDirectory('build-admin')->withEntryPoints(['resources/js/app.ts']) }}
         <style id="app-theme">{!! $theme->css() !!}</style>
         <script>try{if(localStorage.getItem('theme')==='dark')document.documentElement.classList.add('dark')}catch(e){}</script>

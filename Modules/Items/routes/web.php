@@ -35,6 +35,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::get('/', 'index')->name('index')->can('Category View List');
                     Route::get('/add', 'add')->name('add')->can('Category Create');
                     Route::post('/', 'store')->name('store')->can('Category Create');
+                    Route::post('/quick', 'quickStore')->name('quick-store')->can('Category Create');
                     Route::delete('/', 'destroyMany')->name('destroy-many')->can('Category Delete');
                     Route::get('/{category}/edit', 'edit')->whereNumber('category')->name('edit')->can('Category Update');
                     Route::put('/{category}', 'update')->whereNumber('category')->name('update')->can('Category Update');

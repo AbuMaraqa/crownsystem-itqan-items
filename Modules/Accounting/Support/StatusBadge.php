@@ -2,8 +2,8 @@
 
 namespace Modules\Accounting\Support;
 
-use Filament\Support\Contracts\HasColor;
-use Filament\Support\Contracts\HasLabel;
+use Modules\Core\Contracts\HasColor;
+use Modules\Core\Contracts\HasLabel;
 
 /**
  * شارة الحالة في لوحة Vue: النص واللون من التعداد نفسه (getLabel/getColor)، فلا تُكتب

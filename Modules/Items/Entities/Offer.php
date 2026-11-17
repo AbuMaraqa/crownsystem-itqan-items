@@ -111,10 +111,7 @@ class Offer extends Model implements TranslatableContract , HasMedia
             $file = reset($file);
         }
 
-        if (
-            !$file instanceof \Illuminate\Http\UploadedFile &&
-            !($file instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile)
-        ) {
+        if (! $file instanceof \Illuminate\Http\UploadedFile) {
             return null;
         }
 

@@ -2,7 +2,7 @@
 
 namespace Modules\Items\Enums;
 
-use Filament\Support\Contracts\HasLabel;
+use Modules\Core\Contracts\HasLabel;
 
 /**
  * سيريال الصنف: سيريال لكل قطعة، او سيريال بكمية.

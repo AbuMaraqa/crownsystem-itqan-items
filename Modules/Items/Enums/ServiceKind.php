@@ -2,7 +2,7 @@
 
 namespace Modules\Items\Enums;
 
-use Filament\Support\Contracts\HasLabel;
+use Modules\Core\Contracts\HasLabel;
 
 /**
  * نوع الخدمة يحدد حسابي ايرادها وتكلفتها الافتراضيين: خدمات النقل لها حساب

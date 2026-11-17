@@ -2,7 +2,7 @@
 
 namespace Modules\Items\Enums;
 
-use Filament\Support\Contracts\HasLabel;
+use Modules\Core\Contracts\HasLabel;
 
 /**
  * الكمية المجانية في سطر الصنف: في البيع او الشراء او كليهما.

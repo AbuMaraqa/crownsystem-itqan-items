@@ -2,7 +2,7 @@
 
 namespace Modules\Items\Enums;
 
-use Filament\Support\Contracts\HasLabel;
+use Modules\Core\Contracts\HasLabel;
 
 /**
  * مصدر تكلفة الخدمة: داخلية (عمال الشركة ومعداتها، تُحمَّل بالتكلفة المعيارية)،

@@ -2,8 +2,8 @@
 
 namespace Modules\Accounting\Enums;
 
-use Filament\Support\Contracts\HasColor;
-use Filament\Support\Contracts\HasLabel;
+use Modules\Core\Contracts\HasColor;
+use Modules\Core\Contracts\HasLabel;
 
 enum PaymentVoucherStatus: int implements HasColor, HasLabel
 {

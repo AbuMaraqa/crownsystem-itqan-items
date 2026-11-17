@@ -2,8 +2,8 @@
 
 namespace Modules\Accounting\Enums;
 
-use Filament\Support\Contracts\HasColor;
-use Filament\Support\Contracts\HasLabel;
+use Modules\Core\Contracts\HasColor;
+use Modules\Core\Contracts\HasLabel;
 use Modules\Accounting\Support\StockLimits;
 use Modules\Accounting\Support\StockStatus;
 use Modules\Items\Entities\Product;

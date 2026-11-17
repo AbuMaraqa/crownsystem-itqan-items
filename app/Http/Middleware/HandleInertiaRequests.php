@@ -14,7 +14,7 @@ use Tighten\Ziggy\Ziggy;
 
 /**
  * ما تحتاجه كل صفحة Inertia في لوحة التحكم: المستخدم وصلاحياته، القائمة الجانبية، النصوص،
- * اللغات، والمسارات (Ziggy). صفحات Livewire القديمة لا تمر من هنا.
+ * اللغات، والمسارات (Ziggy).
  */
 class HandleInertiaRequests extends Middleware
 {

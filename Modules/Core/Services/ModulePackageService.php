@@ -5,6 +5,7 @@ namespace Modules\Core\Services;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Modules\Core\Entities\User;
+use Nwidart\Modules\Facades\Module;
 
 class ModulePackageService
 {
@@ -87,6 +88,31 @@ class ModulePackageService
                 'is_active' => true
             ]);
         }
+
+        return true;
+    }
+
+    /**
+     * تفعيل باقة للنظام كله: تُعطَّل كل الوحدات ثم تُفعَّل وحدات الباقة وحدها.
+     * تُفحص الباقة قبل تعطيل اي وحدة، وإلا عطّل اسمٌ غير معروف كل الوحدات.
+     */
+    public function activate(string $featureKey): bool
+    {
+        $package = $this->getFeature($featureKey);
+
+        if (empty($package['modules'])) {
+            return false;
+        }
+
+        foreach (Module::allEnabled() as $module) {
+            $module->disable();
+        }
+
+        foreach ($package['modules'] as $moduleName) {
+            Module::findOrFail($moduleName)->enable();
+        }
+
+        session()->put('selected_module', $featureKey);
 
         return true;
     }

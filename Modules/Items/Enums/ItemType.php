@@ -2,7 +2,7 @@
 
 namespace Modules\Items\Enums;
 
-use Filament\Support\Contracts\HasLabel;
+use Modules\Core\Contracts\HasLabel;
 
 /**
  * طبيعة الصنف: سلعة تُباع من البضاعة، او خدمة تُقدَّم للعميل (معالجة، نقل ...)

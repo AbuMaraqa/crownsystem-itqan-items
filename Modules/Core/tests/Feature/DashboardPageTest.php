@@ -9,12 +9,14 @@ use Inertia\Testing\AssertableInertia as Assert;
 use Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter;
 use Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect;
 use Modules\Core\Entities\User;
+use Modules\Core\Enums\UserRole;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
- * لوحة البداية بتصميم malbo (Inertia + Vue): كل ودجت بصلاحيتها فقط، وصفحات Livewire القديمة
- * تُفتح من اللوحة الجديدة بتحميل كامل.
+ * لوحة البداية بتصميم malbo (Inertia + Vue): كل ودجت بصلاحيتها فقط، ومحدد باقة الوحدات
+ * للمدير الاعلى وحده.
  */
 class DashboardPageTest extends TestCase
 {
@@ -115,28 +117,28 @@ class DashboardPageTest extends TestCase
             ->assertUnprocessable();
     }
 
-    public function test_an_inertia_visit_to_a_livewire_page_turns_into_a_full_load(): void
+    public function test_the_module_selector_is_for_the_super_admin_only(): void
     {
-        // قائمة فواتير البيع ما زالت صفحة Livewire؛ عند نقلها يُختار هنا مسار آخر لم يُنقل.
-        $url = route('accounting.sales-invoices.index');
-        // النسخة الصحيحة، حتى لا يكون 409 بسبب اختلاف نسخة الاصول بدل الوسيط الذي نختبره.
-        $version = app(HandleInertiaRequests::class)->version(Request::create($url));
+        $this->actingAs($this->userWith([]))->get(route('module-selector'))->assertForbidden();
+        $this->post(route('module-selector.select'), ['package' => 'core_store'])->assertForbidden();
 
-        $this->actingAs($this->userWith(['Sales Invoice View List']))
-            ->get($url, ['X-Inertia' => 'true', 'X-Inertia-Version' => $version])
-            ->assertStatus(409)
-            ->assertHeader('X-Inertia-Location', $url);
-    }
+        $admin = $this->userWith([]);
+        $admin->assignRole(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value, 'guard_name' => 'web']));
 
-    public function test_a_normal_visit_to_a_livewire_page_is_unchanged(): void
-    {
-        $this->actingAs($this->userWith(['Sales Invoice View List']))
-            ->get(route('accounting.sales-invoices.index'))
+        $this->actingAs($admin)
+            ->get(route('module-selector'))
             ->assertOk()
-            ->assertHeaderMissing('X-Inertia');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Core/ModuleSelector/Index')
+                ->where('packages.0.key', 'core_store')
+                ->has('packages.0.modules')
+                ->etc());
+
+        // باقة غير معروفة ترفض قبل تعطيل اي وحدة.
+        $this->post(route('module-selector.select'), ['package' => 'unknown'])->assertSessionHasErrors('package');
     }
 
-    public function test_an_inertia_visit_to_a_moved_page_stays_inertia(): void
+    public function test_an_inertia_visit_to_a_page_stays_inertia(): void
     {
         $url = route('users.index');
         $version = app(HandleInertiaRequests::class)->version(Request::create($url));

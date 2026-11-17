@@ -3,7 +3,7 @@
 namespace Modules\Core\Services;
 
 use BackedEnum;
-use Filament\Support\Contracts\HasLabel;
+use Modules\Core\Contracts\HasLabel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\DatabaseNotification;

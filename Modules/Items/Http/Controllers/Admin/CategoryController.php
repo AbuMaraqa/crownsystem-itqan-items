@@ -86,6 +86,24 @@ class CategoryController extends Controller
         return to_route('categories.index')->with('success', __('Category created successfully'));
     }
 
+    /**
+     * انشاء تصنيف من داخل نموذج الصنف (زر + بجانب حقل التصنيفات) دون مغادرته، ويعيد
+     * التصنيف الجديد ليُختار في الحقل مباشرة.
+     */
+    public function quickStore(CategoryRequest $request): JsonResponse
+    {
+        $data = $request->validated();
+
+        $category = $this->categoryService->create(
+            $this->attributes($data),
+            Translations::fromForm($data, app()->getLocale(), self::TRANSLATED),
+            $request->file('image'),
+            $request->user()->id,
+        );
+
+        return response()->json(['value' => (int) $category->id, 'label' => (string) $category->name], 201);
+    }
+
     public function edit(int $category): Response
     {
         /** @var Category $model */

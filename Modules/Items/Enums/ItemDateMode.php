@@ -2,7 +2,7 @@
 
 namespace Modules\Items\Enums;
 
-use Filament\Support\Contracts\HasLabel;
+use Modules\Core\Contracts\HasLabel;
 
 /**
  * تاريخ سطر الصنف: دفعات بتاريخ يُختار منها عند البيع، او تاريخ يُدخل بحرية.

@@ -5,7 +5,6 @@ namespace Modules\Core\Entities;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Http\UploadedFile;
-use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Modules\Core\Settings\GeneralSettings;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
@@ -33,21 +32,12 @@ class Settings extends Model implements HasMedia
             $logo = reset($logo);
         }
 
-        if ($logo instanceof TemporaryUploadedFile && $logo->exists()) {
-            $this->addLogo($logo);
-        }
+        $this->addLogo($logo);
     }
 
     public function addLogo($file)
     {
-        if (
-            !$file instanceof \Illuminate\Http\UploadedFile &&
-            !($file instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile)
-        ) {
-            return;
-        }
-
-        if ($file instanceof TemporaryUploadedFile && ! $file->exists()) {
+        if (! $file instanceof UploadedFile || ! $file->isValid()) {
             return;
         }
 

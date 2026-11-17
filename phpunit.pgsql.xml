@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    تشغيل الاختبارات على MySQL بدل SQLite.
+    السبب: عدة ترحيلات تستخدم اسم فهرس صريح مطابق لاسم العمود (created_by، parent_id ...).
+    اسم الفهرس في MySQL محلي للجدول، اما في SQLite فهو عام على قاعدة البيانات، فتتصادم الاسماء
+    ويفشل migrate قبل تشغيل اي اختبار. الاختبار على MySQL يطابق بيئة الانتاج ايضاً.
+
+    الاستخدام: vendor/bin/phpunit -c phpunit.mysql.xml
+-->
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+>
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+        <testsuite name="Modules">
+            <directory>Modules/*/tests</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>app</directory>
+            <directory>Modules</directory>
+        </include>
+    </source>
+    <php>
+        <env name="APP_ENV" value="testing" force="true"/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file" force="true"/>
+        <env name="BCRYPT_ROUNDS" value="4" force="true"/>
+        <env name="CACHE_STORE" value="array" force="true"/>
+        <env name="DB_CONNECTION" value="pgsql" force="true"/>
+        <env name="DB_HOST" value="127.0.0.1" force="true"/>
+        <env name="DB_PORT" value="5432" force="true"/>
+        <!-- غير مفروضين: يمكن تمريرهما من متغيرات البيئة DB_USERNAME وDB_PASSWORD عند التشغيل. -->
+        <env name="DB_USERNAME" value="postgres"/>
+        <env name="DB_PASSWORD" value=""/>
+        <env name="DB_DATABASE" value="crownsystem_test_pgsql" force="true"/>
+        <env name="MAIL_MAILER" value="array" force="true"/>
+        <env name="PULSE_ENABLED" value="false" force="true"/>
+        <env name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <env name="SESSION_DRIVER" value="array" force="true"/>
+        <env name="TELESCOPE_ENABLED" value="false" force="true"/>
+    </php>
+</phpunit>

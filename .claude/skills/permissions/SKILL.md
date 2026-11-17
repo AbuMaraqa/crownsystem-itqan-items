@@ -1,6 +1,6 @@
 ---
 name: permissions
-description: Roles & permissions conventions for crownsystem (Spatie Permission, no policies, no Gate::before). Use whenever adding a page, route, sidebar item, Livewire action, Filament table action, button, or any feature that must be authorized, and whenever creating/seeding permissions or roles.
+description: Roles & permissions conventions for crownsystem (Spatie Permission, no policies, no Gate::before). Use whenever adding a page, route, sidebar item, controller action, Vue button, or any feature that must be authorized, and whenever creating/seeding permissions or roles.
 ---
 
 # Roles & Permissions — crownsystem
@@ -62,21 +62,21 @@ Frontend hiding is not security. A feature is authorized only when ALL applicabl
 
 | Layer | Pattern |
 |---|---|
-| Route | `Route::get('/', Index::class)->name('index')->can('X View List');` — every route, no exceptions. `add` → `Create`, `edit` → `Update` (or `View List` when one Form is also the read-only viewer), `pdf` → `View`/`View List`. Never `middleware('permission:…')`. |
-| Livewire action | first line of every mutating method: `$this->authorize('X Post');` (or `$this->authorize($this->record ? 'X Update' : 'X Create');`). Do NOT use `abort_unless(auth()->user()->can(...))` in new code. |
-| Filament table action / column | `->visible(fn () => auth()->user()->can('X Delete'))` |
-| Blade button | `@can('X Post') … @endcan` |
+| Route | `Route::get('/', 'index')->name('index')->can('X View List');` — every route (GET and every POST/PUT/DELETE), no exceptions. `add`/`store` → `Create`, `edit`/`update` → `Update`, `destroy` → `Delete`, workflow endpoints → their verb (`post` → `X Post`), `pdf` → `View`/`View List`. Never `middleware('permission:…')`. |
+| Endpoint shared by create and edit (lookups, previews) | `->middleware(\Modules\Accounting\Http\Middleware\AuthorizeAnyPermission::class.':X Create,X Update')` on the route or group — passes when the user has any of the listed permissions. |
+| FormRequest / controller | `authorize()` returns `true` (the route decides). When one action does more depending on input (e.g. "save and post"), the controller checks the extra permission: `Gate::authorize('X Post');`. |
+| Vue button / column / menu item | hide with `can('X Post')` from `@/lib/i18n` (`v-if="can('X Delete')"`). |
 | Sidebar | `new SidebarItem('Title', 'solar-…-bold-duotone', ['X View List'], 'module.section.index')` — the SAME permission as the route. |
 
 Do not authorize one entity with another entity's permission (e.g. `Sales Order Update` on a production page) unless the action really mutates that other entity.
 
 ## 5. Roles UI must know the new names
 
-`Modules/Core/Livewire/Pages/Roles/Index.php` groups and translates permissions with hard-coded maps. When adding a new entity or action word, update in that file:
-- `splitPermissionName()` → add any new action suffix (longer suffixes before shorter ones).
-- action sort map → give the new action an order.
-- `translateModuleName()` → `'<Entity>' => '<Arabic plural>'`.
-- `translatePermissionAction()` → `'<Action>' => '<Arabic verb noun>'`.
+`Modules/Core/Support/PermissionLabels.php` groups and translates permissions for the roles screen with constant maps. When adding a new entity or action word, update in that file:
+- `ACTIONS` → add any new action suffix (longest first: `View List` before `View`).
+- `ACTION_WEIGHTS` → give the new action an order.
+- `AR_MODULES` → `'<Entity>' => '<Arabic plural>'`.
+- `AR_ACTIONS` → `'<Action>' => '<Arabic verb noun>'`.
 
 Also add the full permission names and the `"<Entity> Management"` group to the module's `Lang/ar.json` (Modern Standard Arabic — see the `translations` skill).
 
@@ -85,8 +85,8 @@ Also add the full permission names and the `"<Entity> Management"` group to the 
 - [ ] Names follow `<Entity> <Action>`; group is `<Entity> Management`.
 - [ ] Added to the module registry class `GROUPS`; migration calls `sync()`; seeder calls `sync()`.
 - [ ] Super Admin receives them (via `sync()`).
-- [ ] Every route has `->can()`.
-- [ ] Every mutating Livewire method starts with `$this->authorize()`.
-- [ ] Buttons/actions hidden with `@can` / `->visible()`.
+- [ ] Every route (including POST/PUT/DELETE and JSON endpoints) has `->can()` or `AuthorizeAnyPermission`.
+- [ ] Extra permissions decided by input are checked in the controller with `Gate::authorize()`.
+- [ ] Vue buttons/actions hidden with `can('...')`.
 - [ ] Sidebar item uses the route's permission.
-- [ ] Roles UI maps + `ar.json` updated.
+- [ ] `PermissionLabels` maps + `ar.json` updated.

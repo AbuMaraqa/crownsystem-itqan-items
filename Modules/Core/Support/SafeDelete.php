@@ -4,7 +4,7 @@ namespace Modules\Core\Support;
 
 use Closure;
 use Illuminate\Database\QueryException;
-use Masmerise\Toaster\Toaster;
+use Illuminate\Support\Facades\DB;
 
 /**
  * حذف سجل من البيانات الاساسية: اذا كان مرتبطاً بسجلات اخرى ترفض قاعدة البيانات حذفه،
@@ -13,32 +13,20 @@ use Masmerise\Toaster\Toaster;
 class SafeDelete
 {
     /**
-     * صفحات Livewire: الرسالة تظهر عبر Toaster.
-     */
-    public static function run(Closure $delete): bool
-    {
-        if (self::attempt($delete)) {
-            return true;
-        }
-
-        Toaster::error(self::message());
-
-        return false;
-    }
-
-    /**
-     * بلا واجهة: false اذا رفضت قاعدة البيانات الحذف لارتباط السجل. صفحات Inertia تعيد
+     * false اذا رفضت قاعدة البيانات الحذف لارتباط السجل. صفحات Inertia تعيد
      * self::message() في flash.error.
      */
     public static function attempt(Closure $delete): bool
     {
         try {
-            $delete();
+            // داخل معاملة (نقطة حفظ إن كانت هناك معاملة أعلى): على PostgreSQL يُبطل
+            // الخطأ المعاملة كلها، فالتراجع إلى نقطة الحفظ يُبقي ما بعده صالحاً.
+            DB::transaction(fn () => $delete());
 
             return true;
         } catch (QueryException $exception) {
-            // 23000: مخالفة قيد سلامة مرجعية.
-            if ((string) $exception->getCode() !== '23000') {
+            // مخالفة قيد مرجعي: 23000 في MySQL/SQLite، و23503 في PostgreSQL.
+            if (! in_array((string) $exception->getCode(), ['23000', '23503'], true)) {
                 throw $exception;
             }
 

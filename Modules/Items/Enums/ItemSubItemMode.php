@@ -2,7 +2,7 @@
 
 namespace Modules\Items\Enums;
 
-use Filament\Support\Contracts\HasLabel;
+use Modules\Core\Contracts\HasLabel;
 
 /**
  * تفاصيل تحت سطر الصنف: مقاطع الالمنيوم، او مكونات الصنف التجميعي.

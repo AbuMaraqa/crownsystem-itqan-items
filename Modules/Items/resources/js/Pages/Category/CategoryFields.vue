@@ -46,7 +46,7 @@ defineProps<{
             </div>
         </Card>
         <Card>
-            <ImageUpload v-model="form.image" v-model:removed="form.removed_image" :existing="images" :label="t('Image')" required :error="form.errors.image" />
+            <ImageUpload v-model="form.image" v-model:removed="form.removed_image" :existing="images" :label="t('Image')" :error="form.errors.image" />
         </Card>
     </div>
 </template>

@@ -2,9 +2,8 @@
 
 namespace Modules\Core\Enums;
 
-use Filament\Support\Colors\Color;
-use Filament\Support\Contracts\HasColor;
-use Filament\Support\Contracts\HasLabel;
+use Modules\Core\Contracts\HasColor;
+use Modules\Core\Contracts\HasLabel;
 
 enum TransactionType: string implements HasLabel, HasColor
 {
@@ -26,11 +25,11 @@ enum TransactionType: string implements HasLabel, HasColor
     public function getColor(): ?string
     {
         return match ($this) {
-            self::Refund => Color::Red,
-            self::GeneralExpense => Color::Orange,
+            self::Refund => 'danger',
+            self::GeneralExpense => 'warning',
 
-            self::PrepaymentDeposit => Color::Blue,
-            self::OtherIncome => Color::Green,
+            self::PrepaymentDeposit => 'info',
+            self::OtherIncome => 'success',
         };
 
         // أو يمكنك استخدام أسماء الألوان النصية: 'danger', 'warning', 'primary', 'success'

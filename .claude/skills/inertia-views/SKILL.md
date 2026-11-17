@@ -1,13 +1,12 @@
 ---
 name: inertia-views
-description: The control panel's structure taken from malbo — Inertia 3 + Vue 3 + TypeScript + Tailwind 4 pages with Controller → Service → Repository on the server. Use whenever creating, moving or editing an admin page, list table, form, modal, route, sidebar entry or dashboard widget. Livewire pages are legacy and are being moved here module by module.
+description: The control panel's structure taken from malbo — Inertia 3 + Vue 3 + TypeScript + Tailwind 4 pages with Controller → Service → Repository on the server. Use whenever creating or editing an admin page, list table, form, modal, route, sidebar entry, dashboard widget or PDF.
 ---
 
 # Admin pages (Inertia + Vue) — crownsystem
 
 The panel follows malbo (`C:\laragon\www\malbo`, read only): same shell, same components, same layering.
-New pages are written here. A Livewire page is moved here when its section is touched; it keeps its
-route names, so links and permissions do not change.
+Every admin page is written here; there is no Livewire, Filament, Jetstream or Alpine in the project.
 
 Reference implementation: **Core** (`Modules/Core/Http/Controllers/Admin/*`, `Modules/Core/resources/js/Pages/*`).
 Users (`UserController`, `Users/{Index,Add,Edit,UserFields}.vue`) is the fullest example.
@@ -82,11 +81,36 @@ load with `defineAsyncComponent`.
 `t('English key')` in Vue, `__('English key')` in PHP; Arabic (MSA) in the module `Lang/ar.json`
 (see the `translations` skill). The shell's texts live in `Modules/Core/Lang/ar.json`.
 
-## 8. Build and tests
+## 8. Sidebar
 
-- Separate build: `npm run dev:admin` / `npm run build:admin` (`vite.admin.config.ts`, Tailwind 4, `public/build-admin`).
-  Livewire pages keep `npm run dev` (Tailwind 3). Type check: `npm run typecheck`.
+`Modules\Core\Services\{SidebarService, SidebarGroup, SidebarItem}`, registered in the module's
+`Providers/SidebarServiceProvider.php` (or the area's own ServiceProvider, e.g. `InventoryServiceProvider`):
+
+```php
+$this->app->make(SidebarService::class)->add(
+    (new SidebarGroup('Warehouses & Stock', 'solar-box-bold-duotone', [], 81))
+        ->add(new SidebarItem('Goods Receipts', 'solar-inbox-in-bold-duotone', ['Goods Receipt View List'], 'accounting.inventory.goods-receipts.index'))
+);
+```
+
+Shared to Vue by `HandleInertiaRequests` (`sidebar`). Titles are English keys translated with `t()`, so add each
+to `ar.json`; add a new icon name to `Components/layout/navIcons.ts` (unknown names show `fallbackNavIcon`). Item permission = the route's permission.
+
+## 9. PDF
+
+PDFs stay Blade + mPDF (no Vue):
+
+- View in `Modules/<M>/resources/views/pdf/`, `dir="rtl"`, using `core::pdf.partials.{styles,header,footer}`.
+  Documents of one area share a layout: the child view extends `<module>::pdf.<area>.layout`
+  (e.g. `accounting::pdf.inventory.layout`), sets `$docTitle`, `$meta`, `$signatures` and fills `@section('items')`.
+- Rendered by a service extending `Modules\Core\Services\PdfService` (`AccountingPdfService`, `InventoryPdfService`,
+  `ItemsPdfService`) → `streamPdf($view, $data, $filename)`.
+- Routed through a controller, never a closure, with `->can('<Entity> View List')` (or `View`). Use an array action
+  (`[GoodsReceiptController::class, 'pdf']`, `[AccountingPrintController::class, 'receiptVoucher']`); never a bare
+  `'pdf'` string action inside a `->controller()` group, because `PDF` is a class alias (laravel-mpdf facade).
+
+## 10. Build and tests
+
+- `npm run dev` / `npm run build` (`vite.admin.config.ts`, Tailwind 4, `public/build-admin`). Type check: `npm run typecheck`.
 - Tests: feature tests with `assertInertia`; skip the locale redirect with
   `$this->withoutMiddleware([LocaleSessionRedirect::class, LaravelLocalizationRedirectFilter::class])`.
-- An Inertia link to a Livewire page that is not moved yet turns into a full load
-  (`App\Http\Middleware\LeaveInertiaForLegacyPages`).

@@ -2,9 +2,9 @@
 
 namespace Modules\Core\Enums;
 
-use Filament\Support\Contracts\HasLabel;
-use Filament\Support\Contracts\HasColor;
-use Filament\Support\Contracts\HasIcon;
+use Modules\Core\Contracts\HasLabel;
+use Modules\Core\Contracts\HasColor;
+use Modules\Core\Contracts\HasIcon;
 
 enum UserRole: string implements HasLabel, HasColor, HasIcon
 {

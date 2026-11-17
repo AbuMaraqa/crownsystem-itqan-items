@@ -6,12 +6,10 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
-use Livewire\Livewire;
 use Modules\Accounting\Entities\SalesQuotation;
 use Modules\Accounting\Enums\SalesQuotationStatus;
 use Modules\Accounting\tests\Unit\ConsolidatedTestFactory;
 use Modules\Core\Entities\User;
-use Modules\Core\Livewire\HeaderNotification;
 use Inertia\Testing\AssertableInertia as Assert;
 use Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter;
 use Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect;
@@ -136,28 +134,25 @@ class DocumentNotificationTest extends TestCase
         $id = $user->notifications()->firstOrFail()->id;
         $foreignId = $stranger->notifications()->firstOrFail()->id;
 
-        $this->actingAs($user);
+        $this->actingAs($user)->withoutMiddleware([LocaleSessionRedirect::class, LaravelLocalizationRedirectFilter::class]);
 
-        Livewire::test(HeaderNotification::class)
+        // الجرس يعرض اشعارات المستخدم وحده.
+        $this->getJson(route('notifications.latest'))
             ->assertOk()
-            ->assertSee('Hello')
-            ->assertDontSee('Private')
-            ->call('toggleRead', $id)
-            ->assertHasNoErrors();
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.title', 'Hello');
+
+        $this->post(route('notifications.toggle', $id))->assertRedirect();
         $this->assertNotNull(DatabaseNotification::find($id)->read_at);
 
-        Livewire::test(HeaderNotification::class)->call('toggleRead', $id);
+        $this->post(route('notifications.toggle', $id))->assertRedirect();
         $this->assertNull(DatabaseNotification::find($id)->read_at);
 
-        // الحدث الحي يصل مع بيانات الاشعار.
-        Livewire::test(HeaderNotification::class)->dispatch('notification-received', id: $id)->assertOk();
-
-        Livewire::test(HeaderNotification::class)->call('markAllAsRead');
+        $this->post(route('notifications.read'))->assertRedirect();
         $this->assertSame(0, $service->unreadCount($user));
 
         // صفحة الاشعارات (Inertia) تعرض اشعارات المستخدم وحده.
-        $this->withoutMiddleware([LocaleSessionRedirect::class, LaravelLocalizationRedirectFilter::class])
-            ->get(route('notifications.index'))
+        $this->get(route('notifications.index'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->has('table.data', 1)->where('table.data.0.title', 'Hello'));
         $this->assertContains('can:Notification View List', app('router')->getRoutes()->getByName('notifications.index')->gatherMiddleware());

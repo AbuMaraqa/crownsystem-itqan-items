@@ -2,7 +2,7 @@
 
 namespace Modules\Accounting\Enums;
 
-use Filament\Support\Contracts\HasLabel;
+use Modules\Core\Contracts\HasLabel;
 
 enum ChequeDirection: int implements HasLabel
 {

@@ -7,7 +7,7 @@ description: Backend structure conventions for crownsystem (nwidart modules) —
 
 Laravel 12 + `nwidart/laravel-modules`. Active modules: **Core** (users, roles, settings, shared UI/services), **Items** (products, categories, orders), **Accounting** (accounts, sales/purchase docs, inventory, production), **Branch**, **GeoLocation**. There is no `app/Models`.
 
-Companion skills: `permissions`, `livewire-views`, `global-components`, `translations`.
+Companion skills: `inertia-views`, `permissions`, `global-components`, `translations`.
 
 ## 1. Module layout — put each thing in its folder
 
@@ -15,19 +15,20 @@ Companion skills: `permissions`, `livewire-views`, `global-components`, `transla
 Modules/<Module>/
 ├── Entities/                 models (namespace Modules\<Module>\Entities)
 ├── Entities/Concerns/        model traits shared by several models (IsInventoryDocument…)
-├── Enums/                    backed enums (HasLabel + HasColor)
+├── Enums/                    backed enums (Modules\Core\Contracts\HasLabel + HasColor)
 ├── Services/                 business logic, one service per document/process; Services/Concerns/ for shared parts
+├── Repositories/             named reads + tableQuery(); Repositories/Contracts/ for the interfaces
 ├── Support/                  small static helpers, registries (Number, QuickCreate, <Area>Permissions)
-├── Livewire/Pages/<Section>/ pages          (see livewire-views)
-├── Livewire/Concerns/        Livewire traits
-├── Http/Controllers/         thin controllers (PDF/print/API only)
+├── Http/Controllers/Admin/   thin Inertia controllers (see inertia-views); PDF/print/API controllers
+├── Http/Requests/Admin/      FormRequests (validation)
 ├── Transformers/             API resources
 ├── Console/Commands/
 ├── Providers/                <Module>ServiceProvider, RouteServiceProvider, SidebarServiceProvider, <Area>ServiceProvider
 ├── config/config.php         table_prefix, module settings
 ├── database/{migrations,seeders,factories}
 ├── Lang/ar.json
-├── resources/views/
+├── resources/js/Pages/        Vue pages (see inertia-views)
+├── resources/views/pdf/      PDF Blade views
 ├── routes/{web.php,api.php,<area>.php}
 └── tests/{Feature,Unit}
 ```
@@ -77,14 +78,18 @@ class CustomerGroup extends Model
 ## 3. Enums
 
 ```php
-enum SalesInvoiceStatus: int implements HasLabel, HasColor
+use Modules\Core\Contracts\HasColor;
+use Modules\Core\Contracts\HasLabel;
+
+enum SalesInvoiceStatus: int implements HasColor, HasLabel
 {
-    case Draft = 0; case Posted = 1; case Cancelled = 2;
-    public function getLabel(): string { return match ($this) { self::Draft => __('Draft'), ... }; }
-    public function getColor(): string { return match ($this) { self::Draft => 'gray', ... }; }
+    case DRAFT = 1; case POSTED = 2; case CANCELLED = 3;
+    public function getLabel(): string { return match ($this) { self::DRAFT => __('Draft'), ... }; }
+    public function getColor(): string|array|null { return match ($this) { self::DRAFT => 'gray', ... }; }
     public static function options(): array { /* value => label */ }
 }
 ```
+`getColor()` returns a tone name (`success|danger|warning|info|gray|primary`), mapped for the panel by `Modules\Accounting\Support\StatusBadge::tone()`. Add `Modules\Core\Contracts\HasIcon` (`getIcon()`) when the enum has an icon.
 Status columns: `unsignedTinyInteger('status')->default(Enum::Draft->value)`.
 
 ## 4. Migrations
@@ -102,8 +107,8 @@ Copy `Modules/Accounting/database/migrations/2026_10_15_000030_create_accounting
 
 ## 5. Business logic
 
-- Lives in `Services/<Thing>Service.php` (resolved with `app()`), wrapped in `DB::transaction`. Livewire components only collect input, authorize, call the service, show the toast.
-- Rule violations: `throw new DomainException(__('...'))` (multiple messages joined with "\n"); the page shows them via `attempt()` (`HandlesInventoryDocument`).
+- Lives in `Services/<Thing>Service.php` (resolved with `app()`), wrapped in `DB::transaction`. Controllers and FormRequests only collect and validate input and call the service; the controller returns `back()->with('success'|'error', __('...'))` (authorization is on the route, see `permissions`).
+- Rule violations: `throw new DomainException(__('...'))` (multiple messages joined with "\n"); the controller catches it and returns `back()->with('error', $exception->getMessage())`.
 - Journal entries / stock movements only through the existing services (`StockLedgerService`, `PostsInventoryJournal`, `AccountService`). Never write ledger rows directly.
 - Raw SQL imports on products → rebuild the search index (see memory: items-search-index).
 

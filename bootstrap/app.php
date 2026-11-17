@@ -17,10 +17,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->trustProxies(at: '*');
 
-        // لوحة Inertia + Vue (مثل malbo). صفحات Livewire التي لم تُنقل بعد تُفتح بتحميل كامل.
+        // لوحة Inertia + Vue (مثل malbo).
         $middleware->web(append: [
             \App\Http\Middleware\HandleInertiaRequests::class,
-            \App\Http\Middleware\LeaveInertiaForLegacyPages::class,
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
         ]);
 

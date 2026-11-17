@@ -2,7 +2,7 @@
 
 namespace Modules\Accounting\Support;
 
-use Filament\Support\Contracts\HasLabel;
+use Modules\Core\Contracts\HasLabel;
 use Illuminate\Database\Eloquent\Builder;
 use Modules\Items\Entities\Product;
 

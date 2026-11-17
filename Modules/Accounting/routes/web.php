@@ -27,7 +27,6 @@ use Modules\Accounting\Http\Controllers\Admin\SupplierController;
 use Modules\Accounting\Http\Controllers\Admin\TaxController;
 use Modules\Accounting\Http\Controllers\Admin\WarehouseController;
 use Illuminate\Support\Facades\Route;
-use Livewire\Livewire;
 use Modules\Accounting\Http\Controllers\AccountingPrintController;
 use Modules\Accounting\Http\Controllers\Admin\ConsolidatedPurchaseOrderController;
 use Modules\Accounting\Http\Controllers\Admin\ConsolidatedPurchaseOrderTabController;
@@ -46,9 +45,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         'prefix' => \Mcamara\LaravelLocalization\Facades\LaravelLocalization::setLocale(),
         'middleware' => ['localeSessionRedirect', 'localizationRedirect', 'localeViewPath'],
     ], function () {
-        Livewire::setUpdateRoute(function ($handle) {
-            return Route::post('/livewire/update', $handle);
-        });
 
         Route::prefix('admin/accounting')
             ->as('accounting.')

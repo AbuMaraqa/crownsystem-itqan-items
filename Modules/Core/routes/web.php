@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Modules\Core\Http\Controllers\Admin\CurrencyController;
 use Modules\Core\Http\Controllers\Admin\DashboardController;
+use Modules\Core\Http\Controllers\Admin\ModuleSelectorController;
 use Modules\Core\Http\Controllers\Admin\NotificationController;
 use Modules\Core\Http\Controllers\Admin\ProfileController;
 use Modules\Core\Http\Controllers\Admin\RoleController;
@@ -18,13 +19,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ],
         function () {
 
-            Livewire::setUpdateRoute(function ($handle) {
-                return Route::post('/livewire/update', $handle);
-            });
-
             Route::get('/', DashboardController::class)->name('dashboard');
 
-            Route::get('/select-module', \Modules\Core\Livewire\ModuleSelector::class)->name('module-selector');
+            Route::get('/select-module', [ModuleSelectorController::class, 'index'])->name('module-selector');
+            Route::post('/select-module', [ModuleSelectorController::class, 'select'])->name('module-selector.select');
 
             Route::group([
                 'prefix' => 'admin',

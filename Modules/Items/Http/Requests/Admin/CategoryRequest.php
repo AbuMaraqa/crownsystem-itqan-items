@@ -45,7 +45,8 @@ class CategoryRequest extends FormRequest
                 $this->notInsideItself(...),
             ],
             'description' => ['nullable', 'string'],
-            'image' => [$this->imageIsRequired() ? 'required' : 'nullable', 'image', 'mimes:jpeg,jpg,png,gif,webp', 'max:2048'],
+            // الصورة اختيارية للتصنيف.
+            'image' => ['nullable', 'image', 'mimes:jpeg,jpg,png,gif,webp', 'max:2048'],
             'removed_image' => ['nullable', 'array'],
         ];
     }
@@ -58,7 +59,6 @@ class CategoryRequest extends FormRequest
         return [
             'name.required' => __('Name is required'),
             'slug.required' => __('Slug is required'),
-            'image.required' => __('Image is required'),
             'image.image' => __('The file must be a valid image.'),
             'image.mimes' => __('Image must be: JPG, PNG, GIF, or WebP.'),
             'image.max' => __('Image size must not exceed 2MB.'),
@@ -77,23 +77,6 @@ class CategoryRequest extends FormRequest
             'description' => __('Description'),
             'image' => __('Image'),
         ];
-    }
-
-    /**
-     * A category needs an image: a new one always, a saved one when it has none or its image was removed.
-     */
-    private function imageIsRequired(): bool
-    {
-        $id = $this->route('category');
-
-        if ($id === null || ! empty($this->input('removed_image'))) {
-            return true;
-        }
-
-        /** @var Category|null $category */
-        $category = app(CategoryRepositoryInterface::class)->find($id);
-
-        return ! $category?->hasMedia('category');
     }
 
     /**

@@ -2,7 +2,7 @@
 
 namespace Modules\Accounting\Enums;
 
-use Filament\Support\Contracts\HasLabel;
+use Modules\Core\Contracts\HasLabel;
 
 /**
  * اتجاه السهم على بطاقة الرف: البطاقة تُلصق على العمود والصنف على يمينه او يساره.

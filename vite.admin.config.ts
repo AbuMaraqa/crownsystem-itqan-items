@@ -12,8 +12,7 @@ import { defineConfig } from 'vite';
 const root = (path: string): string => resolve(process.cwd(), path);
 
 /**
- * لوحة التحكم الجديدة (Inertia + Vue + Tailwind 4) في بناء مستقل عن صفحات Livewire القديمة،
- * التي تبقى على Tailwind 3 و postcss.config.js حتى تُنقل كلها.
+ * لوحة التحكم (Inertia + Vue + Tailwind 4)، تُبنى في public/build-admin.
  */
 export default defineConfig({
     plugins: [
@@ -27,12 +26,8 @@ export default defineConfig({
         tailwindcss(),
         Icons({ compiler: 'vue3' }),
     ],
-    // Tailwind 4 يعمل عبر الاضافة اعلاه؛ لا نريد ان يمر CSS اللوحة على postcss الخاص بـ Tailwind 3.
-    css: { postcss: { plugins: [] } },
     resolve: {
         alias: [
-            // Tailwind 3 في الجذر لصفحات Livewire؛ نسخة 4 مثبتة باسم tailwindcss4.
-            { find: /^tailwindcss$/, replacement: 'tailwindcss4' },
             { find: '@modules', replacement: root('Modules') },
             { find: '@', replacement: root('resources/js') },
         ],

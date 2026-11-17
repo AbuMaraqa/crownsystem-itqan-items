@@ -9,15 +9,15 @@ Locales: `ar` (default, RTL) and `en` (mcamara/laravel-localization). English is
 
 ## Rules
 
-1. Every user-facing string: `__('English source text')`. No namespaced keys (`__('accounting::x')` is not used), no PHP array lang files for new strings, no hard-coded Arabic in PHP/Blade.
+1. Every user-facing string: `__('English source text')` in PHP/Blade, `t('English source text')` (from `@/lib/i18n`) in Vue. No namespaced keys (`__('accounting::x')` is not used), no PHP array lang files for new strings, no hard-coded Arabic in PHP/Blade/Vue.
 2. Add the Arabic value to the owning module's JSON file:
    - `Modules/<Module>/Lang/ar.json` (loaded by `loadJsonTranslationsFrom` in the module ServiceProvider).
    - Root `lang/ar.json` only for auth/framework strings.
    - Keep keys unique across modules — search all `ar.json` files for the key first and reuse an existing key instead of adding a near-duplicate ("Client" vs "Customer" vs "Customer Name").
    - Keep the file valid JSON (no trailing comma). Insert near related keys.
 3. Arabic values MUST be Modern Standard Arabic (follow the `arabic-fusha` skill): concise UI labels, correct hamza/taa marbuta, no dialect ("اللي", "بدك", "شو" …).
-4. Also translate: sidebar titles (rendered with `__()`), enum `getLabel()` strings, toast messages, `wire:confirm` texts, DomainException messages, table headings/empty states, PDF labels, the `"<Entity> Management"` group and every permission name.
-5. Permission names in the Roles screen are translated by maps in `Modules/Core/Livewire/Pages/Roles/Index.php` (`translateModuleName()`, `translatePermissionAction()`) — update them for new entities/actions (see `permissions`).
+4. Also translate: sidebar titles (rendered with `t()`), enum `getLabel()` strings, toast messages, `confirm()` dialog texts, DomainException messages, table headings/empty states, PDF labels, the `"<Entity> Management"` group and every permission name.
+5. Permission names in the Roles screen are translated by the maps in `Modules/Core/Support/PermissionLabels.php` (`AR_MODULES`, `AR_ACTIONS`) — update them for new entities/actions (see `permissions`).
 6. Placeholders: `__('Posted :count lines', ['count' => $n])` — keep `:name` placeholders identical in the Arabic value.
 7. RTL: use logical Tailwind classes (`text-start`, `ps-`, `ms-`, `start-0`); wrap emails/phones/codes in `<bdi>` inside Arabic text.
 

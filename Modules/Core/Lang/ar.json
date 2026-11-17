@@ -1,6 +1,5 @@
 {
     "Ecommerce": "متجر الالكتروني",
-
     "Home": "الرئيسية",
     "Search...": "ابحث...",
     "Profile": "الملف الشخصي",
@@ -36,8 +35,7 @@
     "Percentage": "نسبة مئوية",
     "Fixed": "ثابت",
     "Year": "السنة",
-
-    "Activity Log":"سجل النشاط",
+    "Activity Log": "سجل النشاط",
     "Created Record": "تم إنشاء السجل",
     "Updated Record": "تم تحديث السجل",
     "Deleted Record": "تم حذف السجل",
@@ -123,7 +121,6 @@
     "Meta Title": "عنوان الميتا",
     "Meta Description": "وصف الميتا",
     "Meta Keywords": "كلمات الميتا",
-
     "Save": "حفظ",
     "Edit": "تعديل",
     "Update": "تعديل",
@@ -132,19 +129,16 @@
     "Ingo": "معلومات",
     "Close": "اغلاق",
     "Info": "معلومات",
-
     "Do you really want to delete these records?": "هل أنت متأكد من حذف هذه السجلات؟",
     "Once these records are deleted, all of their resources and data will be permanently deleted. Before deleting this record, please download any data you wish to retain.": "بمجرد حذف هذه السجلات، سيتم حذف جميع الموارد والبيانات المرتبطة بها بشكل نهائي. قبل حذف هذا السجل، يُرجى تنزيل أي بيانات ترغب في الاحتفاظ بها.",
     "Yes, delete record": "نعم، حذف السجل",
     "No, cancel": "لا، إلغاء",
     "Cancel": "إلغاء",
-
     "Settings": "الإعدادات",
     "System Settings": "إعدادات النظام",
     "Sync System Data": "مزامنة بيانات النظام",
     "Site Information": "معلومات الموقع",
     "Site Logo": "شعار الموقع",
-
     "Roles And Permissions": "الأدوار والصلاحيات",
     "General": "عام",
     "Price": "السعر",
@@ -154,7 +148,6 @@
     "Site Name": "اسم الموقع",
     "Email Address For Contact": "عنوان البريد الإلكتروني للاتصال",
     "Site Description": "وصف الموقع",
-
     "Site Name is required": "اسم الموقع مطلوب",
     "Email Address For Contact is required": "عنوان البريد الإلكتروني للاتصال مطلوب",
     "Email Address For Contact must be a valid email address": "عنوان البريد الإلكتروني للاتصال يجب أن يكون عنوان بريد إلكتروني صالح",
@@ -162,7 +155,6 @@
     "Name is required": "الاسم مطلوب",
     "Slug is required": "الاسم المستعار مطلوب",
     "Image is required": "الصورة مطلوبة",
-
     "Create Role": "إنشاء دور",
     "Role Details": "تفاصيل الدور",
     "Role Name": "اسم الدور",
@@ -171,7 +163,6 @@
     "Permissions are grouped by feature. Open only the group you want to edit.": "الصلاحيات مرتبة حسب الميزة. افتح فقط المجموعة التي تريد تعديلها.",
     "Role": "الدور",
     "Select All Permissions": "حدد كل الصلاحيات",
-
     "Users": "المستخدمين",
     "User Information": "معلومات المستخدم",
     "Roles": "الأدوار",
@@ -186,33 +177,30 @@
     "Created At": "تاريخ الإنشاء",
     "Updated At": "تاريخ التحديث",
     "User Management": "ادارة المستخدمين",
-    "Select All in User Management" : "حدد الكل في ادارة المستخدمين",
-
-    "Currency Management" : "إدارة العملات",
-    "No currencies found" : "لا توجد عملات",
-    "Create a new currency by clicking the button below" : "أنشئ عملة جديدة بالضغط على الزر أدناه",
-    "Select All in Currency Management" : "حدد الكل في إدارة العملات",
-    "Currencies" : "العملات",
-    "currency" : "العملة",
-    "Currency" : "العملة",
-    "Currencies List" : "قائمة العملات",
-    "Add Currency" : "إضافة عملة",
-    "Edit Currency" : "تعديل العملة",
-    "Name must be a string" : "الاسم يجب أن يكون نص",
-    "Code is required" : "الكود مطلوب",
-    "Code must be a string" : "الكود يجب أن يكون نص",
-    "Symbol is required" : "الرمز مطلوب",
-    "Symbol must be a string" : "الرمز يجب أن يكون نص",
-    "Position is required" : "الموضع مطلوب",
-    "Position must be a string" : "الموضع يجب أن يكون نص",
+    "Select All in User Management": "حدد الكل في ادارة المستخدمين",
+    "Currency Management": "إدارة العملات",
+    "No currencies found": "لا توجد عملات",
+    "Create a new currency by clicking the button below": "أنشئ عملة جديدة بالضغط على الزر أدناه",
+    "Select All in Currency Management": "حدد الكل في إدارة العملات",
+    "Currencies": "العملات",
+    "currency": "العملة",
+    "Currency": "العملة",
+    "Currencies List": "قائمة العملات",
+    "Add Currency": "إضافة عملة",
+    "Edit Currency": "تعديل العملة",
+    "Name must be a string": "الاسم يجب أن يكون نص",
+    "Code is required": "الكود مطلوب",
+    "Code must be a string": "الكود يجب أن يكون نص",
+    "Symbol is required": "الرمز مطلوب",
+    "Symbol must be a string": "الرمز يجب أن يكون نص",
+    "Position is required": "الموضع مطلوب",
+    "Position must be a string": "الموضع يجب أن يكون نص",
     "Symbol": "الرمز",
     "Position": "الموقع",
     "Decimal places": "عدد المنازل العشرية",
     "Exchange rate": "سعر الصرف",
-
     "Details": "تفاصيل",
     "Print": "طباعة",
-
     "Total Users": "مجموع المستخدمين",
     "All users in system": "جميع المستخدمين في النظام",
     "Total Clients": "مجموع العملاء",
@@ -221,11 +209,9 @@
     "All products in system": "جميع المنتجات في النظام",
     "Total Orders": "مجموع الطلبات",
     "All orders in system": "جميع الطلبات في النظام",
-
     "Users retrieved successfully": "تم جلب المستخدمين بنجاح",
     "User retrieved successfully": "تم جلب المستخدم بنجاح",
     "User updated successfully": "تم تحديث المستخدم بنجاح",
-
     "General Site Info": "معلومات الموقع العامة",
     "Academic Settings": "الإعدادات الأكاديمية",
     "Academic Configuration": "التكوين الأكاديمي",
@@ -247,7 +233,6 @@
     "Closed": "مغلق",
     "Internal System": "النظام الداخلي",
     "University SSO (PPU)": "نظام الجامعة (SSO)",
-
     "Super Admin": "مدير النظام",
     "Admin": "مدير",
     "User": "مستخدم",
@@ -259,17 +244,14 @@
     "Corporate Relations Officer": "مسؤول العلاقات مع الشركات",
     "Practical Training Supervisor": "مشرف التدريب العملي",
     "Company Supervisor": "مشرف الشركة",
-
     "Read more": "قراءة المزيد",
     "Permission Groups": "مجموعات الصلاحيات",
     "View Permissions": "عرض الصلاحيات",
     "Groups": "مجموعات",
     "more groups": "مجموعات أخرى",
     "No permissions assigned": "لا توجد صلاحيات مضافة",
-
     "Quick Access": "وصول سريع",
     "Users By Role": "المستخدمين حسب الدور",
-
     "Overview": "نظرة عامة",
     "Welcome back": "مرحباً بعودتك",
     "Here's what's happening in your system today.": "إليك آخر مستجدات نظامك اليوم.",
@@ -282,7 +264,6 @@
     "Catalog": "الكتالوج",
     "People & Access": "المستخدمون والصلاحيات",
     "Finance": "المالية",
-
     "Low Stock Alerts": "تنبيهات انخفاض المخزون",
     "Current Stock": "المخزون الحالي",
     "Minimum Stock": "الحد الأدنى للمخزون",
@@ -290,7 +271,6 @@
     "Out Of Stock": "غير متوفر",
     "View All Products": "عرض كل المنتجات",
     "No products have reached their minimum stock level.": "لا توجد منتجات وصلت الى الحد الأدنى للمخزون.",
-
     "Base Currency": "العملة الأساسية",
     "Line Items": "سطور المستند",
     "No items added yet": "لا توجد أصناف مضافة بعد",
@@ -394,7 +374,6 @@
     "Use Last Price": "آخر سعر",
     "Follow the customer group": "حسب تصنيف الزبون",
     "Fills a line with the last posted price for this party and item.": "يعبّئ السطر بآخر سعر مرحّل لهذا الطرف وهذا الصنف.",
-
     "Add image": "إضافة صورة",
     "Click the map to set the location": "اضغط على الخريطة لتحديد الموقع",
     "Drag to reorder": "اسحب لإعادة الترتيب",
@@ -458,9 +437,7 @@
     "See all": "عرض الكل",
     "No users have a role yet": "لا يوجد مستخدمون لديهم دور بعد",
     "Low stock": "مخزون منخفض",
-
     "Could not load the calendar.": "تعذّر تحميل التقويم.",
-
     "Plural name": "اسم الجمع",
     "Three letters, like ILS": "ثلاثة أحرف، مثل ILS",
     "Before": "قبل",
@@ -476,11 +453,9 @@
     "Only a Super Admin can give the Super Admin role.": "لا يمنح دور مدير النظام إلا مدير نظام.",
     "You cannot delete your own account.": "لا يمكنك حذف حسابك.",
     "User deleted successfully.": "تم حذف المستخدم بنجاح.",
-
     "Currency updated successfully": "تم تحديث العملة بنجاح",
     "Currency deleted successfully": "تم حذف العملة بنجاح",
     "Currencies deleted successfully": "تم حذف العملات بنجاح",
-
     "Has users": "لديه مستخدمون",
     "No users": "بدون مستخدمين",
     "No roles found": "لا توجد أدوار",
@@ -493,7 +468,6 @@
     "This role is used by the system and cannot be renamed.": "هذا الدور يستخدمه النظام ولا يمكن تغيير اسمه.",
     "This role is used by the system and cannot be deleted.": "هذا الدور يستخدمه النظام ولا يمكن حذفه.",
     "This role is given to users. Move them to another role first.": "هذا الدور ممنوح لمستخدمين. انقلهم إلى دور آخر أولاً.",
-
     "New platform": "منصة جديدة",
     "No platforms yet": "لا توجد منصات بعد",
     "Dashboard appearance": "مظهر لوحة التحكم",
@@ -504,7 +478,6 @@
     "This color is too light: white text on buttons would be hard to read.": "هذا اللون فاتح جدًا، وسيصعب قراءة النص الأبيض على الأزرار.",
     "No cost items yet": "لا توجد بنود تكاليف بعد",
     "Applies to the whole control panel.": "يُطبَّق على لوحة التحكم كلها.",
-
     "Change Password": "تغيير كلمة المرور",
     "Avatar": "الصورة الشخصية",
     "Cover Photo": "صورة الغلاف",
@@ -524,9 +497,7 @@
     "The provided two factor authentication code was invalid.": "رمز التحقق بخطوتين غير صحيح.",
     "Two-factor authentication is on.": "تم تفعيل التحقق بخطوتين.",
     "Two-factor authentication is off.": "تم إيقاف التحقق بخطوتين.",
-
     "Delete this notification?": "حذف هذا الإشعار؟",
-
     "Forgot your password?": "نسيت كلمة المرور؟",
     "Enter your email and we will send you a link to choose a new password.": "أدخل بريدك الإلكتروني وسنرسل لك رابطًا لاختيار كلمة مرور جديدة.",
     "Send reset link": "إرسال الرابط",
@@ -538,5 +509,13 @@
     "Two-factor code": "رمز التحقق بخطوتين",
     "Code from your authenticator app": "الرمز من تطبيق المصادقة",
     "Recovery code": "رمز الاسترداد",
-    "Use a code from your app": "استخدم رمزًا من التطبيق"
+    "Use a code from your app": "استخدم رمزًا من التطبيق",
+    "Module packages": "باقات الوحدات",
+    "Choose the package of modules this system runs.": "اختر باقة الوحدات التي يعمل بها هذا النظام.",
+    "Activate this package?": "تفعيل هذه الباقة؟",
+    "Every module outside the package will be disabled for the whole system.": "ستُعطَّل كل وحدة خارج الباقة في النظام كله.",
+    "Package activated": "فُعِّلت الباقة",
+    "Activate": "تفعيل",
+    "Confirm": "تأكيد",
+    "Core Store": "المتجر الأساسي"
 }

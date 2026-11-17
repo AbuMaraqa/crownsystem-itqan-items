@@ -132,13 +132,28 @@ class CategoryPriceListProfilePagesTest extends TestCase
         $this->assertTrue($category->hasMedia('category'));
     }
 
-    public function test_a_new_category_needs_a_name_an_image_and_a_free_slug(): void
+    public function test_the_item_form_creates_a_category_in_place_without_an_image(): void
+    {
+        $this->signIn(self::CATEGORY);
+
+        $response = $this->postJson(route('categories.quick-store'), ['name' => 'ألمنيوم'])->assertCreated();
+
+        $category = Category::query()->whereTranslation('name', 'ألمنيوم')->firstOrFail();
+
+        $response->assertExactJson(['value' => $category->id, 'label' => 'ألمنيوم']);
+        $this->assertFalse($category->hasMedia('category'));
+
+        $this->postJson(route('categories.quick-store'), ['name' => ''])->assertUnprocessable()->assertJsonValidationErrors('name');
+    }
+
+    public function test_a_new_category_needs_a_name_and_a_free_slug_but_no_image(): void
     {
         $this->signIn(self::CATEGORY);
         $taken = $this->category('موجود');
 
         $this->post(route('categories.store'), ['name' => '', 'slug' => $taken->slug])
-            ->assertSessionHasErrors(['name', 'slug', 'image']);
+            ->assertSessionHasErrors(['name', 'slug'])
+            ->assertSessionDoesntHaveErrors('image');
 
         $this->assertSame(1, Category::query()->count());
     }

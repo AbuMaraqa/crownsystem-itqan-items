@@ -108,10 +108,7 @@ class AddonOption extends Model implements TranslatableContract, HasMedia
         }
 
         // التحقق من نوع الملف
-        if (
-            !$file instanceof \Illuminate\Http\UploadedFile &&
-            !($file instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile)
-        ) {
+        if (! $file instanceof \Illuminate\Http\UploadedFile) {
             return null;
         }
 
@@ -147,10 +144,7 @@ class AddonOption extends Model implements TranslatableContract, HasMedia
         }
 
         // التحقق من نوع الملف
-        if (
-            !$file instanceof \Illuminate\Http\UploadedFile &&
-            !($file instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile)
-        ) {
+        if (! $file instanceof \Illuminate\Http\UploadedFile) {
             return null;
         }
 
