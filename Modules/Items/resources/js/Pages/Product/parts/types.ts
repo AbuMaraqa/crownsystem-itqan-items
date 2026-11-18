@@ -15,13 +15,6 @@ export interface ProductRowFields {
     sku: string | null;
     barcode: string | null;
     base_price: Num;
-    sale_price: Num;
-    cost_price: Num;
-    wholesale_price: Num;
-    discount_type: string | null;
-    discount_value: Num;
-    discount_start_date: string | null;
-    discount_end_date: string | null;
     max_limit: Num;
     min_limit_1: Num;
     min_limit_2: Num;

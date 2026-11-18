@@ -139,12 +139,12 @@ trait SalesDocumentFixtures
     }
 
     /**
-     * خدمة بالكيلوغرام بتكلفة داخلية (معالجة خام الزبون).
+     * خدمة بالكيلوغرام بتكلفة داخلية (معالجة خام الزبون)؛ تكلفتها تُكتب في سطر المستند.
      */
     protected function serviceProduct(): Product
     {
         $service = $this->newProduct('معالجة الخام');
-        $service->update(['item_type' => 'service', 'service_kind' => 'general', 'service_cost_source' => 'internal', 'pricing_type' => 'weight', 'sale_price' => 0.2, 'cost_price' => 0.08]);
+        $service->update(['item_type' => 'service', 'service_kind' => 'general', 'service_cost_source' => 'internal', 'pricing_type' => 'weight', 'base_price' => 0.2]);
 
         return $service;
     }

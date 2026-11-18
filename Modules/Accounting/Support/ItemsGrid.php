@@ -296,7 +296,7 @@ final class ItemsGrid
 
         $cost = $isPiece || ! $user->can('Product Update')
             ? null
-            : (app(StockLedgerService::class)->averageCost($product->id) ?: (float) $product->cost_price);
+            : app(StockLedgerService::class)->averageCost($product->id);
 
         return [
             'label' => ProductSearch::label($product->id),

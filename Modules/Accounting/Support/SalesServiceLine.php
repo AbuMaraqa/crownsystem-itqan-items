@@ -5,6 +5,7 @@ namespace Modules\Accounting\Support;
 use DomainException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Modules\Accounting\Services\StockLedgerService;
 use Modules\Core\Entities\User;
 use Modules\Items\Entities\Product;
 use Modules\Items\Enums\ItemType;
@@ -62,7 +63,7 @@ final class SalesServiceLine
 
         $pricingBasis = ServicePricingBasis::tryFrom((string) ($item['pricing_basis'] ?? ''))?->value ?? self::defaultPricingBasis($product);
         $costSource = ServiceCostSource::tryFrom((string) ($item['cost_source'] ?? ''))?->value ?? self::defaultCostSource($product);
-        $unitCost = self::decimal($item['unit_cost'] ?? null, (float) ($product?->cost_price ?? 0));
+        $unitCost = self::decimal($item['unit_cost'] ?? null, $product ? app(StockLedgerService::class)->averageCost((int) $product->id) : 0.0);
 
         if ($unitCost < 0) {
             throw new DomainException(__('Service cost cannot be negative.'));
@@ -195,8 +196,9 @@ final class SalesServiceLine
             'label' => ProductSearch::label($product->id),
             'description' => $product->name,
             'pricing_basis' => self::defaultPricingBasis($product),
-            'unit_price' => $unitPrice ?? number_format((float) ($product->sale_price ?: 0), 4, '.', ''),
-            'unit_cost' => number_format((float) ($product->cost_price ?: 0), 4, '.', ''),
+            'unit_price' => $unitPrice ?? number_format((float) ($product->base_price ?: 0), 4, '.', ''),
+            // تكلفة الخدمة تُدخل في السطر من فاتورة مقدّمها او كلفتها الفعلية؛ لا سعر تكلفة في البطاقة.
+            'unit_cost' => number_format(app(StockLedgerService::class)->averageCost((int) $product->id), 4, '.', ''),
             'cost_source' => self::defaultCostSource($product),
         ];
     }

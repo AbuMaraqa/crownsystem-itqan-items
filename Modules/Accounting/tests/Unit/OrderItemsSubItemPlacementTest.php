@@ -36,7 +36,8 @@ class OrderItemsSubItemPlacementTest extends TestCase
     private function tree(): array
     {
         $main = ConsolidatedTestFactory::product('weight');
-        $main->update(['cost_price' => 21]);
+        // سعر شراء الكغم من متوسط تكلفة الصنف الرئيسي.
+        ConsolidatedTestFactory::averageCost($main, 21);
 
         $sub = ConsolidatedTestFactory::product('weight', 6);
         $sub->update(['main_product_id' => $main->id, 'weight_per_meter' => 0.339]);

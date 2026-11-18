@@ -752,11 +752,12 @@ class GoodsReceiptService
     }
 
     /**
-     * كلفة مؤقتة لسطر لم يُسعَّر بعد: كمية الفوترة (الوزن للصنف الموزون) × سعر تكلفة الصنف.
+     * كلفة مؤقتة لسطر لم يُسعَّر بعد: كمية الفوترة (الوزن للصنف الموزون) × متوسط تكلفة الصنف.
      */
     private function provisionalValue(PurchaseOrderItem $item): float
     {
-        $unitCost = (float) ($item->product?->cost_price ?: $item->product?->base_price ?: 0);
+        // كلفة المخزون من المشتريات الفعلية (المتوسط المرجّح) لا من سعر البيع، والا يُسجَّل المخزون بربح لم يتحقق.
+        $unitCost = $item->product_id ? app(StockLedgerService::class)->averageCost((int) $item->product_id) : 0.0;
 
         return $item->invoiceQuantity() * $unitCost;
     }

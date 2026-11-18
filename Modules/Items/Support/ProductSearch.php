@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
+use Modules\Accounting\Services\StockLedgerService;
 use Modules\Items\Entities\Product;
 use Modules\Items\Entities\ProductCuttingRecipe;
 use Modules\Items\Enums\ItemType;
@@ -231,7 +232,8 @@ class ProductSearch
      * Purchase-side payloads for many products in a single query.
      *
      * مع سياق المستند يُسعَّر السطر عبر PriceResolver::forDocumentLines، وبلا سياق (خارج
-     * سطور المستندات) يبقى السعر الافتراضي للصنف.
+     * سطور المستندات) يُقترح متوسط التكلفة المرجّح من المشتريات السابقة. السعر الاساسي سعر
+     * بيع فلا يُقترح سعراً للشراء.
      *
      * @param  array<int, mixed>  $ids
      * @return array<int, array<string, mixed>>
@@ -240,7 +242,7 @@ class ProductSearch
     {
         return self::payloadsFor(
             $ids,
-            fn (Product $product): float => (float) ($product->cost_price ?: $product->base_price ?: 0),
+            fn (Product $product, float $cost): float => $cost,
             $context,
             PriceResolver::BUY,
         );
@@ -261,7 +263,7 @@ class ProductSearch
     /**
      * Sales-side payloads for many products in a single query.
      *
-     * نسبة ربح الزبون (ان وُجدت) تُضاف على سعر التكلفة؛ الصنف بلا تكلفة يبقى على سعر بيعه.
+     * نسبة ربح الزبون (ان وُجدت) تُضاف على متوسط التكلفة المرجّح؛ الصنف بلا تكلفة يبقى على سعره الاساسي.
      *
      * @param  array<int, mixed>  $ids
      * @return array<int, array<string, mixed>>
@@ -270,26 +272,27 @@ class ProductSearch
     {
         return self::payloadsFor(
             $ids,
-            fn (Product $product): float => self::salesUnitPrice($product, $profitMargin),
+            fn (Product $product, float $cost): float => self::salesUnitPrice($product, $cost, $profitMargin),
             $context,
             PriceResolver::SELL,
         );
     }
 
-    public static function salesUnitPrice(Product $product, ?float $profitMargin = null): float
+    /**
+     * سعر البيع المقترح: متوسط التكلفة + نسبة ربح الزبون، والا السعر الاساسي (السعر الوحيد في بطاقة الصنف).
+     */
+    public static function salesUnitPrice(Product $product, float $averageCost, ?float $profitMargin = null): float
     {
-        $cost = (float) ($product->cost_price ?: 0);
-
-        if ($profitMargin !== null && $cost > 0) {
-            return round($cost * (1 + $profitMargin / 100), 4);
+        if ($profitMargin !== null && $averageCost > 0) {
+            return round($averageCost * (1 + $profitMargin / 100), 4);
         }
 
-        return (float) ($product->sale_price ?: $product->base_price ?: $product->cost_price ?: 0);
+        return (float) ($product->base_price ?: 0);
     }
 
     /**
      * @param  array<int, mixed>  $ids
-     * @param  Closure(Product): float  $unitPrice
+     * @param  Closure(Product, float): float  $unitPrice  السعر من الصنف ومتوسط تكلفته
      * @return array<int, array<string, mixed>>
      */
     private static function payloadsFor(array $ids, Closure $unitPrice, ?LinePriceContext $context = null, string $side = PriceResolver::SELL): array
@@ -314,10 +317,23 @@ class ProductSearch
             ->whereIn('id', $ids)
             ->get();
 
-        $linePrices = $context ? PriceResolver::forDocumentLines($products, $context, $side, $unitPrice) : null;
+        // التكلفة من المشتريات الفعلية (المتوسط المرجّح)، لا من رقم يُكتب في بطاقة الصنف. قد يسعّر
+        // PriceResolver صنفاً رئيسياً ليس في القائمة، فتُجلب تكلفته عند الحاجة.
+        $ledger = app(StockLedgerService::class);
+        $costs = $ledger->averageCosts($ids);
+        $cost = function (int $id) use (&$costs, $ledger): float {
+            if (! array_key_exists($id, $costs)) {
+                $costs += $ledger->averageCosts([$id]);
+            }
+
+            return $costs[$id] ?? 0.0;
+        };
+        $priceOf = fn (Product $product): float => $unitPrice($product, $cost((int) $product->id));
+
+        $linePrices = $context ? PriceResolver::forDocumentLines($products, $context, $side, $priceOf) : null;
 
         if ($linePrices !== null) {
-            $unitPrice = fn (Product $product): float => $linePrices[(int) $product->id] ?? 0.0;
+            $priceOf = fn (Product $product): float => $linePrices[(int) $product->id] ?? 0.0;
         }
 
         return $products
@@ -327,7 +343,7 @@ class ProductSearch
                     'label' => self::rememberLabel($product),
                     'barcode' => $product->barcode,
                     'description' => $product->name,
-                    'unit_price' => number_format($unitPrice($product), 4, '.', ''),
+                    'unit_price' => number_format($priceOf($product), 4, '.', ''),
                     'weight_per_meter' => filled($product->weight_per_meter) ? number_format((float) $product->weight_per_meter, 4, '.', '') : null,
                     'length' => filled($product->length) ? number_format((float) $product->length, 4, '.', '') : null,
                     'image' => $product->image ?: null,
@@ -335,7 +351,7 @@ class ProductSearch
                     'item_type' => $product->item_type ?: ItemType::GOODS->value,
                     'service_kind' => $product->service_kind,
                     'service_cost_source' => $product->service_cost_source,
-                    'unit_cost' => number_format((float) ($product->cost_price ?: 0), 4, '.', ''),
+                    'unit_cost' => number_format($cost((int) $product->id), 4, '.', ''),
                     // الصنف الفرعي لا يُضاف بنداً مستقلاً بل داخل صنفه الرئيسي.
                     'main_product_id' => $product->main_product_id ? (int) $product->main_product_id : null,
                     'has_sub_products' => in_array((int) $product->id, $mainIds, true),
@@ -433,7 +449,7 @@ class ProductSearch
     private static function baseQuery(): Builder
     {
         return Product::query()
-            ->select(['id', 'sku', 'barcode', 'base_price', 'sale_price', 'cost_price', 'parent_id', 'main_product_id', 'weight_per_meter', 'length', 'pricing_type', 'item_type', 'service_kind', 'service_cost_source'])
+            ->select(['id', 'sku', 'barcode', 'base_price', 'parent_id', 'main_product_id', 'weight_per_meter', 'length', 'pricing_type', 'item_type', 'service_kind', 'service_cost_source'])
             ->with(['translations' => fn ($query) => $query
                 ->select(['id', 'product_id', 'locale', 'name'])
                 ->whereIn('locale', self::searchLocales())]);

@@ -209,7 +209,7 @@ class ProductionOrderService
                     'service_provider_id' => $item->service_provider_id,
                     'pricing_basis' => $item->pricing_basis ?: ServicePricingBasis::QUANTITY->value,
                     'quantity' => (float) $item->quantity,
-                    'unit_cost' => (float) $item->unit_cost ?: (float) ($product?->cost_price ?? 0),
+                    'unit_cost' => (float) $item->unit_cost ?: $this->averageCost($product?->id),
                 ];
 
                 continue;
@@ -225,7 +225,7 @@ class ProductionOrderService
                 'pricing_type' => $isWeight ? 'weight' : 'simple',
                 'quantity' => (float) $item->quantity,
                 'weight' => $isWeight ? $weight : 0,
-                'unit_cost' => (float) ($product?->cost_price ?? 0),
+                'unit_cost' => $this->averageCost($product?->id),
             ];
         }
 
@@ -331,7 +331,7 @@ class ProductionOrderService
         return [
             'description' => $product->name,
             'pricing_type' => $product->pricing_type === 'weight' ? 'weight' : 'simple',
-            'unit_cost' => number_format((float) ($product->cost_price ?: 0), 4, '.', ''),
+            'unit_cost' => number_format($this->averageCost($product->id), 4, '.', ''),
         ];
     }
 
@@ -352,7 +352,7 @@ class ProductionOrderService
 
         $defaults = [
             'description' => (string) $product->name,
-            'unit_cost' => number_format((float) ($product->cost_price ?: 0), 4, '.', ''),
+            'unit_cost' => number_format($this->averageCost($product->id), 4, '.', ''),
             'cost_source' => ServiceCostSource::tryFrom((string) $product->service_cost_source)?->value ?? ServiceCostSource::INTERNAL->value,
             'pricing_basis' => $product->pricing_type === 'weight' ? ServicePricingBasis::WEIGHT->value : ServicePricingBasis::QUANTITY->value,
         ];
@@ -520,7 +520,7 @@ class ProductionOrderService
                 'pricing_type' => $pricingType,
                 'quantity' => $this->nonNegative($line['quantity'] ?? 0),
                 'weight' => $pricingType === 'weight' ? $this->nonNegative($line['weight'] ?? 0) : 0,
-                'unit_cost' => $this->nonNegative($line['unit_cost'] ?? null, (float) ($product?->cost_price ?? 0)),
+                'unit_cost' => $this->nonNegative($line['unit_cost'] ?? null, $this->averageCost($product?->id)),
                 'notes' => $line['notes'] ?? null,
                 'sort_order' => $index,
             ];
@@ -578,7 +578,7 @@ class ProductionOrderService
                 'provider_reference' => $isExternal ? ($line['provider_reference'] ?? null) : null,
                 'pricing_basis' => ServicePricingBasis::tryFrom((string) ($line['pricing_basis'] ?? ''))?->value ?? ServicePricingBasis::QUANTITY->value,
                 'quantity' => $this->nonNegative($line['quantity'] ?? 0),
-                'unit_cost' => $this->nonNegative($line['unit_cost'] ?? null, (float) ($product?->cost_price ?? 0)),
+                'unit_cost' => $this->nonNegative($line['unit_cost'] ?? null, $this->averageCost($product?->id)),
                 'sent_date' => $isExternal && filled($line['sent_date'] ?? null) ? $line['sent_date'] : null,
                 'received_date' => $isExternal && filled($line['received_date'] ?? null) ? $line['received_date'] : null,
                 'notes' => $line['notes'] ?? null,
@@ -618,6 +618,15 @@ class ProductionOrderService
         foreach ($lines['services'] as $line) {
             $order->services()->create(array_merge($line, ['created_by' => $userId]));
         }
+    }
+
+    /**
+     * تكلفة المادة المقترحة: المتوسط المرجّح من المشتريات الفعلية (مبدأ التكلفة التاريخية)، لا رقم
+     * يُكتب في بطاقة الصنف. ما لم يُشترَ بعد تكلفته صفر حتى تُكتب في السطر.
+     */
+    private function averageCost(?int $productId): float
+    {
+        return $productId ? app(StockLedgerService::class)->averageCost($productId) : 0.0;
     }
 
     private function nonNegative(mixed $value, float $default = 0): float

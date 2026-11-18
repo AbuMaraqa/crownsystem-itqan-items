@@ -4,8 +4,7 @@ import type { AttributeChoice, ProductForm, ProductRowFields, VariationRow } fro
 /** The parent's fields a variation copies. Never its name, slug, attributes or images. */
 const INHERITED = [
     'short_description', 'description', 'barcode',
-    'base_price', 'sale_price', 'cost_price', 'wholesale_price',
-    'discount_type', 'discount_value', 'discount_start_date', 'discount_end_date',
+    'base_price',
     'max_limit', 'min_limit_1', 'min_limit_2',
     'category_id', 'meta_title', 'meta_description', 'meta_keywords',
 ] as const satisfies readonly (keyof ProductRowFields)[];

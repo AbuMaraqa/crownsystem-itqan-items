@@ -79,9 +79,6 @@ class ItemTreeCardRequest extends FormRequest
                 }
             }],
             'base_price' => ['exclude_if:pricing_type,weight', 'required', 'numeric'],
-            'sale_price' => ['exclude_if:pricing_type,weight', 'nullable', 'numeric'],
-            'wholesale_price' => ['exclude_if:pricing_type,weight', 'nullable', 'numeric'],
-            'cost_price' => [Rule::excludeIf(fn (): bool => $this->input('pricing_type') === 'weight' && $this->filled('main_product_id')), 'nullable', 'numeric'],
             'service_kind' => [$isService, 'nullable', Rule::in(array_column(ServiceKind::cases(), 'value'))],
             'service_cost_source' => [$isService, 'nullable', Rule::in(array_column(ServiceCostSource::cases(), 'value'))],
             'revenue_account_id' => [$isService, 'nullable', 'integer'],

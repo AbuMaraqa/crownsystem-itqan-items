@@ -155,8 +155,9 @@ class ProductionOrderPagesTest extends TestCase
         $this->signIn();
         $salesOrder = $this->salesOrder();
         $weight = ConsolidatedTestFactory::product('weight');
+        ConsolidatedTestFactory::averageCost($weight, 8);
         $service = ConsolidatedTestFactory::product();
-        $service->update(['item_type' => ItemType::SERVICE->value, 'pricing_type' => 'weight', 'cost_price' => 3]);
+        $service->update(['item_type' => ItemType::SERVICE->value, 'pricing_type' => 'weight']);
 
         $this->postJson(route('accounting.production-orders.cost-preview'), [
             'sales_order_id' => $salesOrder->id,

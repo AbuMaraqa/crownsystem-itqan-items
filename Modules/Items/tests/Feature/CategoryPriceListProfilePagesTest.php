@@ -143,7 +143,7 @@ class CategoryPriceListProfilePagesTest extends TestCase
         $response->assertExactJson(['value' => $category->id, 'label' => 'ألمنيوم']);
         $this->assertFalse($category->hasMedia('category'));
 
-        $this->postJson(route('categories.quick-store'), ['name' => ''])->assertUnprocessable()->assertJsonValidationErrors('name');
+        $this->postJson(route('categories.quick-store'), ['name' => ''])->assertUnprocessable()->assertJsonValidationErrors('name', 'data');
     }
 
     public function test_a_new_category_needs_a_name_and_a_free_slug_but_no_image(): void

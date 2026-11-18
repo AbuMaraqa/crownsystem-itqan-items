@@ -23,8 +23,9 @@
     --brand-900: #0f3426;
     --font-sans: 'Tajawal', system-ui, sans-serif;
 
-    --ink: #1d2939;
-    --muted: #667085;
+    /* Text a little darker than the malbo default, as the owner asked (2026-11-17). */
+    --ink: #101828;
+    --muted: #475467;
     --line: #e4e7ec;
     --surface: #f9fafb;
     --card: #ffffff;

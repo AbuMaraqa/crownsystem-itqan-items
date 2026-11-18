@@ -103,6 +103,8 @@ export interface ItemCardPayload {
     id: number | null;
     state: Record<string, unknown>;
     image: { id: number; url: string } | null;
+    /** The weighted average cost from the purchases; shown, never typed. Absent on a new item. */
+    average_cost?: number;
     other_colors: Option[];
     parent: { code: string | null; name: string } | null;
     main_sku: string | null;

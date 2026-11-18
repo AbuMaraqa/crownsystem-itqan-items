@@ -95,11 +95,11 @@ class SalesServicesPagesTest extends TestCase
             ->assertOk()
             ->assertJsonPath('0.value', $goods->id);
 
-        // السعر للطرف، والتكلفة واساس التسعير ومصدر التكلفة من بطاقة الخدمة.
+        // السعر للطرف، واساس التسعير ومصدر التكلفة من بطاقة الخدمة؛ لا تكلفة في البطاقة فتُكتب في السطر.
         $this->getJson(route('accounting.items-grid.service', ['document' => 'sales-order', 'product_id' => $service->id, 'party_id' => $this->customer->id]))
             ->assertOk()
             ->assertJsonPath('unit_price', '0.3500')
-            ->assertJsonPath('unit_cost', '0.0800')
+            ->assertJsonPath('unit_cost', '0.0000')
             ->assertJsonPath('pricing_basis', 'weight')
             ->assertJsonPath('cost_source', 'internal');
         $this->assertSame('null', $this->getJson(route('accounting.items-grid.service', ['document' => 'sales-order', 'product_id' => $goods->id]))->getContent());

@@ -222,7 +222,7 @@ class OrderController extends Controller
             if (!$product) continue;
 
             // أ. حساب سعر المنتج الأساسي (مع مراعاة عروض المنتجات)
-            $baseProductPrice = $product->sale_price ?? $product->base_price;
+            $baseProductPrice = $product->base_price;
             $finalProductPrice = $baseProductPrice;
             $offerDiscountPerUnit = 0;
 

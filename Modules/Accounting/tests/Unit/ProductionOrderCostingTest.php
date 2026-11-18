@@ -55,7 +55,7 @@ class ProductionOrderCostingTest extends TestCase
 
         $aluminum = $this->product('weight', 9.5);
         $glass = $this->product('simple', 40);
-        $painting = $this->service(2);
+        $painting = $this->service();
         $painter = User::factory()->create();
 
         $order = app(ProductionOrderService::class)->create([
@@ -71,7 +71,7 @@ class ProductionOrderCostingTest extends TestCase
                 ['worker_name' => 'فني تركيب', 'rate_basis' => LaborRateBasis::FIXED->value, 'quantity' => 9, 'rate' => 150],
             ],
             'services' => [
-                ['product_id' => $painting->id, 'cost_source' => ServiceCostSource::EXTERNAL->value, 'service_provider_id' => $painter->id, 'provider_reference' => 'INV-77', 'quantity' => 120],
+                ['product_id' => $painting->id, 'cost_source' => ServiceCostSource::EXTERNAL->value, 'service_provider_id' => $painter->id, 'provider_reference' => 'INV-77', 'quantity' => 120, 'unit_cost' => 2],
             ],
         ]);
 
@@ -97,7 +97,7 @@ class ProductionOrderCostingTest extends TestCase
         $order = app(ProductionOrderService::class)->create([
             'currency_id' => ConsolidatedTestFactory::currency()->id,
             'services' => [
-                ['product_id' => $this->service(3)->id, 'cost_source' => ServiceCostSource::INTERNAL->value, 'service_provider_id' => User::factory()->create()->id, 'quantity' => 10],
+                ['product_id' => $this->service()->id, 'cost_source' => ServiceCostSource::INTERNAL->value, 'service_provider_id' => User::factory()->create()->id, 'quantity' => 10, 'unit_cost' => 3],
             ],
         ]);
 
@@ -126,7 +126,7 @@ class ProductionOrderCostingTest extends TestCase
         $this->actingAs(User::factory()->create());
 
         $aluminum = $this->product('weight', 9);
-        $painting = $this->service(2);
+        $painting = $this->service();
         $salesOrder = $this->salesOrder();
         $salesOrder->items()->create(['product_id' => $aluminum->id, 'description' => 'المنيوم', 'quantity' => 1, 'unit_price' => 15, 'total_weight' => 100, 'actual_weight' => 98, 'line_total' => 1470]);
         $salesOrder->items()->create(['product_id' => $painting->id, 'line_type' => ItemType::SERVICE->value, 'pricing_basis' => 'weight', 'description' => 'دهان', 'quantity' => 98, 'unit_price' => 3, 'unit_cost' => 2.5, 'cost_source' => ServiceCostSource::EXTERNAL->value, 'line_total' => 294]);
@@ -188,15 +188,16 @@ class ProductionOrderCostingTest extends TestCase
     private function product(string $pricingType, float $cost): Product
     {
         $product = ConsolidatedTestFactory::product($pricingType);
-        $product->update(['cost_price' => $cost]);
+        // تكلفة المادة من متوسط تكلفة مشترياتها، لا من بطاقة الصنف.
+        ConsolidatedTestFactory::averageCost($product, $cost);
 
         return $product;
     }
 
-    private function service(float $cost): Product
+    private function service(): Product
     {
         $product = ConsolidatedTestFactory::product();
-        $product->update(['cost_price' => $cost, 'item_type' => ItemType::SERVICE->value]);
+        $product->update(['item_type' => ItemType::SERVICE->value]);
 
         return $product;
     }

@@ -13,6 +13,13 @@ use Throwable;
 
 class LegacyItemsImporter
 {
+    /** أعمدة جدول items في إتقان بترتيبها. */
+    public const LEGACY_COLUMNS = [
+        'ItemId', 'ItemString', 'Barcode', 'ItemType', 'ItemCost', 'itemunit', 'ItemParent', 'ItemDefStore',
+        'ItemMax', 'ItemMin1', 'ItemMin2', 'ExpDays', 'ItemNote', 'ChRange', 'Prop1', 'Prop2', 'Prop3',
+        'Prop4', 'Prop5', 'Prop6', 'prop7', 'prop8', 'prop9', 'isActive',
+    ];
+
     /**
      * Import the old `items` SQL dump into the current Items module tables.
      *
@@ -27,6 +34,49 @@ class LegacyItemsImporter
             throw new RuntimeException("SQL file not found: {$file}");
         }
 
+        $this->log($logger, "Reading old items SQL: {$file}");
+
+        return $this->importItems($this->readOldItems($file), $file, $dryRun, $allNodesAsProducts, $logger);
+    }
+
+    /**
+     * صفوف جدول items في إتقان (من ملفاته مباشرة او من اي مصدر)، بأسماء أعمدته الاصلية.
+     *
+     * @param  iterable<int, array<string, mixed>>  $rows
+     * @return array<string, int|bool|string>
+     */
+    public function importRows(iterable $rows, string $source, bool $dryRun = false, bool $allNodesAsProducts = false, ?callable $logger = null): array
+    {
+        ini_set('memory_limit', env('ITEMS_SEED_MEMORY_LIMIT', '2048M'));
+        set_time_limit(0);
+
+        $items = [];
+
+        foreach ($rows as $row) {
+            $item = [];
+
+            foreach (self::LEGACY_COLUMNS as $column) {
+                $value = $row[$column] ?? null;
+                $item[$column] = $value === null || is_string($value) ? $value : $this->scalarString($value);
+            }
+
+            $id = $this->normalizeLegacyId($item['ItemId']);
+
+            if ($id !== '') {
+                $item['ItemId'] = $id;
+                $items[$this->legacyKey($id)] = $item;
+            }
+        }
+
+        return $this->importItems($items, $source, $dryRun, $allNodesAsProducts, $logger);
+    }
+
+    /**
+     * @param  array<string, array<string, mixed>>  $items  مفتاحها legacyKey(ItemId)
+     * @return array<string, int|bool|string>
+     */
+    private function importItems(array $items, string $file, bool $dryRun, bool $allNodesAsProducts, ?callable $logger): array
+    {
         $pdo = DB::connection()->getPdo();
         $now = now()->format('Y-m-d H:i:s');
 
@@ -36,11 +86,8 @@ class LegacyItemsImporter
             }
         }
 
-        $this->log($logger, "Reading old items SQL: {$file}");
-        $items = $this->readOldItems($file);
-
         if (! $items) {
-            throw new RuntimeException('No rows were found in the old `items` dump.');
+            throw new RuntimeException('No rows were found in the old `items` table.');
         }
 
         [$categoryOldIds, $productOldIds, $inactiveRows, $missingNames] = $this->classifyOldItems($items, $allNodesAsProducts);
@@ -1153,34 +1200,21 @@ class LegacyItemsImporter
      */
     private function mapOldItem(array $values): array
     {
-        $keys = [
-            'ItemId',
-            'ItemString',
-            'Barcode',
-            'ItemType',
-            'ItemCost',
-            'itemunit',
-            'ItemParent',
-            'ItemDefStore',
-            'ItemMax',
-            'ItemMin1',
-            'ItemMin2',
-            'ExpDays',
-            'ItemNote',
-            'ChRange',
-            'Prop1',
-            'Prop2',
-            'Prop3',
-            'Prop4',
-            'Prop5',
-            'Prop6',
-            'prop7',
-            'prop8',
-            'prop9',
-            'isActive',
-        ];
+        return array_combine(self::LEGACY_COLUMNS, $values);
+    }
 
-        return array_combine($keys, $values);
+    /**
+     * قيمة رقمية من ملفات إتقان بصيغتها النصية كما في ملف SQL المصدَّر، فيبقى منطق التحويل واحداً.
+     */
+    private function scalarString(mixed $value): string
+    {
+        if (is_float($value)) {
+            $text = (string) $value;
+
+            return str_contains($text, 'E') ? rtrim(rtrim(sprintf('%.10F', $value), '0'), '.') : $text;
+        }
+
+        return (string) $value;
     }
 
     /**

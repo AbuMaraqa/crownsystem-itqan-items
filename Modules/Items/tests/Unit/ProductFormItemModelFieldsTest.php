@@ -168,8 +168,8 @@ class ProductFormItemModelFieldsTest extends TestCase
         $this->assertSame('weight', $product->pricing_type);
         $this->assertEquals(0, $product->base_price);
         $this->assertNull($product->sale_price);
-        // التكلفة تبقى ظاهرة للصنف الرئيسي.
-        $this->assertEquals(7, $product->cost_price);
+        // لا سعر تكلفة يُكتب في البطاقة: التكلفة من المشتريات (المتوسط المرجّح).
+        $this->assertNull($product->cost_price);
     }
 
     public function test_a_simple_item_still_needs_a_base_price(): void

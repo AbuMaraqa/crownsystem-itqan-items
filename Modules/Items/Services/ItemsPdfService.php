@@ -91,7 +91,7 @@ class ItemsPdfService extends PdfService
         $qrData = json_encode([
             'sku' => $product->sku,
             'name' => $product->name,
-            'price' => $product->sale_price
+            'price' => $product->base_price
         ]);
 
         return [

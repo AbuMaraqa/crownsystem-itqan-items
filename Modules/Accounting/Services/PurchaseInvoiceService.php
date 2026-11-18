@@ -448,7 +448,7 @@ class PurchaseInvoiceService
             ->map(function (array $item): array {
                 $product = Product::query()->with('translations')->find($item['product_id']);
                 $quantity = $this->decimalValue($item['quantity'] ?? 1, 1);
-                $unitPrice = $this->decimalValue($item['unit_price'] ?? $product?->cost_price ?? $product?->base_price ?? 0);
+                $unitPrice = $this->decimalValue($item['unit_price'] ?? ($product ? app(StockLedgerService::class)->averageCost((int) $product->id) : 0));
 
                 // صنف الوزن باصنافه الفرعية: الكمية المفوترة (كغم) = الوزن الفعلي، وصفر بدونه.
                 $weight = WeightPieces::line($item, $product, ['purchase_order_item_piece_id']);

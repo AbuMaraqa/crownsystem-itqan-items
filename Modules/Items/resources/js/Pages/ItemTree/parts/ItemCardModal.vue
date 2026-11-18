@@ -50,9 +50,6 @@ interface CardForm {
     revenue_account_id: number | null;
     cost_account_id: number | null;
     base_price: Num;
-    sale_price: Num;
-    wholesale_price: Num;
-    cost_price: Num;
     length: Num;
     weight_per_meter: Num;
     synonym_product_id: number | null;
@@ -99,9 +96,6 @@ function blank(): CardForm {
         revenue_account_id: null,
         cost_account_id: null,
         base_price: null,
-        sale_price: null,
-        wholesale_price: null,
-        cost_price: null,
         length: null,
         weight_per_meter: null,
         synonym_product_id: null,
@@ -207,7 +201,7 @@ const tabs = computed(() =>
 );
 
 const tabFields: Record<string, string[]> = {
-    prices: ['base_price', 'sale_price', 'wholesale_price', 'cost_price'],
+    prices: ['base_price'],
     service: ['service_kind', 'service_cost_source', 'revenue_account_id', 'cost_account_id'],
     information: ['length', 'weight_per_meter', 'synonym_product_id', 'shelf', 'site_area', 'min_limit_1', 'min_limit_2', 'max_limit', 'color', 'unit_id', 'item_type_profile_id', 'bundle_count', 'profile_thickness', 'is_open_profile', 'area'],
     images: ['image'],
@@ -217,15 +211,14 @@ const tabFields: Record<string, string[]> = {
 
 const mainHint = computed(() => (form.main_product_id ? (payload.value?.main_sku ?? undefined) : (payload.value?.parent?.code ?? undefined)));
 const mainPlaceholder = computed(() => payload.value?.parent?.name || t('None — this is a main item'));
-const cost = computed(() => Number(form.cost_price ?? 0).toFixed(2));
+const cost = computed(() => Number(payload.value?.average_cost ?? 0).toFixed(2));
 
 /** What the card shows is what it sends: a hidden field keeps its saved value. */
 function visibleData(data: CardForm): Record<string, unknown> {
     const hidden = new Set<string>(['sku']);
 
-    if (isWeight.value) ['base_price', 'sale_price', 'wholesale_price'].forEach((field) => hidden.add(field));
+    if (isWeight.value) hidden.add('base_price');
     else ['bundle_count', 'profile_thickness', 'is_open_profile', 'area'].forEach((field) => hidden.add(field));
-    if (isPiece.value) hidden.add('cost_price');
     if (!isService.value) ['service_kind', 'service_cost_source', 'revenue_account_id', 'cost_account_id'].forEach((field) => hidden.add(field));
     if (!payload.value?.can_edit_limits) ['min_limit_1', 'min_limit_2', 'max_limit'].forEach((field) => hidden.add(field));
     if (!payload.value?.other_colors.length) ['apply_to_colors', 'apply_to_color_ids'].forEach((field) => hidden.add(field));
@@ -281,7 +274,7 @@ function submit(): void {
                         :error="form.errors.main_product_id"
                     />
                 </div>
-                <Field v-if="!isPiece" :label="t('Cost')">
+                <Field v-if="!isPiece" :label="t('Average Cost')">
                     <div class="flex h-10 items-center rounded-lg bg-gray-50 px-3 text-sm text-gray-600 tabular-nums ring-1 ring-gray-950/10 dark:bg-white/5 dark:text-gray-400 dark:ring-white/20" dir="ltr">{{ cost }}</div>
                 </Field>
             </div>
@@ -305,13 +298,8 @@ function submit(): void {
                     <p v-if="isWeight" class="mb-4 rounded-lg bg-surface px-3 py-2 text-sm text-muted">
                         {{ isPiece ? t('A piece has no price. The amount is calculated on its main item.') : t('This item groups its pieces. The price per kg comes from the price lists and can be changed on the document line.') }}
                     </p>
-                    <div class="grid gap-4 md:grid-cols-4">
-                        <template v-if="!isWeight">
-                            <TextInput v-model="form.base_price" type="number" step="any" :label="t('Base Price')" :error="form.errors.base_price" required />
-                            <TextInput v-model="form.sale_price" type="number" step="any" :label="t('Sale Price')" :error="form.errors.sale_price" />
-                            <TextInput v-model="form.wholesale_price" type="number" step="any" :label="t('Wholesale Price')" :error="form.errors.wholesale_price" />
-                        </template>
-                        <TextInput v-if="!isPiece" v-model="form.cost_price" type="number" step="any" :label="t('Cost Price')" :error="form.errors.cost_price" />
+                    <div v-if="!isWeight" class="grid gap-4 md:grid-cols-4">
+                        <TextInput v-model="form.base_price" type="number" step="any" :label="t('Base Price')" :error="form.errors.base_price" required />
                     </div>
                 </template>
 
@@ -322,7 +310,7 @@ function submit(): void {
                         <MultiSelect v-model="form.revenue_account_id" single :options="options.revenue_accounts" :label="t('Revenue Account')" :placeholder="t('Default account')" />
                         <MultiSelect v-model="form.cost_account_id" single :options="options.cost_accounts" :label="t('Cost Account')" :placeholder="t('Default account')" />
                     </div>
-                    <p class="mt-3 text-sm text-muted">{{ t('The service price is the sale price and its cost is the cost price. Pricing type "By Weight" makes the service priced per kg by default.') }}</p>
+                    <p class="mt-3 text-sm text-muted">{{ t('The service price is the base price and its cost is entered on the document line. Pricing type "By Weight" makes the service priced per kg by default.') }}</p>
                 </template>
 
                 <template #information>

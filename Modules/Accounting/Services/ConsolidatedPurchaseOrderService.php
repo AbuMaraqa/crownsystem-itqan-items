@@ -244,7 +244,7 @@ class ConsolidatedPurchaseOrderService
             ->map(function (array $item): array {
                 $product = Product::query()->with('translations')->find($item['product_id']);
                 $quantity = $this->decimalValue($item['quantity'] ?? 1, 1);
-                $unitPrice = $this->decimalValue($item['unit_price'] ?? $product?->cost_price ?? $product?->base_price ?? 0);
+                $unitPrice = $this->decimalValue($item['unit_price'] ?? ($product ? app(StockLedgerService::class)->averageCost((int) $product->id) : 0));
                 $discountMode = ($item['discount_mode'] ?? 'rate') === 'amount' ? 'amount' : 'rate';
                 $discountRate = $this->decimalValue($item['discount_rate'] ?? 0);
                 $discountAmount = $this->decimalValue($item['discount_amount'] ?? 0);

@@ -5,6 +5,7 @@ namespace Modules\Items\tests\Unit;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Modules\Accounting\Entities\CustomerGroup;
+use Modules\Accounting\Entities\ProductCost;
 use Modules\Accounting\Entities\PurchaseInvoice;
 use Modules\Accounting\Entities\SalesInvoice;
 use Modules\Accounting\Enums\PurchaseInvoiceStatus;
@@ -34,6 +35,8 @@ class DocumentLinePriceTest extends TestCase
 
         $this->actingAs(User::factory()->create());
         $this->product = ConsolidatedTestFactory::product();
+        // التراجع: السعر الاساسي (10) للبيع، ومتوسط التكلفة من المشتريات (8) للشراء ولهامش الزبون.
+        ProductCost::query()->create(['product_id' => $this->product->id, 'quantity' => 1, 'value' => 8, 'average_cost' => 8]);
     }
 
     public function test_no_party_means_no_automatic_price(): void
@@ -44,7 +47,7 @@ class DocumentLinePriceTest extends TestCase
 
     public function test_without_a_context_the_old_callers_keep_their_price(): void
     {
-        $this->assertSame('12.0000', ProductSearch::salesItemPayload($this->product->id)['unit_price']);
+        $this->assertSame('10.0000', ProductSearch::salesItemPayload($this->product->id)['unit_price']);
         $this->assertSame('8.0000', ProductSearch::invoiceItemPayload($this->product->id)['unit_price']);
     }
 
@@ -52,7 +55,7 @@ class DocumentLinePriceTest extends TestCase
     {
         $party = User::factory()->create();
 
-        $this->assertSame('12.0000', $this->salePrice($party->id));
+        $this->assertSame('10.0000', $this->salePrice($party->id));
         $this->assertSame('10.0000', ProductSearch::salesItemPayload($this->product->id, 25, LinePriceContext::for($party->id))['unit_price']);
         $this->assertSame('8.0000', ProductSearch::invoiceItemPayload($this->product->id, LinePriceContext::for($party->id))['unit_price']);
     }
@@ -62,7 +65,7 @@ class DocumentLinePriceTest extends TestCase
         $party = User::factory()->create();
         $this->salesInvoice($party, 33);
 
-        $this->assertSame('12.0000', $this->salePrice($party->id));
+        $this->assertSame('10.0000', $this->salePrice($party->id));
 
         $party->update(['use_last_price' => true]);
 
@@ -144,7 +147,7 @@ class DocumentLinePriceTest extends TestCase
         // التصنيف الموقوف لا يسعّر، كما في نسبة الربح.
         $party->update(['use_last_price' => null, 'price_list_id' => null]);
         $group->update(['is_active' => false]);
-        $this->assertSame('12.0000', $this->salePrice($party->id));
+        $this->assertSame('10.0000', $this->salePrice($party->id));
     }
 
     public function test_an_item_missing_from_the_list_or_an_inactive_list_falls_back(): void
@@ -152,13 +155,13 @@ class DocumentLinePriceTest extends TestCase
         $list = PriceList::create(['name' => 'قائمة فارغة']);
         $party = User::factory()->create(['price_list_id' => $list->id]);
 
-        $this->assertSame('12.0000', $this->salePrice($party->id));
+        $this->assertSame('10.0000', $this->salePrice($party->id));
 
         $active = $this->priceList(sell: 40, buy: 30);
         $party->update(['price_list_id' => $active->id]);
         $active->update(['is_active' => false]);
 
-        $this->assertSame('12.0000', $this->salePrice($party->id));
+        $this->assertSame('10.0000', $this->salePrice($party->id));
     }
 
     public function test_a_derived_list_price_is_resolved_through_its_source(): void

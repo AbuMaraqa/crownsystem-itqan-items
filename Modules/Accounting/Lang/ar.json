@@ -1606,6 +1606,7 @@
     "Counted quantity cannot be negative.": "لا يمكن أن تكون الكمية المجرودة سالبة.",
     "Opening balance quantities must be positive.": "يجب أن تكون كميات الرصيد الافتتاحي موجبة.",
     "Unit cost cannot be negative.": "لا يمكن أن تكون تكلفة الوحدة سالبة.",
+    "Enter the unit cost of :item: it has no purchase cost yet.": "أدخل تكلفة الوحدة للصنف :item، إذ لا توجد له تكلفة شراء بعد.",
     "Stock quantity must be greater than zero.": "يجب أن تكون كمية المخزون أكبر من صفر.",
     "Cannot cancel: :item was already issued from the warehouse (available :available, required :required).": "لا يمكن الإلغاء: صُرف :item من المخزن مسبقًا (المتاح :available، المطلوب :required).",
     "Insufficient stock for :item in :warehouse: available :available, required :required.": "الرصيد غير كافٍ من :item في :warehouse: المتاح :available، المطلوب :required.",

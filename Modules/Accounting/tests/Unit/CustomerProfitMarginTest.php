@@ -43,17 +43,19 @@ class CustomerProfitMarginTest extends TestCase
         $this->assertNull(CustomerProfitMargin::for(null));
     }
 
-    public function test_the_margin_is_added_to_the_cost_price(): void
+    public function test_the_margin_is_added_to_the_average_cost(): void
     {
         $product = ConsolidatedTestFactory::product();
+        ConsolidatedTestFactory::averageCost($product, 8);
 
+        // النسبة على متوسط التكلفة المرجّح من المشتريات، وبلا نسبة يبقى السعر الاساسي.
         $this->assertSame('10.0000', ProductSearch::salesItemPayload($product->id, 25)['unit_price']);
         $this->assertSame('8.0000', ProductSearch::salesItemPayload($product->id, 0)['unit_price']);
-        $this->assertSame('12.0000', ProductSearch::salesItemPayload($product->id)['unit_price']);
+        $this->assertSame('10.0000', ProductSearch::salesItemPayload($product->id)['unit_price']);
 
-        // بلا تكلفة لا اساس للنسبة، فيبقى سعر البيع.
-        $product->update(['cost_price' => 0]);
-        $this->assertSame('12.0000', ProductSearch::salesItemPayload($product->id, 25)['unit_price']);
+        // صنف لم يُشترَ بعد: لا اساس للنسبة، فيبقى السعر الاساسي.
+        ConsolidatedTestFactory::averageCost($product, 0);
+        $this->assertSame('10.0000', ProductSearch::salesItemPayload($product->id, 25)['unit_price']);
     }
 
     public function test_a_sales_order_prices_items_with_the_client_margin(): void
@@ -66,7 +68,8 @@ class CustomerProfitMarginTest extends TestCase
         $group = CustomerGroup::create(['name' => 'مقاولون', 'profit_margin' => 50]);
         $client = User::factory()->create(['customer_group_id' => $group->id]);
         $product = ConsolidatedTestFactory::product();
-        // سعر السطر في جدول اصناف طلبية البيع (Vue) للطرف المختار.
+        ConsolidatedTestFactory::averageCost($product, 8);
+        // سعر السطر في جدول اصناف طلبية البيع (Vue) للطرف المختار: متوسط التكلفة 8 + نسبة الزبون.
         $price = fn (?int $party) => $this->getJson(route('accounting.items-grid.item', array_filter([
             'document' => 'sales-order',
             'product_id' => $product->id,

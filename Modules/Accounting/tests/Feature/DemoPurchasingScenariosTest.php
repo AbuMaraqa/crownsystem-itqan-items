@@ -57,8 +57,8 @@ class DemoPurchasingScenariosTest extends TestCase
         $expected = [
             // 100 بـ 4.5 (دورة كاملة) + 40 بـ 4.8 (عرض جديد بعد الملغى).
             'DEMO-HINGE' => [140, 0, 0, 642],
-            // 30 بـ 7 (استلام جزئي، 20 قيد الوصول) + 10 بكلفة مؤقتة 6.5؛ الفاتورة الملغاة لا اثر لها.
-            'DEMO-LOCK' => [40, 0, 20, 275],
+            // 30 بـ 7 (استلام جزئي، 20 قيد الوصول) + 10 بكلفة مؤقتة هي متوسط التكلفة 7؛ الفاتورة الملغاة لا اثر لها.
+            'DEMO-LOCK' => [40, 0, 20, 280],
             // طلبية عرضها مسودة: 1000 قيد الوصول؛ والمخزون من الشراء المباشر 500 بـ 0.04.
             'DEMO-SCREW' => [500, 0, 1000, 20],
             // المقطع بعدده ووزنه المحسوب وبلا قيمة.
@@ -96,8 +96,8 @@ class DemoPurchasingScenariosTest extends TestCase
     {
         // مستلم غير مفوتر = الاستلام الجزئي فقط: 30 × 7 + 117 × 15.
         $this->assertSame(-1965.0, $this->balance($this->account('2125')));
-        // فرق السعر من الفاتورة بلا عرض: 10 × (7 - 6.5).
-        $this->assertSame(5.0, $this->balance($this->account('5115')));
+        // الفاتورة بلا عرض بسعر 7 = الكلفة المؤقتة (متوسط التكلفة 7)، فلا فرق سعر: 10 × (7 - 7).
+        $this->assertSame(0.0, $this->balance($this->account('5115')));
         // الفواتير المرحّلة: 1832.4 + 192 + 70 + 434 + 546.
         $supplier = User::query()->where('name', 'مورد تجريبي - شركة الألمنيوم')->firstOrFail();
         $this->assertSame(-3074.4, $this->balance((int) Account::query()->where('user_id', $supplier->id)->value('id')));

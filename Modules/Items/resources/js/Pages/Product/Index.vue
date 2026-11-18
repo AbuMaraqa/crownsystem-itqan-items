@@ -44,7 +44,6 @@ interface Row {
     is_active: boolean;
     pricing_type: string;
     base_price: string | number;
-    discount: string | number;
     locales: string[];
     sub_items: { count: number; rows: SubItem[]; more: number } | null;
 }
@@ -61,7 +60,6 @@ const columns = computed<TableColumn[]>(() => [
     { key: 'categories', label: t('Category'), toggleable: true },
     { key: 'is_active', label: t('Active'), sort: 'is_active' },
     { key: 'base_price', label: t('Base Price'), sort: 'base_price', class: 'tabular', toggleable: true },
-    { key: 'discount', label: t('Discount'), sort: 'discount', class: 'tabular', toggleable: true },
     { key: 'locales', label: t('Locale'), toggleable: true },
 ]);
 

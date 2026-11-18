@@ -3,6 +3,7 @@
 namespace Modules\Accounting\tests\Unit;
 
 use Illuminate\Support\Str;
+use Modules\Accounting\Entities\ProductCost;
 use Modules\Accounting\Entities\PurchaseOrder;
 use Modules\Core\Entities\Currency;
 use Modules\Items\Entities\Product;
@@ -39,6 +40,15 @@ class ConsolidatedTestFactory
         $product->save();
 
         return $product;
+    }
+
+    /**
+     * متوسط التكلفة المرجّح للصنف كما تتركه مشترياته (ProductCost): التكلفة لا تُكتب في بطاقة
+     * الصنف. بلا كمية ولا قيمة، فاول استلام في الاختبار يحسب متوسطه من جديد.
+     */
+    public static function averageCost(Product $product, float $cost): void
+    {
+        ProductCost::query()->updateOrCreate(['product_id' => $product->id], ['quantity' => 0, 'value' => 0, 'average_cost' => $cost]);
     }
 
     public static function purchaseOrder(): PurchaseOrder

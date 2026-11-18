@@ -218,7 +218,7 @@ class SalesOrderService
                 'line_total' => number_format((float) $item->line_total, 4, '.', ''),
                 'cost_source' => SalesServiceLine::defaultCostSource($item->product),
                 'service_provider_id' => null,
-                'unit_cost' => number_format((float) ($item->product?->cost_price ?: 0), 4, '.', ''),
+                'unit_cost' => number_format($item->product_id ? app(StockLedgerService::class)->averageCost((int) $item->product_id) : 0, 4, '.', ''),
                 'notes' => $item->notes,
             ])->all(),
         ];
@@ -384,7 +384,7 @@ class SalesOrderService
             ->map(function (array $item): array {
                 $product = Product::query()->with('translations')->find($item['product_id']);
                 $quantity = $this->decimalValue($item['quantity'] ?? 1, 1);
-                $unitPrice = $this->decimalValue($item['unit_price'] ?? $product?->sale_price ?? $product?->base_price ?? 0);
+                $unitPrice = $this->decimalValue($item['unit_price'] ?? $product?->base_price ?? 0);
                 $discountMode = ($item['discount_mode'] ?? 'rate') === 'amount' ? 'amount' : 'rate';
                 $discountRate = $this->decimalValue($item['discount_rate'] ?? 0);
                 $discountAmount = $this->decimalValue($item['discount_amount'] ?? 0);

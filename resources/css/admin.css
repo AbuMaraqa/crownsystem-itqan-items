@@ -80,8 +80,9 @@
     --color-gray-200: #e4e7ef;
     --color-gray-300: #d2d7e2;
     --color-gray-400: #9ba3b8;
-    --color-gray-500: #6c7590;
-    --color-gray-600: #4e566f;
+    /* 500/600 are the grey of text: a step darker so it reads more clearly. */
+    --color-gray-500: #5b6480;
+    --color-gray-600: #3f4760;
     --color-gray-700: #363d55;
     --color-gray-800: #232a3d;
     --color-gray-900: #151a28;

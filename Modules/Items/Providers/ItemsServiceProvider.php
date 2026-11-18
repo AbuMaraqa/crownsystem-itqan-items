@@ -6,7 +6,10 @@ use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
+use Modules\Core\Support\Itqan\ItqanStages;
 use Modules\Items\Console\Commands\BackfillLegacyFields;
+use Modules\Items\Services\Itqan\ItqanItemsStage;
+use Modules\Items\Services\Itqan\ItqanPricesStage;
 use Modules\Items\Console\Commands\LinkMainProducts;
 use Modules\Items\Console\Commands\RebuildSearchIndex;
 use Modules\Items\Entities\BrandTranslation;
@@ -48,6 +51,11 @@ class ItemsServiceProvider extends ServiceProvider
         });
 
         $this->registerSearchIndex();
+
+        // مراحل نقل إتقان الخاصة بالاصناف.
+        $stages = $this->app->make(ItqanStages::class);
+        $stages->register('items', ItqanItemsStage::class);
+        $stages->register('prices', ItqanPricesStage::class);
     }
 
     /**

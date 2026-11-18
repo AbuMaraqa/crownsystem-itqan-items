@@ -19,6 +19,7 @@ use Modules\Accounting\Services\GoodsReceiptService;
 use Modules\Accounting\Services\PurchaseInvoiceService;
 use Modules\Accounting\Services\PurchaseOrderService;
 use Modules\Accounting\Services\PurchaseQuotationService;
+use Modules\Accounting\tests\Unit\ConsolidatedTestFactory;
 use Modules\Core\Entities\Currency;
 use Modules\Core\Entities\User;
 use Modules\Items\Entities\Product;
@@ -164,13 +165,15 @@ class PurchaseOrderPriceTest extends TestCase
     public function test_line_values_follow_the_order_price(): void
     {
         [$main, $piece] = $this->weightItems();
+        $unpriced = $this->product('a');
+        ConsolidatedTestFactory::averageCost($unpriced, 8);
         $order = $this->confirmed([
             // وزن بلا وزن فعلي: الوزن المحسوب 7.602 × 11 = 83.622
             ['product_id' => $main->id, 'quantity' => 1, 'unit_price' => 11, 'pieces' => [$this->piece($piece)]],
             // وزن بوزن فعلي: 8 × 11 = 88
             ['product_id' => $main->id, 'quantity' => 1, 'unit_price' => 11, 'actual_weight' => 8, 'pieces' => [$this->piece($piece)]],
-            // بلا سعر: كلفة مؤقتة من تكلفة الصنف 8 × 5 = 40
-            ['product_id' => $this->product('a')->id, 'quantity' => 5, 'unit_price' => 0],
+            // بلا سعر: كلفة مؤقتة من متوسط تكلفة الصنف (لا من سعر البيع) 8 × 5 = 40
+            ['product_id' => $unpriced->id, 'quantity' => 5, 'unit_price' => 0],
         ]);
 
         $values = app(GoodsReceiptService::class)->lineValues($order);
@@ -184,12 +187,13 @@ class PurchaseOrderPriceTest extends TestCase
     public function test_the_page_prices_lines_from_the_supplier_and_offers_to_reprice_on_party_change(): void
     {
         $product = $this->product('a');
+        ConsolidatedTestFactory::averageCost($product, 8);
         $prices = fn (?int $party) => $this->getJson(route('accounting.items-grid.prices', ['document' => 'purchase-order', 'ids' => [$product->id], 'party_id' => $party]))->assertOk()->json();
 
         // بلا مورد لا سعر تلقائي.
         $this->assertSame(0.0, (float) ($prices(null)[$product->id] ?? 0));
 
-        // مع المورد: سعر الشراء، فتعرض الصفحة تغيير الاسعار عند تغيير المورد.
+        // مع المورد: متوسط تكلفة الشراء، فتعرض الصفحة تغيير الاسعار عند تغيير المورد.
         $this->assertSame(8.0, (float) $prices($this->supplier->id)[$product->id]);
     }
 

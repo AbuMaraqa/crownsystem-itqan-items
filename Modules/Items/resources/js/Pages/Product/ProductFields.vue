@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
  * The item card Add and Edit share. What shows follows the item, as on the old page: a weight item
- * hides the e-commerce parts (tags, labels, brand, manufacturers, addons, variations, meta, sale prices
- * and discount), a piece hides its prices, a service hides the inventory tab and the main item.
+ * hides the e-commerce parts (tags, labels, brand, manufacturers, addons, variations, meta) and its
+ * base price, a piece hides its price, a service hides the inventory tab and the main item.
  * A validation error marks its tab and opens it, then the first message scrolls into view.
  */
 import type { InertiaForm } from '@inertiajs/vue3';

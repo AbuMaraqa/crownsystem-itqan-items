@@ -36,6 +36,11 @@ async function parse<T>(response: Response): Promise<T> {
             // Not JSON: the status says enough.
         }
 
+        // bootstrap/app.php answers a JSON validation error as { message, data: { field: [..] } }.
+        if (response.status === 422 && body && !body.errors && body.data && typeof body.data === 'object') {
+            body = { ...body, errors: body.data };
+        }
+
         throw new HttpError(response.status, body);
     }
 

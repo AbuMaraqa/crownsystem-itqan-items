@@ -19,7 +19,6 @@ interface Row {
     name: string;
     sku: string | null;
     base_price: string | number | null;
-    sale_price: string | number | null;
     categories: string;
     parent: string | null;
 }
@@ -32,7 +31,6 @@ const columns = computed<TableColumn[]>(() => [
     { key: 'name', label: t('Name'), sort: 'name' },
     { key: 'sku', label: t('SKU'), sort: 'sku', class: 'tabular' },
     { key: 'base_price', label: t('Base Price'), sort: 'base_price', class: 'tabular' },
-    { key: 'sale_price', label: t('Sale Price'), sort: 'sale_price', class: 'tabular' },
     { key: 'categories', label: t('Category'), toggleable: true },
     { key: 'parent', label: t('Parent Product'), toggleable: true },
 ]);
@@ -40,7 +38,7 @@ const columns = computed<TableColumn[]>(() => [
 const filters = computed<TableFilter[]>(() => [
     { key: 'pricing_type', label: t('Type'), options: [{ value: 'simple', label: t('By Quantity') }, { value: 'weight', label: t('By Weight') }] },
     { type: 'boolean', key: 'is_active', label: t('Status'), trueLabel: t('Active'), falseLabel: t('Inactive') },
-    { type: 'number-range', key: 'sale_price', label: t('Sale Price') },
+    { type: 'number-range', key: 'base_price', label: t('Base Price') },
 ]);
 </script>
 

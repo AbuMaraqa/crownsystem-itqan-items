@@ -21,4 +21,11 @@ return [
         'ibm-plex-sans-arabic' => ['name' => 'IBM Plex Sans Arabic', 'family' => 'IBM+Plex+Sans+Arabic:wght@400;500;700', 'stack' => "'IBM Plex Sans Arabic', system-ui, sans-serif"],
         'cairo' => ['name' => 'Cairo', 'family' => 'Cairo:wght@400;600;700', 'stack' => "'Cairo', system-ui, sans-serif"],
     ],
+
+    /*
+     * نقل بيانات برنامج إتقان: مجلد قاعدة almamoun2015 (ملفات MyISAM). يُمرَّر ايضاً بخيار --path.
+     */
+    'itqan' => [
+        'data_path' => env('ITQAN_DATA_PATH'),
+    ],
 ];

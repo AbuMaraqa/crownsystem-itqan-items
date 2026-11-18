@@ -110,9 +110,9 @@ class CategoryTreeController extends Controller
                     AllowedFilter::callback('search', fn ($query, mixed $value) => ProductSearch::apply($query, (string) $value)),
                     AdminFilter::exact('pricing_type'),
                     AdminFilter::boolean('is_active'),
-                    ...AdminFilter::numberRange('sale_price'),
+                    ...AdminFilter::numberRange('base_price'),
                 )
-                ->sorts(AllowedSort::custom('name', new TranslatedSort), 'sku', 'base_price', 'sale_price', 'id')
+                ->sorts(AllowedSort::custom('name', new TranslatedSort), 'sku', 'base_price', 'id')
                 ->defaultSort('sku')
                 ->rows(fn (Product $product) => [
                     'id' => (int) $product->id,
@@ -120,7 +120,6 @@ class CategoryTreeController extends Controller
                     'name' => (string) $product->name,
                     'sku' => $product->sku,
                     'base_price' => $product->base_price,
-                    'sale_price' => $product->sale_price,
                     'categories' => $product->categories->pluck('name')->join(', '),
                     // المتغيرات تُربط بالتصنيفات ايضاً، فيُذكر الصنف الاب لتمييزها.
                     'parent' => $product->parent?->name,

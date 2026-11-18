@@ -79,7 +79,7 @@ class ProductController extends Controller
                     ...AdminFilter::numberRange('base_price'),
                     ...AdminFilter::dateRange('created_at'),
                 )
-                ->sorts(AllowedSort::custom('name', new TranslatedSort), 'sku', 'slug', 'is_active', 'base_price', 'discount', 'id')
+                ->sorts(AllowedSort::custom('name', new TranslatedSort), 'sku', 'slug', 'is_active', 'base_price', 'id')
                 ->rows(fn (Product $product) => [
                     'id' => $product->id,
                     'image' => $product->image ?: null,
@@ -92,7 +92,6 @@ class ProductController extends Controller
                     'is_active' => (int) $product->is_active === ProductActive::IS_ACTIVE->value,
                     'pricing_type' => $product->pricing_type,
                     'base_price' => $product->base_price,
-                    'discount' => $product->discount,
                     'locales' => $product->translations->pluck('locale')->values(),
                     'sub_items' => $this->subItems($product, $search),
                 ]),
@@ -342,8 +341,6 @@ class ProductController extends Controller
      */
     private function rowState(Product $product): array
     {
-        $date = fn ($value) => $value ? substr((string) $value, 0, 10) : null;
-
         return [
             'name' => (string) $product->name,
             'slug' => $product->slug,
@@ -352,13 +349,6 @@ class ProductController extends Controller
             'sku' => $product->sku,
             'barcode' => $product->barcode,
             'base_price' => $product->base_price,
-            'sale_price' => $product->sale_price,
-            'cost_price' => $product->cost_price,
-            'wholesale_price' => $product->wholesale_price,
-            'discount_type' => $product->discount_type,
-            'discount_value' => $product->discount_value,
-            'discount_start_date' => $date($product->discount_start_date),
-            'discount_end_date' => $date($product->discount_end_date),
             'max_limit' => $product->max_limit,
             'min_limit_1' => $product->min_limit_1,
             'min_limit_2' => $product->min_limit_2,

@@ -4,8 +4,9 @@ import type { InertiaForm } from '@inertiajs/vue3';
 import QuickCreateModal from '@modules/Accounting/resources/js/Pages/parts/QuickCreateModal.vue';
 import { computed, ref, watch } from 'vue';
 
-import type { Option } from '@/Components/form/SelectInput.vue';
+import Field from '@/Components/form/Field.vue';
 import MultiSelect from '@/Components/form/MultiSelect.vue';
+import type { Option } from '@/Components/form/SelectInput.vue';
 import RichEditor from '@/Components/form/RichEditor.vue';
 import TagsInput from '@/Components/form/TagsInput.vue';
 import TextareaInput from '@/Components/form/TextareaInput.vue';
@@ -51,21 +52,23 @@ function firstError(prefix: string): string | undefined {
         <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <TextInput v-model="form.name" class="xl:col-span-2" :label="t('Name')" required :error="form.errors.name" />
             <TextInput v-model="form.slug" class="xl:col-span-2" :label="t('Slug')" dir="ltr" :placeholder="t('Keep empty for auto generated')" :error="form.errors.slug" />
-            <div class="flex items-end gap-2 md:col-span-2">
-                <MultiSelect v-model="form.category_id" class="min-w-0 flex-1" :label="t('Category')" :required="categoryRequired" :options="categoryOptions" :error="firstError('category_id')" />
-                <button
-                    v-if="can('Category Create')"
-                    type="button"
-                    class="mb-px inline-flex size-10 shrink-0 items-center justify-center rounded-lg border border-line text-muted hover:border-brand-300 hover:text-brand-600 dark:hover:text-brand-400"
-                    :class="{ 'mb-7': firstError('category_id') }"
-                    :aria-label="t('Add Category')"
-                    :title="t('Add Category')"
-                    @click="creatingCategory = true"
-                >
-                    <Plus class="size-4" />
-                </button>
-                <QuickCreateModal v-if="can('Category Create')" v-model:open="creatingCategory" :url="route('categories.quick-store')" :title="t('Add Category')" fields="name" @created="onCategoryCreated" />
-            </div>
+            <!-- One field (label beside it in a wide card), its control a select with a "+" that makes a category in place. -->
+            <Field class="md:col-span-2" :label="t('Category')" :required="categoryRequired">
+                <div class="flex items-start gap-2">
+                    <MultiSelect v-model="form.category_id" class="min-w-0 flex-1" :options="categoryOptions" :error="firstError('category_id')" />
+                    <button
+                        v-if="can('Category Create')"
+                        type="button"
+                        class="inline-flex size-9 shrink-0 items-center justify-center rounded-control border border-line text-muted hover:border-brand-300 hover:text-brand-600 dark:hover:text-brand-400"
+                        :aria-label="t('Add a category')"
+                        :title="t('Add a category')"
+                        @click="creatingCategory = true"
+                    >
+                        <Plus class="size-4" />
+                    </button>
+                </div>
+                <QuickCreateModal v-if="can('Category Create')" v-model:open="creatingCategory" :url="route('categories.quick-store')" :title="t('Add a category')" fields="name" @created="onCategoryCreated" />
+            </Field>
             <MultiSelect v-model="form.unit_id" single :label="t('Unit')" :options="options.units" :error="form.errors.unit_id" />
             <template v-if="!isWeight(form)">
                 <MultiSelect v-model="form.brand_id" single :label="t('Brand')" :options="options.brands" :error="form.errors.brand_id" />

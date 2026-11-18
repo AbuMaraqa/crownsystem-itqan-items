@@ -8,7 +8,7 @@ const GROUPS: Record<string, readonly string[]> = {
         'is_open_profile', 'area', 'item_type', 'service_kind', 'service_cost_source', 'revenue_account_id', 'cost_account_id',
         'main_product_id', 'site_area',
     ],
-    price: ['base_price', 'sale_price', 'cost_price', 'wholesale_price', 'discount_type', 'discount_value', 'discount_start_date', 'discount_end_date'],
+    price: ['base_price'],
     inventory: ['color', 'max_limit', 'min_limit_1', 'min_limit_2'],
     accessories: ['accessories'],
     addons: ['addons'],

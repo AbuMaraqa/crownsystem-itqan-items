@@ -25,6 +25,7 @@ use Modules\Accounting\Services\InventoryAccounts;
 use Modules\Accounting\Services\PurchaseInvoiceService;
 use Modules\Accounting\Services\PurchaseOrderService;
 use Modules\Accounting\Services\PurchaseQuotationService;
+use Modules\Accounting\tests\Unit\ConsolidatedTestFactory;
 use Modules\Core\Entities\Currency;
 use Modules\Core\Entities\User;
 use Modules\Items\Entities\Product;
@@ -189,6 +190,7 @@ class PurchaseQuotationFlowTest extends TestCase
     public function test_invoicing_without_a_quotation_starts_unpriced_and_cannot_post_until_priced(): void
     {
         $product = $this->product('شباك');
+        ConsolidatedTestFactory::averageCost($product, 8);
         $order = $this->purchaseOrder($product, 10);
         $service = app(PurchaseInvoiceService::class);
 
@@ -214,7 +216,7 @@ class PurchaseQuotationFlowTest extends TestCase
         ]);
         $invoice = $service->post($invoice);
 
-        // البضاعة دخلت بكلفة مؤقتة (سعر تكلفة الصنف 8)، والفاتورة بسعر 9: الفرق 10 فرق سعر.
+        // البضاعة دخلت بكلفة مؤقتة (متوسط تكلفة الصنف من مشترياته 8)، والفاتورة بسعر 9: الفرق 10 فرق سعر.
         $this->assertSame(PurchaseInvoiceStatus::POSTED, $invoice->status);
         $this->assertSame(80.0, $this->balance($this->warehouseAccount()));
         $this->assertSame(0.0, $this->balance($this->account('2125')));

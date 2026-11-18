@@ -316,9 +316,8 @@ class StockAdjustmentService
             return 0;
         }
 
-        $average = app(StockLedgerService::class)->averageCost($product->id);
-
-        return $average > 0 ? $average : round((float) $product->cost_price, 6);
+        // التكلفة من المشتريات الفعلية فقط؛ لا سعر تكلفة يُكتب في بطاقة الصنف.
+        return app(StockLedgerService::class)->averageCost($product->id);
     }
 
     private function normalizeHeader(array $data): array
@@ -395,6 +394,12 @@ class StockAdjustmentService
 
             if ($unitCost == 0 || $ledger->isPiece($product->id)) {
                 $unitCost = $this->fallbackCost($product);
+            }
+
+            // المخزون الداخل يُقيَّم بتكلفته (مبدأ التكلفة التاريخية): صنف لم يُشترَ بعد لا متوسط
+            // تكلفة له، فتُكتب تكلفة وحدته في السطر بدل ادخاله بقيمة صفر.
+            if ($quantity > 0 && $unitCost == 0 && ! $ledger->isPiece($product->id)) {
+                throw new DomainException(__('Enter the unit cost of :item: it has no purchase cost yet.', ['item' => $product->name]));
             }
 
             $normalized[] = [

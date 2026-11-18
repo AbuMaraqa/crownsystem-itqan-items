@@ -26,8 +26,9 @@ use Modules\Items\Support\ItemCardRules;
  *
  * ما تخفيه البطاقة لا يُكتب، كما في صفحة Livewire السابقة:
  * - صنف الوزن: لا وسوم ولا شارات ولا علامة ولا مصنّعين ولا اضافات ولا متغيرات ولا معلومات وصفية،
- *   ولا سعر اساسي او بيع او جملة ولا خصم (سعر الكيلو من قوائم الاسعار). المقطع (صنف وزن تحت صنف
- *   رئيسي) بلا سعر تكلفة ايضاً. في الاضافة تُصفَّر هذه الاسعار، وفي التعديل تبقى القيم المحفوظة.
+ *   ولا سعر اساسي (سعر الكيلو من قوائم الاسعار). في الاضافة يُصفَّر سعره، وفي التعديل تبقى القيمة المحفوظة.
+ * - السعر الوحيد في البطاقة هو السعر الاساسي؛ لا سعر بيع ولا جملة ولا خصم، ولا سعر تكلفة يُكتب
+ *   يدوياً لان التكلفة تُحسب من المشتريات الفعلية (المتوسط المرجّح في ProductCost).
  * - الخدمة: لا لون ولا حدود مخزون.
  * - حدود المخزون لا يكتبها الا صاحب صلاحية «تعديل الحدود».
  */
@@ -35,8 +36,7 @@ class ProductService
 {
     /** حقول البطاقة التي هي اعمدة في جدول الاصناف (طبيعة الصنف ونوعه من ItemCardRules). */
     private const COLUMNS = [
-        'slug', 'sku', 'barcode', 'base_price', 'sale_price', 'cost_price', 'wholesale_price',
-        'discount_type', 'discount_value', 'discount_start_date', 'discount_end_date',
+        'slug', 'sku', 'barcode', 'base_price',
         'weight_per_meter', 'length', 'pricing_type', 'brand_id', 'unit_id', 'site_area',
         'color', 'max_limit', 'min_limit_1', 'min_limit_2',
     ];
@@ -46,14 +46,12 @@ class ProductService
     /** حقول التجارة الالكترونية التي تختفي عن صنف الوزن. */
     private const COMMERCE = [
         'tags', 'labels', 'brand_id', 'manufacturers', 'addons', 'variations',
-        'base_price', 'sale_price', 'wholesale_price',
-        'discount_type', 'discount_value', 'discount_start_date', 'discount_end_date',
+        'base_price',
         'meta_title', 'meta_description', 'meta_keywords',
     ];
 
     private const VARIATION_COLUMNS = [
-        'sku', 'barcode', 'base_price', 'sale_price', 'cost_price', 'wholesale_price',
-        'discount_type', 'discount_value', 'discount_start_date', 'discount_end_date',
+        'sku', 'barcode', 'base_price',
         'max_limit', 'min_limit_1', 'min_limit_2',
     ];
 
@@ -69,15 +67,9 @@ class ProductService
     {
         $data = $this->visible($data);
 
-        // صنف الوزن بلا سعر في بطاقته: سعر الكيلو من قوائم الاسعار، والمقطع بلا سعر ولا تكلفة.
+        // صنف الوزن بلا سعر في بطاقته: سعر الكيلو من قوائم الاسعار، والمقطع بلا سعر.
         if (($data['pricing_type'] ?? 'simple') === 'weight') {
             $data['base_price'] = 0;
-            $data['sale_price'] = null;
-            $data['wholesale_price'] = null;
-
-            if ($this->isPiece($data)) {
-                $data['cost_price'] = null;
-            }
         }
 
         $product = DB::transaction(function () use ($data, $locale, $userId): Product {
@@ -223,10 +215,6 @@ class ProductService
 
         if (($data['pricing_type'] ?? null) === 'weight') {
             $data = Arr::except($data, self::COMMERCE);
-
-            if ($this->isPiece($data)) {
-                unset($data['cost_price']);
-            }
         }
 
         if ($isService) {
@@ -246,16 +234,6 @@ class ProductService
 
     /**
      * @param  array<string, mixed>  $data
-     */
-    private function isPiece(array $data): bool
-    {
-        return ($data['pricing_type'] ?? null) === 'weight'
-            && ($data['item_type'] ?? null) !== ItemType::SERVICE->value
-            && filled($data['main_product_id'] ?? null);
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
     private function columns(array $data, ?Product $product): array
@@ -270,10 +248,6 @@ class ProductService
         // رقم الصنف الفارغ: يُولَّد عند الاضافة، ويبقى الرقم الحالي عند التعديل.
         if (blank($columns['sku'] ?? null)) {
             unset($columns['sku']);
-        }
-
-        if (array_key_exists('discount_type', $columns) && blank($columns['discount_type'])) {
-            $columns['discount_type'] = 'none';
         }
 
         return [...$columns, ...ItemCardRules::itemTypeAttributes($data), ...ItemCardRules::itemModelAttributes($data)];
@@ -462,7 +436,6 @@ class ProductService
             $fields = Arr::only($row, self::VARIATION_COLUMNS);
             $fields['parent_id'] = $product->id;
             $fields['base_price'] = $fields['base_price'] ?? 0;
-            $fields['discount_type'] = blank($fields['discount_type'] ?? null) ? 'none' : $fields['discount_type'];
 
             if (blank($fields['sku'] ?? null)) {
                 unset($fields['sku']);

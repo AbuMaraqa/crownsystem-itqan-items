@@ -549,7 +549,7 @@ class ItemTreeOperationsTest extends TestCase
         [, $main] = $this->twinMain('00002');
         $main->forceFill(['base_price' => 15, 'sale_price' => 17, 'wholesale_price' => 14, 'cost_price' => 9])->save();
 
-        // اسعار صنف الوزن مخفية في البطاقة: لا تُحفظ ولو وصلت، والتكلفة ظاهرة فتُحفظ.
+        // البطاقة لا تكتب الا السعر الاساسي (ومخفي لصنف الوزن)، والتكلفة من المشتريات: ما وصل غيره لا يُحفظ.
         $this->saveCard([...$this->cardState($main->id), 'base_price' => 99, 'sale_price' => 99, 'wholesale_price' => 99, 'cost_price' => 10], $main->id)
             ->assertSessionHasNoErrors();
 
@@ -557,7 +557,7 @@ class ItemTreeOperationsTest extends TestCase
         $this->assertEquals(15, $main->base_price);
         $this->assertEquals(17, $main->sale_price);
         $this->assertEquals(14, $main->wholesale_price);
-        $this->assertEquals(10, $main->cost_price);
+        $this->assertEquals(9, $main->cost_price);
     }
 
     public function test_a_new_piece_is_saved_from_the_card_without_any_price(): void

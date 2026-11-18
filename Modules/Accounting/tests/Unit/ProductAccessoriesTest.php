@@ -46,7 +46,8 @@ class ProductAccessoriesTest extends TestCase
         $this->assertCount(1, $payload['accessories']);
         $this->assertSame('2.0000', $payload['accessories'][0]['quantity']);
         $this->assertSame($handle->id, $payload['accessories'][0]['product']['id']);
-        $this->assertSame('12.0000', $payload['accessories'][0]['product']['unit_price']);
+        // سعر الملحق: السعر الاساسي (السعر الوحيد في بطاقة الصنف).
+        $this->assertSame('10.0000', $payload['accessories'][0]['product']['unit_price']);
 
         // ملحقات الملحق لا تُجلب، ولا في قطعة داخل صنف رئيسي.
         $this->assertArrayNotHasKey('accessories', $payload['accessories'][0]['product']);

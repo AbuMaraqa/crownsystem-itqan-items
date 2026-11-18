@@ -177,7 +177,7 @@ class SalesQuotationService
                 // صنف الوزن باصنافه الفرعية: الكمية المسعَّرة (كغم) = الوزن الفعلي، وصفر بدونه.
                 $weight = WeightPieces::line($item, $product);
                 $quantity = $weight['pricing_weight'] ?? $quantity;
-                $unitPrice = $this->decimalValue($item['unit_price'] ?? $product?->sale_price ?? $product?->base_price ?? 0);
+                $unitPrice = $this->decimalValue($item['unit_price'] ?? $product?->base_price ?? 0);
                 $discountMode = ($item['discount_mode'] ?? 'rate') === 'amount' ? 'amount' : 'rate';
                 $discountRate = $this->decimalValue($item['discount_rate'] ?? 0);
                 $discountAmount = $this->decimalValue($item['discount_amount'] ?? 0);

@@ -305,6 +305,25 @@ class StockLedgerService
     }
 
     /**
+     * متوسط التكلفة المرجّح لعدة اصناف باستعلام واحد؛ الصنف الذي لم يُشترَ بعد تكلفته صفر.
+     *
+     * @param  array<int, int>  $productIds
+     * @return array<int, float>
+     */
+    public function averageCosts(array $productIds): array
+    {
+        $ids = array_values(array_unique(array_map('intval', $productIds)));
+
+        if ($ids === []) {
+            return [];
+        }
+
+        $costs = ProductCost::query()->whereIn('product_id', $ids)->pluck('average_cost', 'product_id');
+
+        return collect($ids)->mapWithKeys(fn (int $id): array => [$id => round((float) ($costs[$id] ?? 0), 6)])->all();
+    }
+
+    /**
      * عكس دخول من موقعه تماماً (location_id = 0 يعني «بلا موقع»): تُزال طبقته، وتُمنع ان
      * استُهلك منها شيء لان كلفة ما خرج منها قيّدت على مستند آخر. حركة دخول سبقت الطبقات تُخرج
      * من اقدم الطبقات.

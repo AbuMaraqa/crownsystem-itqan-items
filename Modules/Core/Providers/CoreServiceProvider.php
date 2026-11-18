@@ -6,12 +6,14 @@ use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
 use Maatwebsite\Excel\Exporter;
 use Maatwebsite\Excel\Importer;
+use Modules\Core\Console\Commands\ItqanImport;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\Core\Interfaces\ExcelServiceInterface;
 use Modules\Core\Interfaces\TransactionLoggerInterface;
 use Modules\Core\Services\ExcelService;
 use Modules\Core\Services\PdfService;
 use Modules\Core\Services\TransactionLoggerService;
+use Modules\Core\Support\Itqan\ItqanStages;
 use Nwidart\Modules\Traits\PathNamespace;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -67,6 +69,8 @@ class CoreServiceProvider extends ServiceProvider
         $this->app->register(ModulePackageServiceProvider::class);
         $this->app->register(SidebarServiceProvider::class);
 
+        // سجل مراحل نقل إتقان: كل وحدة تضيف مراحلها اليه.
+        $this->app->singleton(ItqanStages::class);
     }
 
     /**
@@ -74,7 +78,9 @@ class CoreServiceProvider extends ServiceProvider
      */
     protected function registerCommands(): void
     {
-        // $this->commands([]);
+        $this->commands([
+            ItqanImport::class,
+        ]);
     }
 
     /**

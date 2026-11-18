@@ -6,6 +6,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\Accounting\Services\StockLedgerService;
 use Modules\Accounting\Support\StockLimits;
 use Modules\Items\Entities\Category;
 use Modules\Items\Entities\Product;
@@ -50,10 +51,7 @@ class ItemCardService
             'revenue_account_id' => $product->revenue_account_id,
             'cost_account_id' => $product->cost_account_id,
             'main_product_id' => $product->main_product_id,
-            'cost_price' => $product->cost_price,
             'base_price' => $product->base_price,
-            'sale_price' => $product->sale_price,
-            'wholesale_price' => $product->wholesale_price,
             'length' => $product->length,
             'weight_per_meter' => $product->weight_per_meter,
             'synonym_product_id' => $product->synonym_product_id,
@@ -76,6 +74,8 @@ class ItemCardService
             'id' => (int) $product->id,
             'state' => $state,
             'image' => $media ? ['id' => $media->id, 'url' => $media->getUrl()] : null,
+            // التكلفة لا تُكتب في البطاقة: هي المتوسط المرجّح من المشتريات الفعلية، للعرض فقط.
+            'average_cost' => app(StockLedgerService::class)->averageCost((int) $product->id),
             'other_colors' => $this->treeService->sameProfileInOtherColors($product)
                 ->map(fn (Product $target): array => ['value' => (int) $target->id, 'label' => trim($target->sku.' - '.$target->mainProduct?->name)])
                 ->values()
@@ -136,7 +136,6 @@ class ItemCardService
                 'manage_stock' => 1,
                 'stock_status' => 'in_stock',
                 'low_stock_threshold' => 10,
-                'discount_type' => 'none',
                 'created_by' => auth()->id(),
             ]);
 
@@ -146,9 +145,6 @@ class ItemCardService
                 ...ItemCardRules::itemTypeAttributes($state),
                 // الحقل المخفي لا يصل: يبقى السعر المحفوظ كما هو.
                 'base_price' => $state['base_price'] ?? $product->base_price ?? 0,
-                'sale_price' => array_key_exists('sale_price', $state) ? $state['sale_price'] : $product->sale_price,
-                'wholesale_price' => array_key_exists('wholesale_price', $state) ? $state['wholesale_price'] : $product->wholesale_price,
-                'cost_price' => array_key_exists('cost_price', $state) ? $state['cost_price'] : $product->cost_price,
                 'length' => $state['length'] ?? null,
                 'weight_per_meter' => $state['weight_per_meter'] ?? null,
                 'synonym_product_id' => $state['synonym_product_id'] ?? null,
