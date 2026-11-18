@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Items\Services;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Modules\Items\Support\LegacyItemFields;
 use Modules\Items\Support\Search\ItemsSearchIndex;
 use PDO;
@@ -19,6 +20,18 @@ class LegacyItemsImporter
         'ItemMax', 'ItemMin1', 'ItemMin2', 'ExpDays', 'ItemNote', 'ChRange', 'Prop1', 'Prop2', 'Prop3',
         'Prop4', 'Prop5', 'Prop6', 'prop7', 'prop8', 'prop9', 'isActive',
     ];
+
+    /** عند وجود الصف: القيمة الجديدة. */
+    private const UPSERT_NEW = 'new';
+
+    /** عند وجود الصف: القيمة الموجودة، والجديدة اذا كانت فارغة (NULL). */
+    private const UPSERT_KEEP = 'keep';
+
+    /** كـ UPSERT_KEEP، والنص الفارغ يُعد فارغاً. */
+    private const UPSERT_KEEP_NON_BLANK = 'keep_non_blank';
+
+    /** عند وجود الصف: NULL. */
+    private const UPSERT_NULL = 'null';
 
     /**
      * Import the old `items` SQL dump into the current Items module tables.
@@ -81,7 +94,7 @@ class LegacyItemsImporter
         $now = now()->format('Y-m-d H:i:s');
 
         foreach ($this->requiredTables() as $table) {
-            if (! $this->tableExists($pdo, $table)) {
+            if (! Schema::hasTable($table)) {
                 throw new RuntimeException("Missing table: {$table}");
             }
         }
@@ -412,7 +425,14 @@ class LegacyItemsImporter
             $this->table('categories'),
             $columns,
             $rows,
-            'code = VALUES(code), status = VALUES(status), sort_order = VALUES(sort_order), updated_at = VALUES(updated_at), deleted_at = NULL',
+            ['slug'],
+            [
+                'code' => self::UPSERT_NEW,
+                'status' => self::UPSERT_NEW,
+                'sort_order' => self::UPSERT_NEW,
+                'updated_at' => self::UPSERT_NEW,
+                'deleted_at' => self::UPSERT_NULL,
+            ],
             500
         );
     }
@@ -441,29 +461,22 @@ class LegacyItemsImporter
             $updates[] = [$categoryId, $parentId];
         }
 
-        foreach (array_chunk($updates, 500) as $chunk) {
-            if (! $chunk) {
-                continue;
+        // تحديث واحد لكل أب: قيمة parent_id معامل مباشر يأخذ نوع العمود في كل قاعدة،
+        // بخلاف CASE الذي يرجع نصاً في PostgreSQL.
+        $idsByParent = [];
+        foreach ($updates as [$id, $parentId]) {
+            $idsByParent[$parentId === null ? '' : (string) $parentId][] = $id;
+        }
+
+        foreach ($idsByParent as $parentKey => $ids) {
+            foreach (array_chunk($ids, 1000) as $chunk) {
+                $placeholders = implode(',', array_fill(0, count($chunk), '?'));
+                $parentSql = $parentKey === '' ? 'NULL' : '?';
+                $params = $parentKey === '' ? [$now, ...$chunk] : [(int) $parentKey, $now, ...$chunk];
+
+                $pdo->prepare('UPDATE ' . $this->tableSql('categories') . " SET parent_id = {$parentSql}, updated_at = ? WHERE id IN ({$placeholders})")
+                    ->execute($params);
             }
-
-            $caseSql = 'CASE id ';
-            $params = [];
-            $ids = [];
-
-            foreach ($chunk as [$id, $parentId]) {
-                $caseSql .= 'WHEN ? THEN ? ';
-                $params[] = $id;
-                $params[] = $parentId;
-                $ids[] = $id;
-            }
-
-            $caseSql .= 'END';
-            $placeholders = implode(',', array_fill(0, count($ids), '?'));
-            $params[] = $now;
-            array_push($params, ...$ids);
-
-            $pdo->prepare('UPDATE ' . $this->tableSql('categories') . " SET parent_id = {$caseSql}, updated_at = ? WHERE id IN ({$placeholders})")
-                ->execute($params);
         }
     }
 
@@ -505,7 +518,13 @@ class LegacyItemsImporter
             $this->table('category_translations'),
             $columns,
             $rows,
-            'name = VALUES(name), description = VALUES(description), updated_at = VALUES(updated_at), deleted_at = NULL',
+            ['category_id', 'locale'],
+            [
+                'name' => self::UPSERT_NEW,
+                'description' => self::UPSERT_NEW,
+                'updated_at' => self::UPSERT_NEW,
+                'deleted_at' => self::UPSERT_NULL,
+            ],
             500
         );
 
@@ -563,41 +582,41 @@ class LegacyItemsImporter
             'unit_id',
         ];
 
-        $updates = implode(', ', [
-            'slug = VALUES(slug)',
-            'barcode = VALUES(barcode)',
-            'discount = VALUES(discount)',
-            'base_price = VALUES(base_price)',
-            'sale_price = VALUES(sale_price)',
-            'cost_price = VALUES(cost_price)',
-            'wholesale_price = VALUES(wholesale_price)',
+        $updates = [
+            'slug' => self::UPSERT_NEW,
+            'barcode' => self::UPSERT_NEW,
+            'discount' => self::UPSERT_NEW,
+            'base_price' => self::UPSERT_NEW,
+            'sale_price' => self::UPSERT_NEW,
+            'cost_price' => self::UPSERT_NEW,
+            'wholesale_price' => self::UPSERT_NEW,
             // stock_quantity لا يُحدَّث عند اعادة الاستيراد: يملكه دفتر المخزون (StockLedgerService).
-            'manage_stock = VALUES(manage_stock)',
-            'low_stock_threshold = VALUES(low_stock_threshold)',
-            'stock_status = VALUES(stock_status)',
-            'allow_backorder = VALUES(allow_backorder)',
-            'max_quantity_per_order = VALUES(max_quantity_per_order)',
-            'discount_type = VALUES(discount_type)',
-            'discount_value = VALUES(discount_value)',
-            'discount_start_date = VALUES(discount_start_date)',
-            'discount_end_date = VALUES(discount_end_date)',
-            'min_quantity_discount = VALUES(min_quantity_discount)',
+            'manage_stock' => self::UPSERT_NEW,
+            'low_stock_threshold' => self::UPSERT_NEW,
+            'stock_status' => self::UPSERT_NEW,
+            'allow_backorder' => self::UPSERT_NEW,
+            'max_quantity_per_order' => self::UPSERT_NEW,
+            'discount_type' => self::UPSERT_NEW,
+            'discount_value' => self::UPSERT_NEW,
+            'discount_start_date' => self::UPSERT_NEW,
+            'discount_end_date' => self::UPSERT_NEW,
+            'min_quantity_discount' => self::UPSERT_NEW,
             // weight لا يُحدَّث: Prop1 ليس وزناً في اغلب الانواع (LegacyItemFields). وهذه الاعمدة
             // تُملأ اذا كانت فارغة فقط، فلا تمحو اعادة الاستيراد ما عدّله المستخدم.
-            'weight_per_meter = COALESCE(weight_per_meter, VALUES(weight_per_meter))',
-            '`length` = COALESCE(`length`, VALUES(`length`))',
-            "shelf = COALESCE(NULLIF(shelf, ''), VALUES(shelf))",
-            'unit_id = COALESCE(unit_id, VALUES(unit_id))',
-            'status = VALUES(status)',
-            'is_featured = VALUES(is_featured)',
-            'is_digital = VALUES(is_digital)',
-            'meta_data = VALUES(meta_data)',
-            'updated_at = VALUES(updated_at)',
-            'parent_id = VALUES(parent_id)',
-            'brand_id = VALUES(brand_id)',
-            'is_active = VALUES(is_active)',
-            'deleted_at = NULL',
-        ]);
+            'weight_per_meter' => self::UPSERT_KEEP,
+            'length' => self::UPSERT_KEEP,
+            'shelf' => self::UPSERT_KEEP_NON_BLANK,
+            'unit_id' => self::UPSERT_KEEP,
+            'status' => self::UPSERT_NEW,
+            'is_featured' => self::UPSERT_NEW,
+            'is_digital' => self::UPSERT_NEW,
+            'meta_data' => self::UPSERT_NEW,
+            'updated_at' => self::UPSERT_NEW,
+            'parent_id' => self::UPSERT_NEW,
+            'brand_id' => self::UPSERT_NEW,
+            'is_active' => self::UPSERT_NEW,
+            'deleted_at' => self::UPSERT_NULL,
+        ];
 
         $rows = [];
         $processed = 0;
@@ -651,7 +670,7 @@ class LegacyItemsImporter
             ];
 
             if (count($rows) >= 500) {
-                $this->bulkUpsert($pdo, $this->table('products'), $columns, $rows, $updates, 500);
+                $this->bulkUpsert($pdo, $this->table('products'), $columns, $rows, ['sku'], $updates, 500);
                 $processed += count($rows);
                 $this->log($logger, "Upserted {$processed} products...");
                 $rows = [];
@@ -659,7 +678,7 @@ class LegacyItemsImporter
         }
 
         if ($rows) {
-            $this->bulkUpsert($pdo, $this->table('products'), $columns, $rows, $updates, 500);
+            $this->bulkUpsert($pdo, $this->table('products'), $columns, $rows, ['sku'], $updates, 500);
             $processed += count($rows);
             $this->log($logger, "Upserted {$processed} products...");
         }
@@ -854,9 +873,13 @@ class LegacyItemsImporter
     /**
      * @param array<int, string> $columns
      * @param array<int, array<int, mixed>> $rows
+     * @param array<int, string> $conflict  المفتاح الفريد الذي يُعرف به الصف الموجود (PostgreSQL وSQLite)
+     * @param array<string, string> $updates  عمود => UPSERT_* عند وجود الصف
      */
-    private function bulkUpsert(PDO $pdo, string $table, array $columns, array $rows, string $updates, int $batchSize): void
+    private function bulkUpsert(PDO $pdo, string $table, array $columns, array $rows, array $conflict, array $updates, int $batchSize): void
     {
+        $upsertSql = $this->upsertClause($table, $conflict, $updates);
+
         foreach (array_chunk($rows, $batchSize) as $chunk) {
             if (! $chunk) {
                 continue;
@@ -865,7 +888,7 @@ class LegacyItemsImporter
             $columnSql = implode(', ', array_map(fn (string $column): string => $this->quoteIdentifier($column), $columns));
             $rowPlaceholder = '(' . implode(', ', array_fill(0, count($columns), '?')) . ')';
             $placeholders = implode(', ', array_fill(0, count($chunk), $rowPlaceholder));
-            $sql = 'INSERT INTO ' . $this->quoteIdentifier($table) . " ({$columnSql}) VALUES {$placeholders} ON DUPLICATE KEY UPDATE {$updates}";
+            $sql = 'INSERT INTO ' . $this->quoteIdentifier($table) . " ({$columnSql}) VALUES {$placeholders} {$upsertSql}";
 
             $values = [];
             foreach ($chunk as $row) {
@@ -1347,14 +1370,42 @@ class LegacyItemsImporter
         return $value !== null && $value > 0 ? $value : null;
     }
 
-    private function tableExists(PDO $pdo, string $table): bool
+    /**
+     * ما يلي VALUES في الادراج: ON DUPLICATE KEY UPDATE في MySQL، وON CONFLICT في PostgreSQL وSQLite.
+     *
+     * @param array<int, string> $conflict
+     * @param array<string, string> $updates
+     */
+    private function upsertClause(string $table, array $conflict, array $updates): string
     {
-        $stmt = $pdo->prepare(
-            'SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?'
-        );
-        $stmt->execute([$table]);
+        $mysql = $this->usesMysql();
+        $sets = [];
 
-        return (int) $stmt->fetchColumn() > 0;
+        foreach ($updates as $column => $mode) {
+            $target = $this->quoteIdentifier($column);
+            $current = $mysql ? $target : $this->quoteIdentifier($table) . '.' . $target;
+            $incoming = $mysql ? "VALUES({$target})" : "EXCLUDED.{$target}";
+
+            $sets[] = $target . ' = ' . match ($mode) {
+                self::UPSERT_NEW => $incoming,
+                self::UPSERT_KEEP => "COALESCE({$current}, {$incoming})",
+                self::UPSERT_KEEP_NON_BLANK => "COALESCE(NULLIF({$current}, ''), {$incoming})",
+                self::UPSERT_NULL => 'NULL',
+            };
+        }
+
+        if ($mysql) {
+            return 'ON DUPLICATE KEY UPDATE ' . implode(', ', $sets);
+        }
+
+        $conflictSql = implode(', ', array_map(fn (string $column): string => $this->quoteIdentifier($column), $conflict));
+
+        return "ON CONFLICT ({$conflictSql}) DO UPDATE SET " . implode(', ', $sets);
+    }
+
+    private function usesMysql(): bool
+    {
+        return in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true);
     }
 
     private function table(string $name): string
@@ -1369,7 +1420,7 @@ class LegacyItemsImporter
 
     private function quoteIdentifier(string $identifier): string
     {
-        return '`' . str_replace('`', '``', $identifier) . '`';
+        return DB::connection()->getQueryGrammar()->wrap($identifier);
     }
 
     private function log(?callable $logger, string $message): void
