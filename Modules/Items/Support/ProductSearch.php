@@ -34,6 +34,13 @@ use Modules\Items\Support\Search\SearchScorer;
 class ProductSearch
 {
     /**
+     * عدد المطابقات الذي يصبح بعده البحث "واسعاً" في PostgreSQL. حوله يتساوى الشكلان في
+     * whereMatches(): ربط كل مطابقة بصفها (نحو 0.013ms للصف) ومرور واحد على جدول الاصناف
+     * (نحو 350ms ثابتة) على 368 الف صنف.
+     */
+    private const BROAD_MATCHES = 25000;
+
+    /**
      * @var array<int, string>
      */
     private static array $labelCache = [];
@@ -65,17 +72,51 @@ class ProductSearch
             // المحاولة الاخيرة تُطبَّق ولو لم تطابق شيئاً، فيظهر الجدول فارغاً.
             // والتحقق بأرخص الاجزاء اولاً (الرقم ثم الاسم ثم الفهرس)، ويتوقف عند اول مطابقة.
             if ($index === array_key_last($attempts) || collect($parts)->contains(fn (QueryBuilder $part): bool => $part->exists())) {
-                $union = array_shift($parts);
-
-                foreach ($parts as $part) {
-                    $union->unionAll($part);
-                }
-
-                return $query->whereIn($query->qualifyColumn('id'), DB::query()->fromSub($union, 'matches')->select('matches.id'));
+                return self::whereMatches($query, $parts);
             }
         }
 
         return $query;
+    }
+
+    /**
+     * قصر الاستعلام على المعرّفات التي تعيدها الاجزاء.
+     *
+     * الشكل المعتاد: IN على UNION ALL للاجزاء، فيُحسب الجدول المشتق مرة ويُربط كل
+     * معرّف بصفه. لكن PostgreSQL لا يعرف عدد المعرّفات المميزة في UNION فيقدّرها 200،
+     * فإن طابقت كلمة شائعة مئات الآلاف رُبطت واحداً واحداً (ثوانٍ). فللبحث الواسع
+     * فيه: IN لكل جزء مفصولة بـ OR، فيمر على جدول الاصناف مرة مقابل جداول تجزئة.
+     *
+     * @param  array<int, QueryBuilder>  $parts
+     */
+    private static function whereMatches(Builder $query, array $parts): Builder
+    {
+        $id = $query->qualifyColumn('id');
+
+        // UNION يُبنى على نسخة من الجزء الاول، فتبقى الاجزاء كما هي للشكل الآخر.
+        $union = clone $parts[0];
+
+        foreach (array_slice($parts, 1) as $part) {
+            $union->unionAll($part);
+        }
+
+        if (DB::getDriverName() === 'pgsql' && self::isBroad($union)) {
+            return $query->where(function (Builder $query) use ($id, $parts) {
+                foreach ($parts as $part) {
+                    $query->orWhereIn($id, $part);
+                }
+            });
+        }
+
+        return $query->whereIn($id, DB::query()->fromSub($union, 'matches')->select('matches.id'));
+    }
+
+    /**
+     * هل تبلغ المطابقات BROAD_MATCHES؟ العدّ يتوقف عند الحد، فالكلمة الشائعة لا تمر على كل شيء.
+     */
+    private static function isBroad(QueryBuilder $union): bool
+    {
+        return DB::query()->fromSub((clone $union)->limit(self::BROAD_MATCHES), 'probe')->count() >= self::BROAD_MATCHES;
     }
 
     /**
