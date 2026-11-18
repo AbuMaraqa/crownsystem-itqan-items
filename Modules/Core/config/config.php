@@ -27,5 +27,9 @@ return [
      */
     'itqan' => [
         'data_path' => env('ITQAN_DATA_PATH'),
+        // للـ ItqanImportSeeder: مراحل مفصولة بفاصلة (فارغ = كلها)، والتجربة، ومستخدم النسبة.
+        'stages' => env('ITQAN_STAGES', ''),
+        'dry_run' => env('ITQAN_DRY_RUN', false),
+        'user_id' => env('ITQAN_USER_ID'),
     ],
 ];
