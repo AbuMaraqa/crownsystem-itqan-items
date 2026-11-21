@@ -54,6 +54,7 @@ class Category extends Model implements TranslatableContract, HasMedia
         'status',
         'sort_order',
         'parent_id',
+        'pricing_type',
         'created_by',
     ];
 
@@ -227,6 +228,14 @@ class Category extends Model implements TranslatableContract, HasMedia
     public function products()
     {
         return $this->belongsToMany(Product::class, config('items.table_prefix') . 'products_categories');
+    }
+
+    /**
+     * ألوان التصنيف مع سعر الكيلو لكل منها (مجموعات السعر).
+     */
+    public function categoryFinishes(): HasMany
+    {
+        return $this->hasMany(CategoryFinish::class, 'category_id');
     }
 
     public static function getCategoryTree($parentId = null)

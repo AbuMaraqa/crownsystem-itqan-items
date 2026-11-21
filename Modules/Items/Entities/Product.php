@@ -93,6 +93,7 @@ class Product extends Model implements TranslatableContract, HasMedia
         'meta_data',
         'parent_id',
         'main_product_id',
+        'finish_id',
         'synonym_product_id',
         'brand_id',
         'unit_id',
@@ -351,6 +352,14 @@ class Product extends Model implements TranslatableContract, HasMedia
     public function isTransportService(): bool
     {
         return $this->isService() && $this->service_kind === ServiceKind::TRANSPORT->value;
+    }
+
+    /**
+     * لون الصنف الابن (او «بلا لون» للموزون الذي لا ألوان له).
+     */
+    public function finish(): BelongsTo
+    {
+        return $this->belongsTo(Finish::class, 'finish_id');
     }
 
     /**

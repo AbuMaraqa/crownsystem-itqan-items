@@ -48,7 +48,7 @@
 
 ---
 
-### المهمة 1: الجداول والكيانات
+### Task 1 (المهمة 1): الجداول والكيانات
 
 **الملفات:**
 - إنشاء: `Modules/Items/database/migrations/2026_11_21_000001_create_items_finishes_table.php`
@@ -96,7 +96,7 @@
 
 ---
 
-### المهمة 2: توحيد الأسماء واقتراح ربط التصنيفات
+### Task 2 (المهمة 2): توحيد الأسماء واقتراح ربط التصنيفات
 
 **الملفات:**
 - إنشاء: `Modules/Items/Support/Itqan/ItqanNames.php`
@@ -173,7 +173,7 @@
 
 ---
 
-### المهمة 3: ملف الربط وأمر `itqan:category-map`
+### Task 3 (المهمة 3): ملف الربط وأمر `itqan:category-map`
 
 **الملفات:**
 - إنشاء: `Modules/Items/Support/Itqan/CategoryMapFile.php`
@@ -213,7 +213,7 @@
 
 ---
 
-### المهمة 4: المستورد الجديد `CatalogImporter`
+### Task 4 (المهمة 4): المستورد الجديد `CatalogImporter`
 
 **الملفات:**
 - إنشاء: `Modules/Items/Services/Itqan/CatalogImporter.php`
@@ -318,7 +318,7 @@
 
 ---
 
-### المهمة 5: الأسعار عبر الروابط
+### Task 5 (المهمة 5): الأسعار عبر الروابط
 
 **الملفات:**
 - تعديل: `Modules/Items/Services/Itqan/ItqanPricesStage.php`. بدل `productIdsBySku` تُستعمل الروابط. حدود الدالة الحالية: `run` من السطر 40 تقريبًا إلى 130.
@@ -350,7 +350,7 @@
 
 ---
 
-### المهمة 6: المرحلة `ItqanCatalogStage` والعيّنة والتشغيل المحلي
+### Task 6 (المهمة 6): المرحلة `ItqanCatalogStage` والعيّنة والتشغيل المحلي
 
 **الملفات:**
 - إنشاء: `Modules/Items/Services/Itqan/ItqanCatalogStage.php`، وهو `implements ItqanImportStage`.
