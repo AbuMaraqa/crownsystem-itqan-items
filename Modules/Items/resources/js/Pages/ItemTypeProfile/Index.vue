@@ -10,9 +10,10 @@ import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { confirm } from '@/lib/confirm';
 import { can, t } from '@/lib/i18n';
 import { route } from '@/lib/route';
+import { createdByColumn } from '@/lib/tableColumns';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
 
-import RecordActions from '../parts/RecordActions.vue';
+import RecordActions from '@/Components/table/RecordActions.vue';
 import ItemTypeProfileFormModal from './parts/ItemTypeProfileFormModal.vue';
 import type { ItemTypeModes, ItemTypeProfileRow } from './parts/types';
 
@@ -33,6 +34,7 @@ const columns = computed<TableColumn[]>(() => [
     { key: 'dimensions', label: t('Dimensions'), class: 'tabular', toggleable: true, hidden: true },
     { key: 'sort_order', label: t('Sort Order'), sort: 'sort_order', class: 'tabular', toggleable: true, hidden: true },
     { key: 'is_active', label: t('Is Active') },
+    createdByColumn(),
 ]);
 
 const filters = computed<TableFilter[]>(() => [
@@ -98,7 +100,7 @@ async function removeMany(ids: (number | string)[]): Promise<void> {
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Item Type Profile Delete')" :empty-title="t('No item types found')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Item Type Profile Delete')" :reorder-url="can('Item Type Profile Update') ? route('item-type-profiles.reorder') : undefined" :empty-title="t('No item types found')">
         <template #cell-code="{ row }">
             <bdi>{{ row.code }}</bdi>
         </template>

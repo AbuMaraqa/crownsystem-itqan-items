@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Branch\Entities\Branch;
+use Modules\Core\Entities\Concerns\HasSortOrder;
 use Modules\Core\Entities\User;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -17,6 +18,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 class Warehouse extends Model implements TranslatableContract
 {
     use HasFactory;
+    use HasSortOrder;
     use LogsActivity;
     use SoftDeletes;
     use Translatable;

@@ -8,6 +8,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
 use Modules\Core\Support\SafeDelete;
@@ -15,12 +16,14 @@ use Modules\Items\Entities\Label;
 use Modules\Items\Http\Requests\Admin\LabelRequest;
 use Modules\Items\Repositories\Contracts\LabelRepositoryInterface;
 use Modules\Items\Services\LabelService;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 use Modules\Items\Support\TranslatedSort;
 use Spatie\QueryBuilder\AllowedSort;
 
 class LabelController extends Controller
 {
+    use ReordersRecords;
+
     public function __construct(
         private readonly LabelRepositoryInterface $labels,
         private readonly LabelService $labelService,
@@ -33,6 +36,8 @@ class LabelController extends Controller
                 ->search(['slug'])
                 ->filters(AdminFilter::translated('name'), ...AdminFilter::dateRange('created_at'))
                 ->sorts(AllowedSort::custom('name', new TranslatedSort), 'slug', 'id')
+                ->reorderable()
+                ->withCreator()
                 ->rows(fn (Label $label) => [
                     'id' => $label->id,
                     'name' => (string) $label->name,
@@ -89,6 +94,11 @@ class LabelController extends Controller
         }
 
         return back()->with('success', __('Labels deleted successfully'));
+    }
+
+    protected function sortableModel(): string
+    {
+        return Label::class;
     }
 
     public function info(int $label): JsonResponse

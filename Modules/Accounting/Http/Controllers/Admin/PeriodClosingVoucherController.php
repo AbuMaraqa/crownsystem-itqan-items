@@ -18,7 +18,7 @@ use Modules\Accounting\Support\StatusBadge;
 use Modules\Core\Support\UserCellData;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 
 /**
  * قيود اقفال السنوات (تُنشأ تلقائياً عند اقفال السنة المالية)، والغاؤها بقيد عكسي.
@@ -38,6 +38,7 @@ class PeriodClosingVoucherController extends Controller
                 ->filters(AdminFilter::exact('status'), AdminFilter::exact('fiscal_year', 'fiscal_year_id'), ...AdminFilter::dateRange('closing_date'))
                 ->sorts('reference_no', 'closing_date', 'net_profit_base', 'id')
                 ->defaultSort('-closing_date')
+                ->withCreator()
                 ->rows(fn (PeriodClosingVoucher $voucher) => [
                     'id' => $voucher->id,
                     'reference_no' => $voucher->reference_no,
@@ -51,7 +52,6 @@ class PeriodClosingVoucherController extends Controller
                     ] : null,
                     'status' => StatusBadge::of($voucher->status),
                     'is_posted' => $voucher->status === PeriodClosingVoucherStatus::POSTED,
-                    'created_by' => UserCellData::of($voucher->createdBy),
                 ]),
             'statuses' => SelectOptions::from(PeriodClosingVoucherStatus::options()),
             'fiscalYears' => SelectOptions::from($this->vouchers->fiscalYearOptions()->all()),

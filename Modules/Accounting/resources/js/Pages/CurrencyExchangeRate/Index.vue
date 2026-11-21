@@ -11,10 +11,11 @@ import Modal from '@/Components/ui/Modal.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { can, t } from '@/lib/i18n';
+import { createdByColumn } from '@/lib/tableColumns';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
-import RecordActions from '@modules/Items/resources/js/Pages/parts/RecordActions.vue';
-import { useRecordDelete } from '@modules/Items/resources/js/Pages/parts/useRecordDelete';
-import { useRecordModal } from '@modules/Items/resources/js/Pages/parts/useRecordModal';
+import RecordActions from '@/Components/table/RecordActions.vue';
+import { useRecordDelete } from '@/lib/useRecordDelete';
+import { useRecordModal } from '@/lib/useRecordModal';
 
 import type { Option } from '../parts/types';
 
@@ -49,6 +50,7 @@ const columns = computed<TableColumn[]>(() => [
     { key: 'rate_date', label: t('Rate Date'), sort: 'rate_date' },
     { key: 'exchange_rate', label: t('Exchange Rate'), sort: 'exchange_rate', class: 'tabular' },
     { key: 'is_active', label: t('Active') },
+    createdByColumn(),
 ]);
 
 const filters = computed<TableFilter[]>(() => [

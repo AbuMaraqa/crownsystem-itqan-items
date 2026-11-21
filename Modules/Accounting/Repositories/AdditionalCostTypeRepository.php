@@ -16,6 +16,6 @@ class AdditionalCostTypeRepository extends BaseEloquentRepository implements Add
 
     public function tableQuery(): Builder
     {
-        return $this->query()->with(['createdBy.media']);
+        return $this->query();
     }
 }

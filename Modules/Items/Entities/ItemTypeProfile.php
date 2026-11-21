@@ -8,6 +8,7 @@ use DomainException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Modules\Core\Entities\Concerns\HasSortOrder;
 use Modules\Core\Entities\User;
 use Modules\Items\Enums\ItemBonusMode;
 use Modules\Items\Enums\ItemDateMode;
@@ -23,6 +24,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
  */
 class ItemTypeProfile extends Model implements TranslatableContract
 {
+    use HasSortOrder;
     use LogsActivity;
     use Translatable;
 

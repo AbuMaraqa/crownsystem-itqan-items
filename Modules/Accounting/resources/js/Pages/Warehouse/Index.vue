@@ -11,9 +11,10 @@ import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { can, t } from '@/lib/i18n';
 import { Boxes, MapPin } from '@/lib/icons';
 import { route } from '@/lib/route';
+import { createdByColumn } from '@/lib/tableColumns';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
-import RecordActions from '@modules/Items/resources/js/Pages/parts/RecordActions.vue';
-import { useRecordDelete } from '@modules/Items/resources/js/Pages/parts/useRecordDelete';
+import RecordActions from '@/Components/table/RecordActions.vue';
+import { useRecordDelete } from '@/lib/useRecordDelete';
 
 import type { Option } from '../parts/types';
 
@@ -47,6 +48,7 @@ const columns = computed<TableColumn[]>(() => [
     { key: 'email', label: t('Email') },
     { key: 'is_active', label: t('Status'), sort: 'is_active' },
     { key: 'locales', label: t('Locale'), toggleable: true },
+    createdByColumn(),
 ]);
 
 const filters = computed<TableFilter[]>(() => [
@@ -68,7 +70,7 @@ const { remove, removeMany } = useRecordDelete(routes);
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Warehouse Delete')" :empty-title="t('No warehouses found')" :empty-text="t('Create a new warehouse by clicking the button below')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Warehouse Delete')" :reorder-url="can('Warehouse Update') ? route('accounting.warehouses.reorder') : undefined" :empty-title="t('No warehouses found')" :empty-text="t('Create a new warehouse by clicking the button below')">
         <template #cell-name="{ row }">
             <Link v-if="can('Warehouse Update')" :href="route('accounting.warehouses.edit', row.id)" class="font-medium text-brand-600 hover:underline dark:text-brand-400">{{ row.name }}</Link>
             <template v-else>{{ row.name }}</template>
@@ -118,8 +120,10 @@ const { remove, removeMany } = useRecordDelete(routes);
                 ]"
                 @delete="remove(row.id, row.name)"
             >
-                <DropdownItem v-if="can('Warehouse Location View List')" :href="route('accounting.inventory.layout', row.id)"><MapPin />{{ t('Warehouse Layout') }}</DropdownItem>
-                <DropdownItem v-if="can('Stock View List')" :href="row.stock_url"><Boxes />{{ t('Stock Balances') }}</DropdownItem>
+                <template v-if="can('Warehouse Location View List') || can('Stock View List')" #default>
+                    <DropdownItem v-if="can('Warehouse Location View List')" :href="route('accounting.inventory.layout', row.id)"><MapPin />{{ t('Warehouse Layout') }}</DropdownItem>
+                    <DropdownItem v-if="can('Stock View List')" :href="row.stock_url"><Boxes />{{ t('Stock Balances') }}</DropdownItem>
+                </template>
             </RecordActions>
         </template>
         <template #bulk="{ selected }">

@@ -29,7 +29,7 @@ const dir = computed(() => page.props.dir as 'rtl' | 'ltr');
             <div class="flex min-h-screen flex-col transition-[padding] duration-200 ease-out" :class="collapsed ? 'lg:ps-sidebar-collapsed' : 'lg:ps-sidebar'">
                 <AppHeader />
                 <SectionNav />
-                <main id="content" class="mx-auto flex w-full max-w-[1440px] flex-1 flex-col px-4 pt-4 pb-6 md:px-6 lg:px-8">
+                <main id="content" class="mx-auto flex w-full max-w-page flex-1 flex-col px-4 pt-5 pb-7 md:px-6 lg:px-gutter">
                     <slot />
                 </main>
                 <AppFooter />

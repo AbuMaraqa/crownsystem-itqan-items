@@ -3,32 +3,31 @@ import { computed } from 'vue';
 
 import TextInput from '@/Components/form/TextInput.vue';
 import DataTable from '@/Components/table/DataTable.vue';
-import UserCell from '@/Components/table/UserCell.vue';
 import Button from '@/Components/ui/Button.vue';
 import Modal from '@/Components/ui/Modal.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { can, t } from '@/lib/i18n';
+import { route } from '@/lib/route';
+import { createdByColumn } from '@/lib/tableColumns';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
-import RecordActions from '@modules/Items/resources/js/Pages/parts/RecordActions.vue';
-import { useRecordDelete } from '@modules/Items/resources/js/Pages/parts/useRecordDelete';
-import { useRecordModal } from '@modules/Items/resources/js/Pages/parts/useRecordModal';
+import RecordActions from '@/Components/table/RecordActions.vue';
+import { useRecordDelete } from '@/lib/useRecordDelete';
+import { useRecordModal } from '@/lib/useRecordModal';
 
-import type { UserCellData } from '../parts/types';
 
 defineOptions({ layout: AdminLayout });
 
 interface Row {
     id: number;
     name: string;
-    created_by: UserCellData | null;
 }
 
 defineProps<{ table: TablePayload<Row> }>();
 
 const columns = computed<TableColumn[]>(() => [
     { key: 'name', label: t('Name'), sort: 'name' },
-    { key: 'created_by', label: t('Added By'), toggleable: true },
+    createdByColumn(),
 ]);
 
 const filters = computed<TableFilter[]>(() => [
@@ -52,14 +51,10 @@ function editRow(row: Row): void {
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :empty-title="t('No data available')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :reorder-url="can('Attachment Category Update') ? route('accounting.attachment-categories.reorder') : undefined" :empty-title="t('No data available')">
         <template #cell-name="{ row }">
             <button v-if="can('Attachment Category Update')" type="button" class="font-medium text-brand-600 hover:underline dark:text-brand-400" @click="editRow(row)">{{ row.name }}</button>
             <span v-else class="font-medium">{{ row.name }}</span>
-        </template>
-        <template #cell-created_by="{ row }">
-            <UserCell v-if="row.created_by" :name="row.created_by.name" :avatar="row.created_by.avatar" :detail="row.created_by.detail" />
-            <span v-else class="text-muted">—</span>
         </template>
         <template #empty>
             <Button v-if="can('Attachment Category Create')" variant="primary" @click="add">{{ t('Add Attachment Category') }}</Button>

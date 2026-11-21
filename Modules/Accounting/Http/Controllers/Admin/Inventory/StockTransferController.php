@@ -23,7 +23,7 @@ use Modules\Accounting\Support\InventoryLines;
 use Modules\Accounting\Support\Number;
 use Modules\Accounting\Support\SelectOptions;
 use Modules\Core\Support\AdminFilter;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 
 /**
  * التحويل المخزني بين مخزنين، او نقل داخل نفس المخزن الى موقع آخر حين يمتلئ موقع الصنف.

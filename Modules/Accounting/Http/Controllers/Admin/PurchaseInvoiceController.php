@@ -28,7 +28,7 @@ use Modules\Core\Services\ReferenceNumberService;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
 use Modules\Core\Support\UserCellData;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 use Spatie\QueryBuilder\AllowedFilter;
 
 /**
@@ -87,6 +87,7 @@ class PurchaseInvoiceController extends Controller
                 )
                 ->sorts('reference_no', 'invoice_date', 'due_date', 'total_amount', 'status', 'id')
                 ->defaultSort('-invoice_date')
+                ->withCreator()
                 ->rows(fn (PurchaseInvoice $invoice) => [
                     'id' => $invoice->id,
                     'reference_no' => $invoice->reference_no,
@@ -263,7 +264,7 @@ class PurchaseInvoiceController extends Controller
 
     public function info(int $purchaseInvoice): JsonResponse
     {
-        return response()->json(RecordInfo::of($this->find($purchaseInvoice)));
+        return response()->json(RecordInfo::of($this->invoices->query()->withTrashed()->findOrFail($purchaseInvoice)));
     }
 
     public function print(int $purchaseInvoice, AccountingPdfService $pdf): mixed

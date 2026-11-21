@@ -26,7 +26,7 @@ use Modules\Core\Services\ReferenceNumberService;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
 use Modules\Core\Support\UserCellData;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 use Spatie\QueryBuilder\AllowedFilter;
 
 /**
@@ -64,6 +64,7 @@ class PurchaseQuotationController extends Controller
                 )
                 ->sorts('reference_no', 'quotation_date', 'valid_until', 'total_amount', 'status', 'id')
                 ->defaultSort('-id')
+                ->withCreator()
                 ->rows(fn (PurchaseQuotation $quotation) => [
                     'id' => $quotation->id,
                     'reference_no' => $quotation->reference_no,
@@ -76,9 +77,10 @@ class PurchaseQuotationController extends Controller
                     'total_amount_full' => Number::money($quotation->total_amount),
                     'currency' => $quotation->currency?->code,
                     'status' => StatusBadge::of($quotation->status),
-                    'created_by' => UserCellData::of($quotation->createdBy),
                     'notes' => $quotation->notes,
                     'deleted' => $quotation->trashed(),
+                    'editable' => ! $quotation->trashed() && $quotation->canBeEdited(),
+                    'can_delete' => ! $quotation->trashed() && $quotation->canBeDeleted(),
                 ]),
             'statusOptions' => SelectOptions::from(PurchaseQuotationStatus::options()),
             'currencyOptions' => SelectOptions::currencies(),
@@ -233,7 +235,7 @@ class PurchaseQuotationController extends Controller
 
     public function info(int $purchaseQuotation): JsonResponse
     {
-        return response()->json(RecordInfo::of($this->find($purchaseQuotation)));
+        return response()->json(RecordInfo::of($this->quotations->query()->withTrashed()->findOrFail($purchaseQuotation)));
     }
 
     public function print(int $purchaseQuotation, AccountingPdfService $pdf): mixed

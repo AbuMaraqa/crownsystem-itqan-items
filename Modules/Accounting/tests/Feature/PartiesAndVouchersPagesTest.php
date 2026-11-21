@@ -408,7 +408,8 @@ class PartiesAndVouchersPagesTest extends TestCase
         $this->post(route('accounting.receipt-vouchers.post', $draft->id), $this->voucherPayload($this->customer->id))->assertForbidden();
         $this->post(route('accounting.receipt-vouchers.cancel', $posted->id))->assertForbidden();
         $this->delete(route('accounting.receipt-vouchers.destroy', $draft->id))->assertForbidden();
-        $this->getJson(route('accounting.receipt-vouchers.info', $draft->id))->assertForbidden();
+        // Info is basic: whoever sees the list sees the row's history (View List).
+        $this->getJson(route('accounting.receipt-vouchers.info', $draft->id))->assertOk();
 
         $this->assertSame(ReceiptVoucherStatus::DRAFT, $draft->refresh()->status);
         $this->assertSame(ReceiptVoucherStatus::POSTED, $posted->refresh()->status);

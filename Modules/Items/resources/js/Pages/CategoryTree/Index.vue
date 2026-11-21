@@ -78,7 +78,7 @@ onBeforeUnmount(() => clearTimeout(timer));
             <label class="relative w-full md:max-w-sm">
                 <span class="sr-only">{{ t('Search categories...') }}</span>
                 <Search class="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-gray-400" />
-                <input v-model="filters.search" type="search" :placeholder="t('Search categories...')" class="h-10 w-full rounded-lg border border-line bg-card ps-9 pe-3 text-sm outline-none focus:border-brand-300 focus:shadow-focus-ring" />
+                <input v-model="filters.search" type="search" :placeholder="t('Search categories...')" class="h-control w-full rounded-control border border-line bg-card ps-9 pe-3 text-sm outline-none focus:border-brand-300 focus:shadow-focus-ring" />
             </label>
             <label class="inline-flex items-center gap-2 text-sm text-muted">
                 <input v-model="filters.show_inactive" type="checkbox" class="size-4 rounded accent-brand-500" />

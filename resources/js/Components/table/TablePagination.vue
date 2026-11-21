@@ -18,14 +18,14 @@ const pages = computed<(number | null)[]>(() => {
     return sorted.flatMap((page, index) => (index > 0 && page - sorted[index - 1] > 1 ? [null, page] : [page]));
 });
 
-const button = 'inline-flex size-8 items-center justify-center rounded-lg text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-40';
+const button = 'inline-flex size-control-sm items-center justify-center rounded-control text-[13px] font-medium transition-colors disabled:pointer-events-none disabled:opacity-40';
 </script>
 
 <template>
-    <nav class="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-3.5 text-sm text-muted" :aria-label="t('Pagination')">
+    <nav class="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-3 text-[13px] text-muted" :aria-label="t('Pagination')">
         <label class="flex items-center gap-2">
             <span>{{ t('Show') }}</span>
-            <select :value="meta.per_page" class="h-8 rounded-lg border border-line bg-card px-2 text-sm text-ink shadow-theme-xs" @change="emit('perPage', Number(($event.target as HTMLSelectElement).value))">
+            <select :value="meta.per_page" class="h-control-sm rounded-control border border-gray-200 bg-card px-2 text-[13px] text-ink shadow-theme-xs dark:border-gray-800" @change="emit('perPage', Number(($event.target as HTMLSelectElement).value))">
                 <option v-for="size in [10, 25, 50, 100]" :key="size" :value="size">{{ size }}</option>
             </select>
             <span>{{ t('per page') }}</span>

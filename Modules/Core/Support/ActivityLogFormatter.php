@@ -45,6 +45,14 @@ class ActivityLogFormatter
         };
     }
 
+    /**
+     * اسم الحدث الموحَّد (created / updated / deleted / restored أو فارغ) لتلوين سجل النشاط في الواجهة.
+     */
+    public static function event(Activity $activity): string
+    {
+        return self::eventName($activity);
+    }
+
     public static function eventColor(Activity $activity): string
     {
         return match (self::eventName($activity)) {

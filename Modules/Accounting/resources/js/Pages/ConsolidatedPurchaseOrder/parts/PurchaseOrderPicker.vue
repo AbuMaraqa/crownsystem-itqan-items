@@ -194,7 +194,7 @@ onBeforeUnmount(() => {
                     <button type="button" class="text-muted hover:text-danger" :title="t('Change purchase order')" :aria-label="t('Change purchase order')" @click="change"><X class="size-4" /></button>
                 </div>
                 <template v-else>
-                    <input v-model="poSearch" type="search" :placeholder="t('Search by reference or client...')" :class="[controlClasses, 'h-10']" />
+                    <input v-model="poSearch" type="search" :placeholder="t('Search by reference or client...')" :class="[controlClasses, 'h-control']" />
                     <div class="mt-2 max-h-48 overflow-y-auto rounded-lg border border-line">
                         <button
                             v-for="option in purchaseOrders"
@@ -211,9 +211,9 @@ onBeforeUnmount(() => {
             </div>
 
             <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <input v-model="itemSearch" type="search" :disabled="!purchaseOrder" :placeholder="t('Search by main item, sub-item or barcode...')" :class="[controlClasses, 'col-span-2 h-10']" />
-                <input v-model="lengthSearch" type="number" step="0.001" min="0" dir="ltr" :disabled="!purchaseOrder" :placeholder="t('Search by length')" :title="t('Sub item length')" :class="[controlClasses, 'h-10']" />
-                <input v-model="quantitySearch" type="number" step="0.001" min="0" dir="ltr" :disabled="!purchaseOrder" :placeholder="t('Search by quantity')" :title="t('Sub item quantity')" :class="[controlClasses, 'h-10']" />
+                <input v-model="itemSearch" type="search" :disabled="!purchaseOrder" :placeholder="t('Search by main item, sub-item or barcode...')" :class="[controlClasses, 'col-span-2 h-control']" />
+                <input v-model="lengthSearch" type="number" step="0.001" min="0" dir="ltr" :disabled="!purchaseOrder" :placeholder="t('Search by length')" :title="t('Sub item length')" :class="[controlClasses, 'h-control']" />
+                <input v-model="quantitySearch" type="number" step="0.001" min="0" dir="ltr" :disabled="!purchaseOrder" :placeholder="t('Search by quantity')" :title="t('Sub item quantity')" :class="[controlClasses, 'h-control']" />
             </div>
 
             <p v-if="notice" class="rounded-lg px-3 py-2 text-sm" :class="notice.tone === 'success' ? 'bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400' : 'bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400'" role="status">

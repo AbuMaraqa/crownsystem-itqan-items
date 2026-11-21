@@ -10,10 +10,11 @@ import PageHeader from '@/Components/ui/PageHeader.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { can, t } from '@/lib/i18n';
 import { route } from '@/lib/route';
+import { createdByColumn } from '@/lib/tableColumns';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
 
-import RecordActions from '../parts/RecordActions.vue';
-import { useRecordDelete } from '../parts/useRecordDelete';
+import RecordActions from '@/Components/table/RecordActions.vue';
+import { useRecordDelete } from '@/lib/useRecordDelete';
 
 defineOptions({ layout: AdminLayout });
 
@@ -34,6 +35,7 @@ const columns = computed<TableColumn[]>(() => [
     { key: 'description', label: t('Description'), toggleable: true },
     { key: 'type', label: t('Type'), sort: 'type' },
     { key: 'locales', label: t('Locale'), toggleable: true },
+    createdByColumn(),
 ]);
 
 const filters = computed<TableFilter[]>(() => [
@@ -52,7 +54,7 @@ const { remove, removeMany } = useRecordDelete('addons');
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Addon Delete')" :empty-title="t('No addons found')" :empty-text="t('Create a new addon by clicking the button below')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Addon Delete')" :reorder-url="can('Addon Update') ? route('addons.reorder') : undefined" :empty-title="t('No addons found')" :empty-text="t('Create a new addon by clicking the button below')">
         <template #cell-image="{ row }">
             <img v-if="row.image" :src="row.image" alt="" class="size-12 rounded-control object-cover" />
         </template>

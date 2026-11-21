@@ -29,39 +29,59 @@ onMounted(() => {
 
 onUnmounted(() => window.removeEventListener('scroll', onScroll));
 
-const iconButton = buttonClasses({ variant: 'ghost', size: 'icon-md', class: 'rounded-full text-gray-500 dark:text-gray-400' });
+const iconButton = buttonClasses({
+    variant: 'ghost',
+    size: 'icon-md',
+    class: 'size-9 rounded-full text-gray-500 hover:text-brand-500 dark:text-gray-400 dark:hover:text-brand-400',
+});
 </script>
 
 <template>
     <header
-        class="sticky top-0 z-40 flex h-header shrink-0 items-center gap-3 border-b px-4 transition-[background-color,border-color,box-shadow] md:px-6 lg:px-8"
+        class="sticky top-0 z-40 flex h-header shrink-0 border-b px-4 transition-[background-color,border-color,box-shadow] md:px-6 lg:px-gutter"
         :class="scrolled ? 'border-line bg-card/85 shadow-theme-xs backdrop-blur-md' : 'border-transparent bg-canvas'"
     >
-        <button type="button" :class="buttonClasses({ variant: 'secondary', size: 'icon-md', class: 'lg:hidden' })" :aria-label="t('Open menu')" @click="toggle">
-            <Menu />
-        </button>
-        <div class="lg:hidden"><SidebarBrand :show-text="false" /></div>
-
-        <!-- The page's breadcrumb lands here (PageHeader teleports it). -->
-        <div id="header-breadcrumbs" class="hidden min-w-0 lg:block" />
-
-        <div class="ms-auto flex items-center gap-1 sm:gap-1.5">
-            <!-- Looks like a field, opens the search dialog: pages and actions by name. -->
+        <!-- The same box as the page under it, so the header's edges line up with the content's. -->
+        <div class="mx-auto flex w-full max-w-page items-center gap-3">
             <button
                 type="button"
-                class="me-1.5 hidden h-10 w-60 items-center gap-2.5 rounded-lg border border-line bg-card px-3 text-sm text-gray-400 shadow-theme-xs transition-colors hover:border-gray-300 xl:flex dark:text-gray-500 dark:hover:border-gray-700"
-                :aria-label="t('Search')"
-                @click="searchOpen = true"
+                :class="
+                    buttonClasses({
+                        variant: 'secondary',
+                        size: 'icon-md',
+                        class: 'lg:hidden',
+                    })
+                "
+                :aria-label="t('Open menu')"
+                @click="toggle"
             >
-                <Search class="size-4.5" />
-                <span class="flex-1 text-start">{{ t('Search...') }}</span>
-                <span class="flex items-center gap-1" dir="ltr"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">K</kbd></span>
+                <Menu />
             </button>
-            <button type="button" :class="[iconButton, 'xl:hidden']" :aria-label="t('Search')" title="Ctrl+K" @click="searchOpen = true"><Search /></button>
-            <NotificationsButton :button-class="iconButton" />
-            <AppsMenu :button-class="iconButton" />
-            <span class="mx-1 hidden h-6 w-px bg-line sm:block" aria-hidden="true" />
-            <UserDropdown />
+            <div class="lg:hidden"><SidebarBrand :show-text="false" /></div>
+
+            <!-- The page's breadcrumb lands here (PageHeader teleports it). -->
+            <div id="header-breadcrumbs" class="hidden min-w-0 lg:block" />
+
+            <div class="ms-auto flex items-center gap-1 sm:gap-1.5">
+                <!-- Looks like a field, opens the search dialog: pages and actions by name. -->
+                <button
+                    type="button"
+                    class="me-1.5 hidden h-control w-60 items-center gap-2.5 rounded-control border border-gray-200 bg-card px-3 text-[13px] text-gray-500 shadow-theme-xs transition-colors hover:border-gray-300 xl:flex dark:border-gray-800 dark:text-gray-400 dark:hover:border-gray-700"
+                    :aria-label="t('Search')"
+                    @click="searchOpen = true"
+                >
+                    <Search class="size-4.5" />
+                    <span class="flex-1 text-start">{{ t('Search...') }}</span>
+                    <span class="flex items-center gap-1" dir="ltr"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">K</kbd></span>
+                </button>
+                <button type="button" :class="[iconButton, 'xl:hidden']" :aria-label="t('Search')" title="Ctrl+K" @click="searchOpen = true">
+                    <Search />
+                </button>
+                <NotificationsButton :button-class="iconButton" />
+                <AppsMenu :button-class="iconButton" />
+                <span class="mx-1 hidden h-6 w-px bg-line sm:block" aria-hidden="true" />
+                <UserDropdown />
+            </div>
         </div>
 
         <CommandSearch v-model:open="searchOpen" />

@@ -33,7 +33,7 @@ watch(
         <p v-if="confirmState.options.description" class="text-sm text-muted">{{ confirmState.options.description }}</p>
         <div v-if="confirmState.options.typeToConfirm" class="mt-3">
             <label class="mb-1 block text-sm">{{ t('Type :text to confirm', { text: confirmState.options.typeToConfirm }) }}</label>
-            <input v-model="typed" class="h-9 w-full rounded-control border border-line px-3 text-sm" autocomplete="off" />
+            <input v-model="typed" class="h-control w-full rounded-control border border-gray-200 px-3 text-[13px] dark:border-gray-800" autocomplete="off" />
         </div>
         <template #footer>
             <Button @click="answer(false)">{{ t('Cancel') }}</Button>

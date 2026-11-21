@@ -4,6 +4,7 @@ namespace Modules\Branch\Entities;
 
 use Astrotomic\Translatable\Contracts\Translatable as TranslatableContract;
 use Astrotomic\Translatable\Translatable;
+use Modules\Core\Entities\Concerns\HasSortOrder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -21,6 +22,7 @@ class Branch extends Model implements TranslatableContract
     use LogsActivity;
     use softDeletes;
     use Translatable;
+    use HasSortOrder;
 
     public function __construct(array $attributes = [])
     {

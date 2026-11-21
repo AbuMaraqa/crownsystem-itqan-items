@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Modules\Branch\Entities\Branch;
+use Modules\Core\Entities\Concerns\HasSortOrder;
 use Modules\Core\Entities\User;
 use Modules\Items\Enums\AttributeType;
 use Modules\Items\Enums\OfferType;
@@ -25,6 +26,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 
 class Offer extends Model implements TranslatableContract , HasMedia
 {
+    use HasSortOrder;
     use LogsActivity;
     use Translatable;
     use InteractsWithMedia;

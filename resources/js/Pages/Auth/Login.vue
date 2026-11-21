@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Link, useForm } from '@inertiajs/vue3';
 
+import AuthHeading from '@/Components/auth/AuthHeading.vue';
+import Checkbox from '@/Components/form/Checkbox.vue';
+import PasswordInput from '@/Components/form/PasswordInput.vue';
 import TextInput from '@/Components/form/TextInput.vue';
-import Toggle from '@/Components/form/Toggle.vue';
+import Alert from '@/Components/ui/Alert.vue';
 import Button from '@/Components/ui/Button.vue';
 import GuestLayout from '@/Layouts/GuestLayout.vue';
 import { t } from '@/lib/i18n';
@@ -18,16 +21,16 @@ function submit(): void {
 </script>
 
 <template>
-    <Head :title="t('Log in')" />
-    <h1 class="mb-4 text-base font-semibold">{{ t('Log in') }}</h1>
-    <p v-if="status" class="mb-3 text-sm text-success">{{ status }}</p>
-    <form class="space-y-4" @submit.prevent="submit">
-        <TextInput v-model="form.email" :label="t('Email')" type="email" autocomplete="username" dir="ltr" required :error="form.errors.email" />
-        <TextInput v-model="form.password" :label="t('Password')" type="password" autocomplete="current-password" dir="ltr" required :error="form.errors.password" />
-        <Toggle v-model="form.remember" :label="t('Remember me')" />
+    <AuthHeading :title="t('Log in')" :description="t('Please sign in to continue')" />
+    <Alert v-if="status" tone="success">{{ status }}</Alert>
+    <form class="flex flex-col gap-5" @submit.prevent="submit">
+        <TextInput v-model="form.email" :label="t('Email')" type="email" placeholder="email@example.com" autocomplete="username" dir="ltr" required :error="form.errors.email" />
+        <PasswordInput v-model="form.password" :label="t('Password')" autocomplete="current-password" required :error="form.errors.password">
+            <template #aside>
+                <Link href="/forgot-password" class="text-sm font-medium text-brand-500 hover:text-brand-600 dark:text-brand-400">{{ t('Forgot Password?') }}</Link>
+            </template>
+        </PasswordInput>
+        <Checkbox v-model="form.remember" :label="t('Remember me')" />
         <Button type="submit" variant="primary" class="w-full" :loading="form.processing">{{ t('Log in') }}</Button>
-        <p class="text-center text-sm">
-            <Link href="/forgot-password" class="text-muted underline hover:text-ink">{{ t('Forgot your password?') }}</Link>
-        </p>
     </form>
 </template>

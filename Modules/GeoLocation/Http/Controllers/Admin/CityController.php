@@ -4,12 +4,15 @@ namespace Modules\GeoLocation\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Support\Locales;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
+use Modules\Core\Support\RecordInfo;
 use Modules\GeoLocation\Entities\City;
 use Modules\GeoLocation\Enums\CapitalType;
 use Modules\GeoLocation\Enums\CityType;
@@ -22,6 +25,8 @@ use Modules\GeoLocation\Support\GeoFilters;
 
 class CityController extends Controller
 {
+    use ReordersRecords;
+
     public function __construct(
         private readonly CityRepositoryInterface $cities,
         private readonly CityService $cityService,
@@ -46,6 +51,8 @@ class CityController extends Controller
                     ...AdminFilter::dateRange('created_at'),
                 )
                 ->sorts(GeoFilters::nameSort(), 'population', 'type', 'created_at', 'id')
+                ->reorderable()
+                ->withCreator()
                 ->rows(fn (City $city) => [
                     'id' => $city->id,
                     'name' => $city->name,
@@ -128,6 +135,16 @@ class CityController extends Controller
         $this->cityService->deleteMany($ids);
 
         return back()->with('success', __('Cities deleted successfully'));
+    }
+
+    public function info(int $city): JsonResponse
+    {
+        return response()->json(RecordInfo::of($this->cities->findOrFail($city)));
+    }
+
+    protected function sortableModel(): string
+    {
+        return City::class;
     }
 
     /**

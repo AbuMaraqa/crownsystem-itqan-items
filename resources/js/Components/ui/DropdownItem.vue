@@ -8,7 +8,7 @@ defineProps<{ href?: string; external?: boolean; destructive?: boolean }>();
 const emit = defineEmits<{ select: [event: Event] }>();
 
 const classes =
-    'flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-start font-medium outline-none select-none [&_svg]:size-[18px] [&_svg]:shrink-0';
+    'flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-start text-[13px] font-medium outline-none select-none [&_svg]:size-[18px] [&_svg]:shrink-0';
 </script>
 
 <template>

@@ -55,7 +55,7 @@ function remove(value: string | number): void {
     <Field :id="id" :label="label" :error="error" :hint="hint" :required="required">
         <ComboboxRoot v-model="model as never" :multiple="!single" ignore-filter class="relative" @update:open="search = ''">
             <ComboboxAnchor
-                class="flex min-h-9 w-full flex-wrap items-center gap-1 rounded-control border bg-card px-2 py-1 focus-within:border-brand"
+                class="flex min-h-control w-full flex-wrap items-center gap-1 rounded-control border bg-card px-2 py-1 focus-within:border-brand"
                 :class="error ? 'border-danger' : 'border-line'"
             >
                 <span v-for="value in selected" :key="value" class="inline-flex items-center gap-1 rounded bg-surface px-1.5 py-0.5 text-sm">

@@ -14,6 +14,7 @@ Rule: if something is displayed or computed in more than one place, it has ONE s
 | Show a user (avatar + name + email/phone) in a Vue table or page | `<UserCell :name :avatar :detail :href />` (`resources/js/Components/table/UserCell.vue`); the server sends `Modules\Core\Support\UserCellData::of($user)` (null-safe; TS type `UserCellData` in `resources/js/types/user.ts`) | an inline `<img>` + name, or building the array by hand |
 | Same, in Blade HTML | `{{ $user->user_display_html }}` (returns `HtmlString`; null-safe: `{{ $doc->client?->user_display_html ?? '-' }}`) | hand-built `<img>` + name + email markup |
 | Avatar URL only | `$user->avatar_url` (uploaded media, else cached initials PNG `data:` URL) | `getFirstMediaUrl('avatar')`, `asset($user->avatar_url)` — `asset()` breaks `data:` URLs |
+| Same, as an array in PHP (Inertia props, JSON) | `$user->user_cell` (accessor → `UserCellData::of($this)`) | building `['name' => …, 'avatar' => …]` by hand |
 | Plain text name (PDF, select option label, toast, notification, string concat) | `$user->name` | putting `user_display_html` into PDFs/selects |
 
 - The Blade design lives in ONE file: `Modules/Core/resources/views/partials/user-display.blade.php`; the Vue one in `UserCell.vue`. Change them there only.
@@ -80,7 +81,7 @@ The server flashes `back()->with('success'|'error', __('...'))`; `resources/js/C
 
 | Need | Use | Never |
 |---|---|---|
-| Row actions of a list (View, Info, Edit, Delete) and add/edit modals | `Modules/Items/resources/js/Pages/parts/` (`RecordActions`, `useRecordModal`, `useRecordDelete`, `RecordInfoModal`, `RecordViewModal`) + `Modules\Items\Support\RecordInfo::of($model)` for the `<route>.info` JSON | a menu or modal per page |
+| Row actions of EVERY table: the 4 coloured icon buttons Info · View · Edit · Delete (Info/View = `<Entity> View List`, Edit = `Update` + `editable`, Delete = `Delete` + `deletable`; extra actions as `DropdownItem`s in its slot, behind ⋮) | `resources/js/Components/table/RecordActions.vue` (+ `ActionButton`, `RecordInfoModal`, `RecordViewModal`), `@/lib/useRecordModal`, `@/lib/useRecordDelete`; the `<routes>.info` JSON (`->can('<Entity> View List')`) returns `Modules\Core\Support\RecordInfo::of($model)` (creator card + readable activity timeline from `ActivityLogFormatter::rows()`) | a `RowMenu` or modal per page, raw JSON in the activity log |
 | A status enum as a badge | `Modules\Accounting\Support\StatusBadge::of($enum)` → `{label, tone}` for `Badge.vue` | mapping colors in each controller |
 | Select options from enums, accounts, branches, currencies | `Modules\Accounting\Support\SelectOptions` | `->map(fn ...)` per controller |
 | Payment allocations on a voucher / invoice / return page | `PaymentAllocationPanel::of($record)` (`Modules\Accounting\Support`) + `<PaymentAllocationPanel :panel />` (`Modules/Accounting/resources/js/Pages/parts/PaymentAllocationPanel.vue`) | a payments table per page |
@@ -90,6 +91,9 @@ The server flashes `back()->with('success'|'error', __('...'))`; `resources/js/C
 | The item tree's right-click menu (what each node allows) | `Modules\Items\Services\ItemTreeService::nodeActions()` / `allows()` | deciding actions in Vue only |
 | A simple Accounting lookup (create, update, active switch, safe delete) | extend `Modules\Accounting\Services\LookupService`; the in-row switch is `Modules/Accounting/resources/js/Pages/parts/useActiveToggle.ts` | a service per lookup with copied CRUD |
 | A list page's data (filters, sort, pages) | `Modules\Core\Support\AdminTable` + `AdminFilter` on the server, `<DataTable>` in Vue | a hand-paginated query or table |
+| «Created By» column of a table | server `AdminTable::...->withCreator()` (row `created_by` = `UserCellData`, eager-loads `createdBy.media`), client `createdByColumn()` from `@/lib/tableColumns` (DataTable draws `type: 'user'` columns with `UserCell`) | a creator column built per page |
+| Drag-and-drop row order (setup tables only, never documents) | model `Modules\Core\Entities\Concerns\HasSortOrder` (`sort_order`), controller `Modules\Core\Http\Controllers\Concerns\ReordersRecords` + `sortableModel()`, route `Route::post('/reorder', 'reorder')->name('reorder')->can('<Entity> Update')`, `AdminTable::...->reorderable()`, `<DataTable :reorder-url>`; saving in `Modules\Core\Services\RecordOrderService` | a sort_order form field or a reorder endpoint per page |
+| `created_by` filled automatically on a model that did not have it | `Modules\Core\Entities\Concerns\HasCreator` (also defines `createdBy()`) | setting `created_by` in every service |
 | Delete a record other records may use | `SafeDelete::attempt(fn () => ...)` in the Service, `back()->with('error', SafeDelete::message())` in the controller | catching `QueryException` per page |
 | Service lines and customer materials under the grid (sales orders/invoices) | `items-grid/ServiceLines.vue` + `CustomerMaterials.vue`, passed to totals as `GridContext.extraLines`; server rules in `Modules\Accounting\Support\SalesServiceLine` (`merge`, `rows`, `materialRows`, `defaults`, `options`, `providers`), validation `Http/Requests/Admin/Concerns/ValidatesSalesServiceLines` | service rows built per page |
 | A page's own JSON calls (searches, pickers, previews) | `Modules/Accounting/resources/js/Pages/parts/http.ts` (`getJson`/`postJson`, XSRF header, `HttpError` with validation errors); record writes stay on Inertia `router`/`useForm` | `fetch` / `axios` per page |
@@ -101,6 +105,12 @@ The server flashes `back()->with('success'|'error', __('...'))`; `resources/js/C
 | Follow a notification's link | `NotificationService::safeUrl()` | another `str_starts_with('/')` check |
 | Panel color and font | `Modules\Core\Support\DashboardTheme` (settings `dashboard_color`, `dashboard_font`) | hard-coded brand colors |
 | Texts in Vue | `t('English key')` from `@/lib/i18n`, Arabic in the module `Lang/ar.json` | Arabic text in a `.vue` file |
+| Height and corners of a field or button | `h-control` (34px) / `h-control-sm` (28px), `rounded-control` (6px); fields take `controlClasses`, buttons `buttonClasses()` / `<Button>` | `h-9`, `h-10`, `rounded-lg` on a field |
+| Page width and side gutter | `max-w-page` (1280px) and `px-gutter` (30px) from `admin.css`; a bar that bleeds to the page edge uses `lg:-mx-gutter` | `max-w-[1440px]`, `lg:px-8`, `-mx-8` |
+| Password field (show/hide button) | `resources/js/Components/form/PasswordInput.vue`; a link on the label line goes in Field's `#aside` slot | `type="password"` on a TextInput |
+| Checkbox with its label | `resources/js/Components/form/Checkbox.vue` | a bare `<input type="checkbox">` + label |
+| A message box in a page or form (sent, saved, warning) | `resources/js/Components/ui/Alert.vue` (`tone` info/success/warning/danger) | a coloured `<p>` |
+| Sign-in screens | `GuestLayout` (form card + brand panel) and `Components/auth/AuthHeading.vue` for the title | a page-level layout or heading |
 
 ## 10. Adding a new global piece
 

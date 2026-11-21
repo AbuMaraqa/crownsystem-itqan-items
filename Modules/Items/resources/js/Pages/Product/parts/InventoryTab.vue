@@ -28,7 +28,7 @@ const colorsId = useId();
             <div class="grid gap-4 md:grid-cols-4">
                 <!-- Colour names are suggested so they stay written one way (Product::colorOptions). -->
                 <Field :id="colorId" :label="t('Color')" :error="error('color')" :hint="t('Write it on the aluminum type; its sub-items take it from there.')">
-                    <input :id="colorId" v-model="form.color" :list="colorsId" maxlength="50" :aria-invalid="!!error('color')" :class="[controlClasses, 'h-10']" />
+                    <input :id="colorId" v-model="form.color" :list="colorsId" maxlength="50" :aria-invalid="!!error('color')" :class="[controlClasses, 'h-control']" />
                     <datalist :id="colorsId">
                         <option v-for="color in options.colors" :key="color" :value="color" />
                     </datalist>

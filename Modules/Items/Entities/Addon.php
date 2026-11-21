@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
+use Modules\Core\Entities\Concerns\HasSortOrder;
 use Modules\Core\Entities\User;
 use Modules\Core\Enums\ImageQuality;
 use Modules\Core\Enums\ImageSize;
@@ -27,6 +28,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 
 class Addon extends Model implements TranslatableContract, HasMedia
 {
+    use HasSortOrder;
     use InteractsWithMedia;
     use Translatable;
     use SoftDeletes;

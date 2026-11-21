@@ -16,8 +16,9 @@ import { confirm } from '@/lib/confirm';
 import { can, t } from '@/lib/i18n';
 import { CircleCheck, CircleAlert, X } from '@/lib/icons';
 import { route } from '@/lib/route';
+import { createdByColumn } from '@/lib/tableColumns';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
-import RecordActions from '@modules/Items/resources/js/Pages/parts/RecordActions.vue';
+import RecordActions from '@/Components/table/RecordActions.vue';
 
 import type { StatusBadge } from '../parts/statusBadge';
 import type { UserCellData } from '../parts/types';
@@ -58,6 +59,7 @@ const columns = computed<TableColumn[]>(() => [
     { key: 'currency', label: t('Currency') },
     { key: 'amount', label: t('Amount'), sort: 'amount', class: 'text-end' },
     { key: 'status', label: t('Status') },
+    createdByColumn(),
 ]);
 
 const filters = computed<TableFilter[]>(() => [
@@ -139,8 +141,8 @@ const fields = (row: Row) => [
             <Badge v-if="row.status" :tone="row.status.tone">{{ row.status.label }}</Badge>
         </template>
         <template #actions="{ row }">
-            <RecordActions entity="Cheque" routes="accounting.cheques" :id="row.id" :title="row.cheque_number" :fields="fields(row)">
-                <template v-if="row.is_under_collection">
+            <RecordActions entity="Cheque" routes="accounting.cheques" :id="row.id" :title="row.cheque_number" :fields="fields(row)" :editable="false" :deletable="false">
+                <template v-if="row.is_under_collection && (can('Cheque Clear') || can('Cheque Bounce') || can('Cheque Cancel'))" #default>
                     <DropdownItem v-if="can('Cheque Clear')" @select="markCleared(row)"><CircleCheck />{{ t('Mark Cleared') }}</DropdownItem>
                     <DropdownItem v-if="can('Cheque Bounce')" @select="transition(row, 'bounce')"><CircleAlert />{{ t('Mark Bounced') }}</DropdownItem>
                     <DropdownItem v-if="can('Cheque Cancel')" @select="transition(row, 'cancel')"><X />{{ t('Cancel') }}</DropdownItem>

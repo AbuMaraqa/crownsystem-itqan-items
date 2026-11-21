@@ -9,7 +9,7 @@ defineProps<{ crumbs: { title: string; href: string }[]; current: string }>();
 
 <template>
     <nav :aria-label="t('Breadcrumb')">
-        <ol class="flex flex-wrap items-center gap-x-1.5 text-sm">
+        <ol class="flex flex-wrap items-center gap-x-1.5 text-[13px]">
             <li v-for="crumb in crumbs" :key="crumb.href" class="flex items-center gap-1.5">
                 <Link :href="crumb.href" class="text-gray-500 transition-colors hover:text-brand-600 dark:text-gray-400 dark:hover:text-brand-400">{{ crumb.title }}</Link>
                 <ChevronRight class="size-3.5 text-gray-400 rtl:rotate-180" />

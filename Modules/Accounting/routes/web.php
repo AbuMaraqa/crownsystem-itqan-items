@@ -57,7 +57,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::get('/{account}/edit', 'edit')->whereNumber('account')->name('edit')->can('Account Update');
                     Route::put('/{account}', 'update')->whereNumber('account')->name('update')->can('Account Update');
                     Route::delete('/{account}', 'destroy')->whereNumber('account')->name('destroy')->can('Account Delete');
-                    Route::get('/{account}/info', 'info')->whereNumber('account')->name('info')->can('Account Info');
+                    Route::get('/{account}/info', 'info')->whereNumber('account')->name('info')->can('Account View List');
                 });
 
                 Route::prefix('journal-entries')->as('journal-entries.')->controller(JournalEntryController::class)->group(function () {
@@ -70,7 +70,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::delete('/{journalEntry}', 'destroy')->whereNumber('journalEntry')->name('destroy')->can('Journal Entry Delete');
                     Route::post('/{journalEntry}/post', 'post')->whereNumber('journalEntry')->name('post')->can('Journal Entry Post');
                     Route::post('/{journalEntry}/void', 'void')->whereNumber('journalEntry')->name('void')->can('Journal Entry Void');
-                    Route::get('/{journalEntry}/info', 'info')->whereNumber('journalEntry')->name('info')->can('Journal Entry Info');
+                    Route::get('/{journalEntry}/info', 'info')->whereNumber('journalEntry')->name('info')->can('Journal Entry View List');
                 });
 
                 Route::prefix('warehouses')->as('warehouses.')->controller(WarehouseController::class)->group(function () {
@@ -79,10 +79,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::post('/', 'store')->name('store')->can('Warehouse Create');
                     Route::post('/branches', 'storeBranch')->name('branches.store')->can('Branch Create');
                     Route::delete('/', 'destroyMany')->name('destroy-many')->can('Warehouse Delete');
+                    Route::post('/reorder', 'reorder')->name('reorder')->can('Warehouse Update');
                     Route::get('/{warehouse}/edit', 'edit')->whereNumber('warehouse')->name('edit')->can('Warehouse Update');
                     Route::put('/{warehouse}', 'update')->whereNumber('warehouse')->name('update')->can('Warehouse Update');
                     Route::delete('/{warehouse}', 'destroy')->whereNumber('warehouse')->name('destroy')->can('Warehouse Delete');
-                    Route::get('/{warehouse}/info', 'info')->whereNumber('warehouse')->name('info')->can('Warehouse Info');
+                    Route::get('/{warehouse}/info', 'info')->whereNumber('warehouse')->name('info')->can('Warehouse View List');
                 });
 
                 Route::prefix('suppliers')->as('suppliers.')->controller(SupplierController::class)->group(function () {
@@ -91,6 +92,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::post('/', 'store')->name('store')->can('Supplier Create');
                     Route::get('/{supplier}/edit', 'edit')->whereNumber('supplier')->name('edit')->can('Supplier Update');
                     Route::put('/{supplier}', 'update')->whereNumber('supplier')->name('update')->can('Supplier Update');
+                    Route::get('/{supplier}/info', 'info')->whereNumber('supplier')->name('info')->can('Supplier View List');
                 });
 
                 Route::prefix('receipt-vouchers')->as('receipt-vouchers.')->controller(ReceiptVoucherController::class)->group(function () {
@@ -104,7 +106,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::post('/{receiptVoucher}/post', 'post')->whereNumber('receiptVoucher')->name('post')->can('Receipt Voucher Post');
                     Route::post('/{receiptVoucher}/cancel', 'cancel')->whereNumber('receiptVoucher')->name('cancel')->can('Receipt Voucher Cancel');
                     Route::delete('/{receiptVoucher}', 'destroy')->whereNumber('receiptVoucher')->name('destroy')->can('Receipt Voucher Delete');
-                    Route::get('/{receiptVoucher}/info', 'info')->whereNumber('receiptVoucher')->name('info')->can('Receipt Voucher Info');
+                    Route::get('/{receiptVoucher}/info', 'info')->whereNumber('receiptVoucher')->name('info')->can('Receipt Voucher View List');
                     Route::get('/{receiptVoucher}/pdf', [AccountingPrintController::class, 'receiptVoucher'])->whereNumber('receiptVoucher')->name('pdf')->can('Receipt Voucher View');
                 });
 
@@ -119,7 +121,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::post('/{paymentVoucher}/post', 'post')->whereNumber('paymentVoucher')->name('post')->can('Payment Voucher Post');
                     Route::post('/{paymentVoucher}/cancel', 'cancel')->whereNumber('paymentVoucher')->name('cancel')->can('Payment Voucher Cancel');
                     Route::delete('/{paymentVoucher}', 'destroy')->whereNumber('paymentVoucher')->name('destroy')->can('Payment Voucher Delete');
-                    Route::get('/{paymentVoucher}/info', 'info')->whereNumber('paymentVoucher')->name('info')->can('Payment Voucher Info');
+                    Route::get('/{paymentVoucher}/info', 'info')->whereNumber('paymentVoucher')->name('info')->can('Payment Voucher View List');
                     Route::get('/{paymentVoucher}/pdf', [AccountingPrintController::class, 'paymentVoucher'])->whereNumber('paymentVoucher')->name('pdf')->can('Payment Voucher View');
                 });
 
@@ -128,7 +130,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::post('/{cheque}/clear', 'clear')->whereNumber('cheque')->name('clear')->can('Cheque Clear');
                     Route::post('/{cheque}/bounce', 'bounce')->whereNumber('cheque')->name('bounce')->can('Cheque Bounce');
                     Route::post('/{cheque}/cancel', 'cancel')->whereNumber('cheque')->name('cancel')->can('Cheque Cancel');
-                    Route::get('/{cheque}/info', 'info')->whereNumber('cheque')->name('info')->can('Cheque Info');
+                    Route::get('/{cheque}/info', 'info')->whereNumber('cheque')->name('info')->can('Cheque View List');
                 });
 
                 Route::prefix('fiscal-years')->as('fiscal-years.')->controller(FiscalYearController::class)->group(function () {
@@ -137,10 +139,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::put('/{fiscalYear}', 'update')->whereNumber('fiscalYear')->name('update')->can('Fiscal Year Update');
                     Route::post('/{fiscalYear}/close', 'close')->whereNumber('fiscalYear')->name('close')->can('Fiscal Year Close');
                     Route::post('/{fiscalYear}/reopen', 'reopen')->whereNumber('fiscalYear')->name('reopen')->can('Fiscal Year Reopen');
-                    Route::get('/{fiscalYear}/info', 'info')->whereNumber('fiscalYear')->name('info')->can('Fiscal Year Info');
+                    Route::get('/{fiscalYear}/info', 'info')->whereNumber('fiscalYear')->name('info')->can('Fiscal Year View List');
                     Route::get('/{fiscalYear}/periods', 'periods')->whereNumber('fiscalYear')->name('periods')->can('Fiscal Year View List');
                     Route::post('/periods/{period}/close', 'closePeriod')->whereNumber('period')->name('periods.close')->can('Accounting Period Close');
                     Route::post('/periods/{period}/reopen', 'reopenPeriod')->whereNumber('period')->name('periods.reopen')->can('Accounting Period Reopen');
+                    Route::get('/periods/{period}/info', 'periodInfo')->whereNumber('period')->name('periods.info')->can('Fiscal Year View List');
                 });
 
                 Route::prefix('period-closing-vouchers')->as('period-closing-vouchers.')->controller(PeriodClosingVoucherController::class)->group(function () {
@@ -160,12 +163,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 Route::prefix('account-mappings')->as('account-mappings.')->controller(AccountMappingController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Accounting Mapping View List');
                     Route::put('/{mapping}', 'update')->whereNumber('mapping')->name('update')->can('Accounting Mapping Update');
+                    Route::get('/{mapping}/info', 'info')->whereNumber('mapping')->name('info')->can('Accounting Mapping View List');
                 });
 
                 Route::prefix('customer-groups')->as('customer-groups.')->controller(CustomerGroupController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Customer Group View List');
                     Route::get('/customers', 'customers')->name('customers')->can('Customer Group View List');
                     Route::post('/', 'store')->name('store')->can('Customer Group Create');
+                    Route::post('/reorder', 'reorder')->name('reorder')->can('Customer Group Update');
+                    Route::get('/{group}/info', 'info')->whereNumber('group')->name('info')->can('Customer Group View List');
                     Route::put('/{group}', 'update')->whereNumber('group')->name('update')->can('Customer Group Update');
                     Route::put('/{group}/active', 'active')->whereNumber('group')->name('active')->can('Customer Group Update');
                     Route::delete('/{group}', 'destroy')->whereNumber('group')->name('destroy')->can('Customer Group Delete');
@@ -174,15 +180,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 Route::prefix('taxes')->as('taxes.')->controller(TaxController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Tax View List');
                     Route::post('/', 'store')->name('store')->can('Tax Create');
+                    Route::post('/reorder', 'reorder')->name('reorder')->can('Tax Update');
                     Route::put('/{tax}', 'update')->whereNumber('tax')->name('update')->can('Tax Update');
                     Route::put('/{tax}/active', 'active')->whereNumber('tax')->name('active')->can('Tax Update');
                     Route::delete('/{tax}', 'destroy')->whereNumber('tax')->name('destroy')->can('Tax Delete');
-                    Route::get('/{tax}/info', 'info')->whereNumber('tax')->name('info')->can('Tax Info');
+                    Route::get('/{tax}/info', 'info')->whereNumber('tax')->name('info')->can('Tax View List');
                 });
 
                 Route::prefix('attachment-categories')->as('attachment-categories.')->controller(AttachmentCategoryController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Attachment Category View List');
                     Route::post('/', 'store')->name('store')->can('Attachment Category Create');
+                    Route::post('/reorder', 'reorder')->name('reorder')->can('Attachment Category Update');
+                    Route::get('/{category}/info', 'info')->whereNumber('category')->name('info')->can('Attachment Category View List');
                     Route::put('/{category}', 'update')->whereNumber('category')->name('update')->can('Attachment Category Update');
                     Route::delete('/{category}', 'destroy')->whereNumber('category')->name('destroy')->can('Attachment Category Delete');
                 });
@@ -190,6 +199,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 Route::prefix('clearance-attachment-types')->as('clearance-attachment-types.')->controller(ClearanceAttachmentTypeController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Clearance Attachment Type View List');
                     Route::post('/', 'store')->name('store')->can('Clearance Attachment Type Create');
+                    Route::post('/reorder', 'reorder')->name('reorder')->can('Clearance Attachment Type Update');
+                    Route::get('/{type}/info', 'info')->whereNumber('type')->name('info')->can('Clearance Attachment Type View List');
                     Route::put('/{type}', 'update')->whereNumber('type')->name('update')->can('Clearance Attachment Type Update');
                     Route::delete('/{type}', 'destroy')->whereNumber('type')->name('destroy')->can('Clearance Attachment Type Delete');
                 });
@@ -197,6 +208,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 Route::prefix('delivery-cost-elements')->as('delivery-cost-elements.')->controller(DeliveryCostElementController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Delivery Cost Element View List');
                     Route::post('/', 'store')->name('store')->can('Delivery Cost Element Create');
+                    Route::post('/reorder', 'reorder')->name('reorder')->can('Delivery Cost Element Update');
+                    Route::get('/{element}/info', 'info')->whereNumber('element')->name('info')->can('Delivery Cost Element View List');
                     Route::put('/{element}', 'update')->whereNumber('element')->name('update')->can('Delivery Cost Element Update');
                     Route::delete('/{element}', 'destroy')->whereNumber('element')->name('destroy')->can('Delivery Cost Element Delete');
                 });
@@ -204,6 +217,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 Route::prefix('additional-cost-types')->as('additional-cost-types.')->controller(AdditionalCostTypeController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Additional Cost Type View List');
                     Route::post('/', 'store')->name('store')->can('Additional Cost Type Create');
+                    Route::post('/reorder', 'reorder')->name('reorder')->can('Additional Cost Type Update');
+                    Route::get('/{type}/info', 'info')->whereNumber('type')->name('info')->can('Additional Cost Type View List');
                     Route::put('/{type}', 'update')->whereNumber('type')->name('update')->can('Additional Cost Type Update');
                     Route::put('/{type}/active', 'active')->whereNumber('type')->name('active')->can('Additional Cost Type Update');
                     Route::delete('/{type}', 'destroy')->whereNumber('type')->name('destroy')->can('Additional Cost Type Delete');
@@ -212,6 +227,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 Route::prefix('reappraisal-elements')->as('reappraisal-elements.')->controller(ReappraisalElementController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Reappraisal Element View List');
                     Route::post('/', 'store')->name('store')->can('Reappraisal Element Create');
+                    Route::post('/reorder', 'reorder')->name('reorder')->can('Reappraisal Element Update');
+                    Route::get('/{element}/info', 'info')->whereNumber('element')->name('info')->can('Reappraisal Element View List');
                     Route::put('/{element}', 'update')->whereNumber('element')->name('update')->can('Reappraisal Element Update');
                     Route::put('/{element}/active', 'active')->whereNumber('element')->name('active')->can('Reappraisal Element Update');
                     Route::delete('/{element}', 'destroy')->whereNumber('element')->name('destroy')->can('Reappraisal Element Delete');
@@ -222,7 +239,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::post('/', 'store')->name('store')->can('Currency Exchange Rate Create');
                     Route::put('/{rate}', 'update')->whereNumber('rate')->name('update')->can('Currency Exchange Rate Update');
                     Route::delete('/{rate}', 'destroy')->whereNumber('rate')->name('destroy')->can('Currency Exchange Rate Delete');
-                    Route::get('/{rate}/info', 'info')->whereNumber('rate')->name('info')->can('Currency Exchange Rate Info');
+                    Route::get('/{rate}/info', 'info')->whereNumber('rate')->name('info')->can('Currency Exchange Rate View List');
                 });
 
 
@@ -258,7 +275,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::post('/{purchaseOrder}/invoice', 'invoice')->whereNumber('purchaseOrder')->name('invoice')->can('Purchase Invoice Create');
                     Route::post('/{purchaseOrder}/cancel', 'cancel')->whereNumber('purchaseOrder')->name('cancel')->can('Purchase Order Cancel');
                     Route::delete('/{purchaseOrder}', 'destroy')->whereNumber('purchaseOrder')->name('destroy')->can('Purchase Order Delete');
-                    Route::get('/{purchaseOrder}/info', 'info')->whereNumber('purchaseOrder')->name('info')->can('Purchase Order Info');
+                    Route::get('/{purchaseOrder}/info', 'info')->whereNumber('purchaseOrder')->name('info')->can('Purchase Order View List');
                     Route::get('/{purchaseOrder}/pdf', 'print')->whereNumber('purchaseOrder')->name('pdf')->can('Purchase Order View');
                 });
 
@@ -273,7 +290,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::post('/{purchaseInvoice}/post', 'post')->whereNumber('purchaseInvoice')->name('post')->can('Purchase Invoice Post');
                     Route::post('/{purchaseInvoice}/cancel', 'cancel')->whereNumber('purchaseInvoice')->name('cancel')->can('Purchase Invoice Cancel');
                     Route::delete('/{purchaseInvoice}', 'destroy')->whereNumber('purchaseInvoice')->name('destroy')->can('Purchase Invoice Delete');
-                    Route::get('/{purchaseInvoice}/info', 'info')->whereNumber('purchaseInvoice')->name('info')->can('Purchase Invoice Info');
+                    Route::get('/{purchaseInvoice}/info', 'info')->whereNumber('purchaseInvoice')->name('info')->can('Purchase Invoice View List');
                     Route::get('/{purchaseInvoice}/pdf', 'print')->whereNumber('purchaseInvoice')->name('pdf')->can('Purchase Invoice View');
                 });
 
@@ -288,7 +305,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::post('/{purchaseReturn}/post', 'post')->whereNumber('purchaseReturn')->name('post')->can('Purchase Return Post');
                     Route::post('/{purchaseReturn}/cancel', 'cancel')->whereNumber('purchaseReturn')->name('cancel')->can('Purchase Return Cancel');
                     Route::delete('/{purchaseReturn}', 'destroy')->whereNumber('purchaseReturn')->name('destroy')->can('Purchase Return Delete');
-                    Route::get('/{purchaseReturn}/info', 'info')->whereNumber('purchaseReturn')->name('info')->can('Purchase Return Info');
+                    Route::get('/{purchaseReturn}/info', 'info')->whereNumber('purchaseReturn')->name('info')->can('Purchase Return View List');
                     Route::get('/{purchaseReturn}/pdf', 'print')->whereNumber('purchaseReturn')->name('pdf')->can('Purchase Return View');
                 });
 
@@ -310,6 +327,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                         Route::put('/{consolidatedPurchaseOrder}', 'update')->whereNumber('consolidatedPurchaseOrder')->name('update')->can('Consolidated Purchase Order Update');
                         Route::post('/{consolidatedPurchaseOrder}/status', 'changeStatus')->whereNumber('consolidatedPurchaseOrder')->name('status')->can('Consolidated Purchase Order Update');
                         Route::delete('/{consolidatedPurchaseOrder}', 'destroy')->whereNumber('consolidatedPurchaseOrder')->name('destroy')->can('Consolidated Purchase Order Delete');
+                        Route::get('/{consolidatedPurchaseOrder}/info', 'info')->whereNumber('consolidatedPurchaseOrder')->name('info')->can('Consolidated Purchase Order View List');
                         Route::get('/{consolidatedPurchaseOrder}/quote-request/{supplier}', 'quoteRequest')->whereNumber(['consolidatedPurchaseOrder', 'supplier'])->name('quote-request')->can('Consolidated Purchase Order View');
                         Route::post('/{consolidatedPurchaseOrder}/items/pull', 'pullItems')->whereNumber('consolidatedPurchaseOrder')->name('items.pull')->can('Consolidated Purchase Order Update');
                         Route::put('/{consolidatedPurchaseOrder}/items/{item}', 'updateItem')->whereNumber(['consolidatedPurchaseOrder', 'item'])->name('items.update')->can('Consolidated Purchase Order Update');
@@ -360,7 +378,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::post('/{salesQuotation}/convert', 'convert')->whereNumber('salesQuotation')->name('convert')->can('Sales Order Create');
                     Route::post('/{salesQuotation}/cancel', 'cancel')->whereNumber('salesQuotation')->name('cancel')->can('Sales Quotation Cancel');
                     Route::delete('/{salesQuotation}', 'destroy')->whereNumber('salesQuotation')->name('destroy')->can('Sales Quotation Delete');
-                    Route::get('/{salesQuotation}/info', 'info')->whereNumber('salesQuotation')->name('info')->can('Sales Quotation Info');
+                    Route::get('/{salesQuotation}/info', 'info')->whereNumber('salesQuotation')->name('info')->can('Sales Quotation View List');
                     // مصفوفة لا نص: alias الحزمة PDF يجعل 'pdf' اسم صنف فيُكسر تحميل المسارات.
                     Route::get('/{salesQuotation}/pdf', [SalesQuotationController::class, 'pdf'])->whereNumber('salesQuotation')->name('pdf')->can('Sales Quotation View');
                 });
@@ -388,6 +406,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::post('/{productionOrder}/reopen', 'reopen')->whereNumber('productionOrder')->name('reopen')->can('Production Order Complete');
                     Route::post('/{productionOrder}/cancel', 'cancel')->whereNumber('productionOrder')->name('cancel')->can('Production Order Cancel');
                     Route::delete('/{productionOrder}', 'destroy')->whereNumber('productionOrder')->name('destroy')->can('Production Order Delete');
+                    Route::get('/{productionOrder}/info', 'info')->whereNumber('productionOrder')->name('info')->can('Production Order View List');
                 });
 
                 Route::prefix('sales-orders')->as('sales-orders.')->controller(SalesOrderController::class)->group(function () {
@@ -404,7 +423,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::post('/{salesOrder}/invoice', 'invoice')->whereNumber('salesOrder')->name('invoice')->can('Sales Invoice Create');
                     Route::post('/{salesOrder}/cancel', 'cancel')->whereNumber('salesOrder')->name('cancel')->can('Sales Order Cancel');
                     Route::delete('/{salesOrder}', 'destroy')->whereNumber('salesOrder')->name('destroy')->can('Sales Order Delete');
-                    Route::get('/{salesOrder}/info', 'info')->whereNumber('salesOrder')->name('info')->can('Sales Order Info');
+                    Route::get('/{salesOrder}/info', 'info')->whereNumber('salesOrder')->name('info')->can('Sales Order View List');
                     Route::get('/{salesOrder}/pdf', [SalesOrderController::class, 'pdf'])->whereNumber('salesOrder')->name('pdf')->can('Sales Order View');
                 });
 
@@ -419,7 +438,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::post('/{salesInvoice}/post', 'post')->whereNumber('salesInvoice')->name('post')->can('Sales Invoice Post');
                     Route::post('/{salesInvoice}/cancel', 'cancel')->whereNumber('salesInvoice')->name('cancel')->can('Sales Invoice Cancel');
                     Route::delete('/{salesInvoice}', 'destroy')->whereNumber('salesInvoice')->name('destroy')->can('Sales Invoice Delete');
-                    Route::get('/{salesInvoice}/info', 'info')->whereNumber('salesInvoice')->name('info')->can('Sales Invoice Info');
+                    Route::get('/{salesInvoice}/info', 'info')->whereNumber('salesInvoice')->name('info')->can('Sales Invoice View List');
                     Route::get('/{salesInvoice}/pdf', [SalesInvoiceController::class, 'pdf'])->whereNumber('salesInvoice')->name('pdf')->can('Sales Invoice View');
                 });
 
@@ -434,7 +453,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::post('/{salesReturn}/post', 'post')->whereNumber('salesReturn')->name('post')->can('Sales Return Post');
                     Route::post('/{salesReturn}/cancel', 'cancel')->whereNumber('salesReturn')->name('cancel')->can('Sales Return Cancel');
                     Route::delete('/{salesReturn}', 'destroy')->whereNumber('salesReturn')->name('destroy')->can('Sales Return Delete');
-                    Route::get('/{salesReturn}/info', 'info')->whereNumber('salesReturn')->name('info')->can('Sales Return Info');
+                    Route::get('/{salesReturn}/info', 'info')->whereNumber('salesReturn')->name('info')->can('Sales Return View List');
                     Route::get('/{salesReturn}/pdf', [AccountingPrintController::class, 'salesReturn'])->name('pdf')->can('Sales Return View');
                 });
 

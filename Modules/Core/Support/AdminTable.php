@@ -25,6 +25,12 @@ class AdminTable
 
     private string $defaultSort = '-id';
 
+    /** The relation behind the «Created By» column, or null when the table has none. */
+    private ?string $creator = null;
+
+    /** The column the rows are dragged by, or null when the table cannot be reordered. */
+    private ?string $reorderColumn = null;
+
     private function __construct(private readonly Builder $query) {}
 
     public static function for(Builder $query): self
@@ -49,6 +55,30 @@ class AdminTable
     public function defaultSort(string $sort): self
     {
         $this->defaultSort = $sort;
+
+        return $this;
+    }
+
+    /**
+     * Adds `created_by` (UserCellData) to every row for the shared «Created By» column
+     * (`createdByColumn()` in `@/lib/tableColumns`), with the creator and its avatar eager-loaded.
+     */
+    public function withCreator(string $relation = 'createdBy'): self
+    {
+        $this->creator = $relation;
+        $this->query->with($relation.'.media');
+
+        return $this;
+    }
+
+    /**
+     * Rows ordered by hand (drag and drop): sorted by `$column` by default, ties by id. The model uses
+     * `Modules\Core\Entities\Concerns\HasSortOrder` and its controller `ReordersRecords`.
+     */
+    public function reorderable(string $column = 'sort_order'): self
+    {
+        $this->reorderColumn = $column;
+        $this->defaultSort = $column;
 
         return $this;
     }
@@ -88,15 +118,32 @@ class AdminTable
         $perPage = (int) $request->integer('perPage', self::PAGE_SIZES[1]);
         $perPage = in_array($perPage, self::PAGE_SIZES, true) ? $perPage : self::PAGE_SIZES[1];
 
-        $paginator = QueryBuilder::for($this->query, $request)
+        $sorts = $this->sorts;
+
+        if ($this->reorderColumn !== null && ! in_array($this->reorderColumn, $sorts, true)) {
+            $sorts[] = $this->reorderColumn;
+        }
+
+        $builder = QueryBuilder::for($this->query, $request)
             ->allowedFilters(...$this->filters)
-            ->allowedSorts(...$this->sorts)
-            ->defaultSort($this->defaultSort)
-            ->paginate($perPage)
-            ->withQueryString();
+            ->allowedSorts(...$sorts)
+            ->defaultSort($this->defaultSort);
+
+        if ($this->reorderColumn !== null) {
+            // Equal positions (new rows, old data) still keep one stable order to drag.
+            $builder->orderBy($this->query->getModel()->getQualifiedKeyName());
+        }
+
+        $paginator = $builder->paginate($perPage)->withQueryString();
+
+        $map = $this->creator === null ? $row : fn (mixed $model): array => [
+            ...$row($model),
+            'created_by' => UserCellData::of($model->{$this->creator}),
+        ];
 
         return [
-            'data' => $paginator->getCollection()->map($row)->values()->all(),
+            'reorder' => $this->reorderColumn,
+            'data' => $paginator->getCollection()->map($map)->values()->all(),
             'meta' => [
                 'current_page' => $paginator->currentPage(),
                 'last_page' => $paginator->lastPage(),

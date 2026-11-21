@@ -114,7 +114,7 @@ async function remove(node: AccountNode): Promise<void> {
     }
 }
 
-const control = 'h-10 w-full rounded-lg border border-line bg-card px-3 text-sm outline-none focus:border-brand-300 focus:shadow-focus-ring';
+const control = 'h-control w-full rounded-control border border-line bg-card px-3 text-sm outline-none focus:border-brand-300 focus:shadow-focus-ring';
 const columns = computed(() => [t('Account'), t('Type'), t('Normal Balance'), t('Balance'), t('Status')]);
 </script>
 

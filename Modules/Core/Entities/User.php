@@ -19,6 +19,8 @@ use Laravolt\Avatar\Avatar;
 use Modules\Accounting\Entities\Account;
 use Modules\Accounting\Entities\CustomerGroup;
 use Modules\Branch\Entities\Branch;
+use Modules\Core\Entities\Concerns\HasCreator;
+use Modules\Core\Support\UserCellData;
 use Modules\Items\Entities\Order;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
@@ -82,6 +84,7 @@ class User extends Authenticatable implements HasMedia
         return \Database\Factories\UserFactory::new();
     }
 
+    use HasCreator;
     use HasRoles;
     use InteractsWithMedia;
     use Notifiable;
@@ -268,6 +271,17 @@ class User extends Authenticatable implements HasMedia
     public function getUserDisplayHtmlAttribute(): HtmlString
     {
         return new HtmlString(view('core::partials.user-display', ['user' => $this])->render());
+    }
+
+    /**
+     * المستخدم كما تعرضه جداول Vue ونوافذها (الصورة + الاسم + البريد) عبر مكوّن UserCell: $user->user_cell
+     * المصدر الوحيد هو UserCellData::of(). يحتاج تحميل media مسبقاً عند عرض قائمة.
+     *
+     * @return array{id: int, name: string, avatar: string, detail: ?string}
+     */
+    public function getUserCellAttribute(): array
+    {
+        return UserCellData::of($this);
     }
 
     public function userModules(): HasMany

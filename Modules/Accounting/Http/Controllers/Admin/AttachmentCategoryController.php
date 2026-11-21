@@ -3,6 +3,7 @@
 namespace Modules\Accounting\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -10,9 +11,10 @@ use Modules\Accounting\Entities\AttachmentCategory;
 use Modules\Accounting\Http\Requests\Admin\AttachmentCategoryRequest;
 use Modules\Accounting\Repositories\Contracts\AttachmentCategoryRepositoryInterface;
 use Modules\Accounting\Services\AttachmentCategoryService;
-use Modules\Core\Support\UserCellData;
+use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
+use Modules\Core\Support\RecordInfo;
 use Modules\Core\Support\SafeDelete;
 
 /**
@@ -20,6 +22,8 @@ use Modules\Core\Support\SafeDelete;
  */
 class AttachmentCategoryController extends Controller
 {
+    use ReordersRecords;
+
     public function __construct(
         private readonly AttachmentCategoryRepositoryInterface $records,
         private readonly AttachmentCategoryService $service,
@@ -32,11 +36,11 @@ class AttachmentCategoryController extends Controller
                 ->search(['name'], translated: null)
                 ->filters(AdminFilter::text('name'), ...AdminFilter::dateRange('created_at'))
                 ->sorts('name', 'created_at', 'id')
-                ->defaultSort('-created_at')
+                ->reorderable()
+                ->withCreator()
                 ->rows(fn (AttachmentCategory $category) => [
                     'id' => $category->id,
                     'name' => $category->name,
-                    'created_by' => UserCellData::of($category->createdBy),
                 ]),
         ]);
     }
@@ -68,5 +72,15 @@ class AttachmentCategoryController extends Controller
         }
 
         return back()->with('success', __('Attachment category deleted successfully'));
+    }
+
+    protected function sortableModel(): string
+    {
+        return AttachmentCategory::class;
+    }
+
+    public function info(int $category): JsonResponse
+    {
+        return response()->json(RecordInfo::of($this->records->findOrFail($category)));
     }
 }

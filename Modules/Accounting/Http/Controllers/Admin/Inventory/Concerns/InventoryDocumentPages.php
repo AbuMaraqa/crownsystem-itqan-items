@@ -82,6 +82,7 @@ trait InventoryDocumentPages
             )
             ->sorts('reference_no', $dateColumn, 'total_quantity', 'total_weight', 'total_cost', 'status', 'id', ...$sorts)
             ->defaultSort('-id')
+            ->withCreator()
             ->rows(fn (Model $document) => [
                 'id' => $document->id,
                 'reference_no' => $document->reference_no,
@@ -90,7 +91,6 @@ trait InventoryDocumentPages
                 'total_weight' => Number::quantity($document->total_weight),
                 'total_cost' => $canSeeCost ? number_format((float) $document->total_cost, 2) : null,
                 'status' => StatusBadge::of($document->status),
-                'created_by' => UserCellData::of($document->createdBy),
                 'editable' => $document->canBeEdited(),
                 'can_delete' => $document->isDraft(),
                 ...$row($document),

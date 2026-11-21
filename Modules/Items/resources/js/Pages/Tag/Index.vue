@@ -2,18 +2,20 @@
 import { computed } from 'vue';
 
 import DataTable from '@/Components/table/DataTable.vue';
+import RecordActions from '@/Components/table/RecordActions.vue';
 import Button from '@/Components/ui/Button.vue';
 import Modal from '@/Components/ui/Modal.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { can, t } from '@/lib/i18n';
+import { route } from '@/lib/route';
+import { createdByColumn } from '@/lib/tableColumns';
+import { useRecordDelete } from '@/lib/useRecordDelete';
+import { useRecordModal } from '@/lib/useRecordModal';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
 
 import BadgeFields, { type BadgeForm } from '../parts/BadgeFields.vue';
 import ColorBadge from '../parts/ColorBadge.vue';
-import RecordActions from '../parts/RecordActions.vue';
-import { useRecordDelete } from '../parts/useRecordDelete';
-import { useRecordModal } from '../parts/useRecordModal';
 
 defineOptions({ layout: AdminLayout });
 
@@ -35,6 +37,7 @@ const columns = computed<TableColumn[]>(() => [
     { key: 'slug', label: t('Slug'), sort: 'slug' },
     { key: 'color', label: t('Color') },
     { key: 'locales', label: t('Locale'), toggleable: true },
+    createdByColumn(),
 ]);
 
 const filters = computed<TableFilter[]>(() => [
@@ -64,7 +67,7 @@ function editRow(row: Row): void {
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Tag Delete')" :empty-title="t('No tags found')" :empty-text="t('Create a new tag by clicking the button below')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Tag Delete')" :reorder-url="can('Tag Update') ? route('tags.reorder') : undefined" :empty-title="t('No tags found')" :empty-text="t('Create a new tag by clicking the button below')">
         <template #cell-name="{ row }">
             <button v-if="can('Tag Update')" type="button" class="font-medium text-brand-600 dark:text-brand-400 hover:underline" @click="editRow(row)">{{ row.name }}</button>
             <template v-else>{{ row.name }}</template>

@@ -166,7 +166,7 @@ watch(
                     :error="orderError ?? form.errors.purchase_order_id"
                 />
                 <Field v-else :label="t('Purchase Order')">
-                    <div class="flex h-10 items-center rounded-lg border border-line bg-gray-50 px-3 text-sm dark:bg-white/[0.03]">
+                    <div class="flex h-control items-center rounded-control border border-line bg-gray-50 px-3 text-[13px] dark:bg-white/[0.03]">
                         <Link v-if="record?.purchase_order && can('Purchase Order View List')" :href="route('accounting.purchase-orders.edit', record.purchase_order.id)" class="font-medium text-brand-600 hover:underline dark:text-brand-400"><bdi>{{ record.purchase_order.reference_no }}</bdi></Link>
                         <bdi v-else-if="record?.purchase_order">{{ record.purchase_order.reference_no }}</bdi>
                         <span v-else class="text-muted">{{ t('Manual') }}</span>

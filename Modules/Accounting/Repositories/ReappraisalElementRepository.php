@@ -16,6 +16,6 @@ class ReappraisalElementRepository extends BaseEloquentRepository implements Rea
 
     public function tableQuery(): Builder
     {
-        return $this->query()->with(['createdBy.media']);
+        return $this->query();
     }
 }

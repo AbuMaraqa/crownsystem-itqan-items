@@ -3,6 +3,7 @@
 namespace Modules\Accounting\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -12,6 +13,7 @@ use Modules\Accounting\Services\SupplierService;
 use Modules\Core\Entities\User;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
+use Modules\Core\Support\RecordInfo;
 
 class SupplierController extends Controller
 {
@@ -33,6 +35,7 @@ class SupplierController extends Controller
                     ...AdminFilter::dateRange('created_at'),
                 )
                 ->sorts('name', 'email', 'created_at', 'id')
+                ->withCreator()
                 ->rows(fn (User $supplier) => [
                     'id' => $supplier->id,
                     'name' => $supplier->name,
@@ -78,5 +81,10 @@ class SupplierController extends Controller
         $this->supplierService->update($this->suppliers->findSupplier($supplier), $request->validated());
 
         return to_route('accounting.suppliers.index')->with('success', __('Supplier updated successfully'));
+    }
+
+    public function info(int $supplier): JsonResponse
+    {
+        return response()->json(RecordInfo::of($this->suppliers->findSupplier($supplier)));
     }
 }

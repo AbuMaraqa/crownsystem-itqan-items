@@ -227,7 +227,8 @@ class OrderPagesTest extends TestCase
         $this->put(route('orders.update', $order->id), $this->payload([['product_id' => $door->id, 'quantity' => 9]]))->assertForbidden();
         $this->delete(route('orders.destroy', $order->id))->assertForbidden();
         $this->getJson(route('orders.lookup', ['type' => 'customers']))->assertForbidden();
-        $this->getJson(route('orders.info', $order->id))->assertForbidden();
+        // Info is basic: whoever sees the list sees the row's history (View List).
+        $this->getJson(route('orders.info', $order->id))->assertOk();
 
         $this->assertSame(1, Order::query()->count());
     }

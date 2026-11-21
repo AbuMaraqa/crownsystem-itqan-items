@@ -9,6 +9,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
 use Modules\Core\Support\Translations;
@@ -17,7 +18,7 @@ use Modules\Items\Enums\CategoryStatus;
 use Modules\Items\Http\Requests\Admin\CategoryRequest;
 use Modules\Items\Repositories\Contracts\CategoryRepositoryInterface;
 use Modules\Items\Services\CategoryService;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 use Modules\Items\Support\TranslatedSort;
 use Spatie\QueryBuilder\AllowedSort;
 
@@ -27,6 +28,8 @@ use Spatie\QueryBuilder\AllowedSort;
  */
 class CategoryController extends Controller
 {
+    use ReordersRecords;
+
     private const TRANSLATED = ['name', 'description'];
 
     public function __construct(
@@ -46,7 +49,8 @@ class CategoryController extends Controller
                     ...AdminFilter::dateRange('created_at'),
                 )
                 ->sorts(AllowedSort::custom('name', new TranslatedSort), 'code', 'slug', 'id')
-                ->defaultSort('code')
+                ->reorderable()
+                ->withCreator()
                 ->rows(fn (Category $category) => [
                     'id' => $category->id,
                     'image' => $category->image ?: null,
@@ -167,6 +171,11 @@ class CategoryController extends Controller
         }
 
         return back()->with('success', __('Categories deleted successfully'));
+    }
+
+    protected function sortableModel(): string
+    {
+        return Category::class;
     }
 
     public function info(int $category): JsonResponse

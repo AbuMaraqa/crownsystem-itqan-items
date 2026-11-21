@@ -8,11 +8,13 @@ import Modal from '@/Components/ui/Modal.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { can, t } from '@/lib/i18n';
+import { route } from '@/lib/route';
+import { createdByColumn } from '@/lib/tableColumns';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
 
-import RecordActions from '../parts/RecordActions.vue';
-import { useRecordDelete } from '../parts/useRecordDelete';
-import { useRecordModal } from '../parts/useRecordModal';
+import RecordActions from '@/Components/table/RecordActions.vue';
+import { useRecordDelete } from '@/lib/useRecordDelete';
+import { useRecordModal } from '@/lib/useRecordModal';
 import BrandFields, { type BrandForm } from './BrandFields.vue';
 
 defineOptions({ layout: AdminLayout });
@@ -35,6 +37,7 @@ const columns = computed<TableColumn[]>(() => [
     { key: 'name', label: t('Name'), sort: 'name' },
     { key: 'slug', label: t('Slug'), sort: 'slug' },
     { key: 'locales', label: t('Locale'), toggleable: true },
+    createdByColumn(),
 ]);
 
 const filters = computed<TableFilter[]>(() => [
@@ -67,7 +70,7 @@ function editRow(row: Row): void {
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Brand Delete')" :empty-title="t('No brands found')" :empty-text="t('Create a new brand by clicking the button below')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Brand Delete')" :reorder-url="can('Brand Update') ? route('brands.reorder') : undefined" :empty-title="t('No brands found')" :empty-text="t('Create a new brand by clicking the button below')">
         <template #cell-image="{ row }">
             <img v-if="row.image" :src="row.image" alt="" class="size-12 rounded-control object-cover" />
         </template>

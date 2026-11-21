@@ -454,21 +454,23 @@ class AttributeAddonOfferPagesTest extends TestCase
         $this->put(route('attributes.update', $attribute->id), ['name' => 'x', 'type' => 1])->assertForbidden();
         $this->delete(route('attributes.destroy', $attribute->id))->assertForbidden();
         $this->delete(route('attributes.destroy-many'), ['ids' => [$attribute->id]])->assertForbidden();
-        $this->getJson(route('attributes.info', $attribute->id))->assertForbidden();
+        // Info is basic: whoever sees the list sees the row's history (View List).
+        $this->getJson(route('attributes.info', $attribute->id))->assertOk();
 
         $this->get(route('addons.add'))->assertForbidden();
         $this->post(route('addons.store'), [])->assertForbidden();
         $this->get(route('addons.edit', 1))->assertForbidden();
         $this->put(route('addons.update', 1), [])->assertForbidden();
         $this->delete(route('addons.destroy', 1))->assertForbidden();
-        $this->getJson(route('addons.info', 1))->assertForbidden();
+        // Info passes the permission (View List); there is no addon 1.
+        $this->getJson(route('addons.info', 1))->assertNotFound();
 
         $this->get(route('offers.add'))->assertForbidden();
         $this->post(route('offers.store'), [])->assertForbidden();
         $this->get(route('offers.edit', 1))->assertForbidden();
         $this->put(route('offers.update', 1), [])->assertForbidden();
         $this->delete(route('offers.destroy', 1))->assertForbidden();
-        $this->getJson(route('offers.info', 1))->assertForbidden();
+        $this->getJson(route('offers.info', 1))->assertNotFound();
         $this->getJson(route('offers.targets', ['model' => 'items_category']))->assertForbidden();
         $this->getJson(route('offers.edit-targets', ['model' => 'items_category']))->assertForbidden();
 
@@ -483,6 +485,6 @@ class AttributeAddonOfferPagesTest extends TestCase
 
         $this->getJson(route('addons.info', $addon->id))
             ->assertOk()
-            ->assertJsonPath('created_by', $user->name);
+            ->assertJsonPath('created_by.name', $user->name);
     }
 }

@@ -4,6 +4,8 @@ namespace Modules\GeoLocation\Entities;
 
 use Astrotomic\Translatable\Translatable;
 use Astrotomic\Translatable\Contracts\Translatable as TranslatableContract;
+use Modules\Core\Entities\Concerns\HasCreator;
+use Modules\Core\Entities\Concerns\HasSortOrder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -24,6 +26,8 @@ class City extends Model implements TranslatableContract
 {
     use LogsActivity;
     use Translatable;
+    use HasCreator;
+    use HasSortOrder;
 
     public function __construct(array $attributes = [])
     {

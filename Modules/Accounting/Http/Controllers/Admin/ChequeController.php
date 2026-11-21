@@ -21,7 +21,7 @@ use Modules\Accounting\Support\StatusBadge;
 use Modules\Core\Support\UserCellData;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 use Spatie\QueryBuilder\AllowedFilter;
 
 /**
@@ -56,6 +56,7 @@ class ChequeController extends Controller
                 )
                 ->sorts('cheque_number', 'cheque_date', 'amount', 'id')
                 ->defaultSort('-cheque_date')
+                ->withCreator()
                 ->rows(fn (Cheque $cheque) => [
                     'id' => $cheque->id,
                     'cheque_number' => $cheque->cheque_number,

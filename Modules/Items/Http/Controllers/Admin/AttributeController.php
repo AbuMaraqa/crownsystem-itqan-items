@@ -8,6 +8,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
 use Modules\Core\Support\SafeDelete;
@@ -17,12 +18,14 @@ use Modules\Items\Enums\AttributeType;
 use Modules\Items\Http\Requests\Admin\AttributeRequest;
 use Modules\Items\Repositories\Contracts\AttributeRepositoryInterface;
 use Modules\Items\Services\AttributeService;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 use Modules\Items\Support\TranslatedSort;
 use Spatie\QueryBuilder\AllowedSort;
 
 class AttributeController extends Controller
 {
+    use ReordersRecords;
+
     public function __construct(
         private readonly AttributeRepositoryInterface $attributes,
         private readonly AttributeService $attributeService,
@@ -35,6 +38,8 @@ class AttributeController extends Controller
                 ->search(['slug'])
                 ->filters(AdminFilter::translated('name'), AdminFilter::exact('type'), ...AdminFilter::dateRange('created_at'))
                 ->sorts(AllowedSort::custom('name', new TranslatedSort), 'slug', 'type', 'id')
+                ->reorderable()
+                ->withCreator()
                 ->rows(fn (Attribute $attribute) => [
                     'id' => $attribute->id,
                     'name' => (string) $attribute->name,
@@ -122,6 +127,11 @@ class AttributeController extends Controller
         }
 
         return back()->with('success', __('Attributes deleted successfully'));
+    }
+
+    protected function sortableModel(): string
+    {
+        return Attribute::class;
     }
 
     public function info(int $attribute): JsonResponse

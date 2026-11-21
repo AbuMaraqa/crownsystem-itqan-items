@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
+use Modules\Core\Entities\Concerns\HasSortOrder;
 use Modules\Core\Entities\User;
 use Modules\Items\Enums\AttributeType;
 use Spatie\Activitylog\LogOptions;
@@ -19,6 +20,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 
 class Brand extends Model implements TranslatableContract , HasMedia
 {
+    use HasSortOrder;
     use HasFactory;
     use LogsActivity;
     use Translatable;

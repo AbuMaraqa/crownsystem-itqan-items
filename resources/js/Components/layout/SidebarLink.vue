@@ -12,9 +12,9 @@ defineProps<{ entry: NavEntry; href: string; active: boolean; showText: boolean 
     <li>
         <Link
             :href="href"
-            class="group flex h-10 items-center gap-3 rounded-lg px-2.5 text-sm font-medium transition-colors"
+            class="group flex h-[34px] items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-medium transition-colors"
             :class="[
-                active ? 'bg-gray-100 text-brand-600 dark:bg-white/5 dark:text-brand-400' : 'text-gray-700 hover:bg-gray-50 hover:text-brand-600 dark:text-gray-300 dark:hover:bg-white/[0.03] dark:hover:text-brand-400',
+                active ? 'bg-gray-100/60 text-brand-500 dark:bg-white/5 dark:text-brand-400' : 'text-gray-950 hover:bg-gray-100/60 hover:text-brand-500 dark:text-gray-200 dark:hover:bg-white/[0.03] dark:hover:text-brand-400',
                 { 'justify-center': !showText },
             ]"
             :title="showText ? undefined : t(entry.title)"
@@ -23,8 +23,8 @@ defineProps<{ entry: NavEntry; href: string; active: boolean; showText: boolean 
         >
             <component
                 :is="navIcons[entry.icon] ?? fallbackNavIcon"
-                class="size-5 shrink-0 transition-colors"
-                :class="active ? 'text-brand-500 dark:text-brand-400' : 'text-gray-400 group-hover:text-brand-500 dark:text-gray-500 dark:group-hover:text-brand-400'"
+                class="size-[18px] shrink-0 transition-colors"
+                :class="active ? 'text-brand-500 dark:text-brand-400' : 'text-gray-500 group-hover:text-brand-500 dark:text-gray-400 dark:group-hover:text-brand-400'"
             />
             <span v-if="showText" class="truncate">{{ t(entry.title) }}</span>
         </Link>

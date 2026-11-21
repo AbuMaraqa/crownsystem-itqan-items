@@ -1,20 +1,18 @@
 <script setup lang="ts">
-import RowMenu from '@/Components/table/RowMenu.vue';
-import DropdownItem from '@/Components/ui/DropdownItem.vue';
-import DropdownSeparator from '@/Components/ui/DropdownSeparator.vue';
-import { Link, router } from '@inertiajs/vue3';
+import { Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 import type { Option } from '@/Components/form/SelectInput.vue';
 import DataTable from '@/Components/table/DataTable.vue';
+import RecordActions from '@/Components/table/RecordActions.vue';
 import Badge from '@/Components/ui/Badge.vue';
 import Button from '@/Components/ui/Button.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
-import { confirm } from '@/lib/confirm';
 import { can, t } from '@/lib/i18n';
-import { Pencil, Trash2 } from '@/lib/icons';
 import { route } from '@/lib/route';
+import { createdByColumn } from '@/lib/tableColumns';
+import { useRecordDelete } from '@/lib/useRecordDelete';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
 
 defineOptions({ layout: AdminLayout });
@@ -63,6 +61,7 @@ const columns = computed<TableColumn[]>(() => [
     { key: 'longitude', label: t('Longitude'), class: 'tabular', toggleable: true, hidden: true },
     { key: 'status', label: t('Status'), sort: 'status' },
     { key: 'locales', label: t('Locale'), toggleable: true },
+    createdByColumn(),
 ]);
 
 const filters = computed<TableFilter[]>(() => [
@@ -76,17 +75,7 @@ const filters = computed<TableFilter[]>(() => [
     { type: 'date-range', key: 'created_at', label: t('Created at') },
 ]);
 
-async function remove(row: Row): Promise<void> {
-    if (await confirm({ title: t('Delete :name?', { name: row.name }), description: t('This cannot be undone.') })) {
-        router.delete(route('branches.destroy', row.id), { preserveScroll: true });
-    }
-}
-
-async function removeMany(ids: (number | string)[]): Promise<void> {
-    if (await confirm({ title: t('Delete :count items?', { count: ids.length }), description: t('This cannot be undone.') })) {
-        router.delete(route('branches.destroy-many'), { data: { ids }, preserveScroll: true });
-    }
-}
+const { remove, removeMany } = useRecordDelete('branches');
 </script>
 
 <template>
@@ -96,7 +85,7 @@ async function removeMany(ids: (number | string)[]): Promise<void> {
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Branch Delete')" :empty-title="t('No branches found')" :empty-text="t('Create a new branch by clicking the button below')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Branch Delete')" :reorder-url="can('Branch Update') ? route('branches.reorder') : undefined" :empty-title="t('No branches found')" :empty-text="t('Create a new branch by clicking the button below')">
         <template #cell-name="{ row }">
             <Link v-if="can('Branch Update')" :href="route('branches.edit', row.id)" class="font-medium text-brand-600 dark:text-brand-400 hover:underline">{{ row.name }}</Link>
             <template v-else>{{ row.name }}</template>
@@ -109,11 +98,27 @@ async function removeMany(ids: (number | string)[]): Promise<void> {
             <span class="text-muted uppercase">{{ row.locales.join(', ') }}</span>
         </template>
         <template #actions="{ row }">
-            <RowMenu>
-                <DropdownItem v-if="can('Branch Update')" :href="route('branches.edit', row.id)"><Pencil />{{ t('Edit') }}</DropdownItem>
-                <DropdownSeparator v-if="can('Branch Delete')" />
-                <DropdownItem v-if="can('Branch Delete')" destructive @select="remove(row)"><Trash2 />{{ t('Delete') }}</DropdownItem>
-            </RowMenu>
+            <RecordActions
+                entity="Branch"
+                routes="branches"
+                :id="row.id"
+                :title="row.name"
+                :fields="[
+                    { label: t('Name'), value: row.name },
+                    { label: t('Status'), value: row.status_label },
+                    { label: t('Phone'), value: row.phone },
+                    { label: t('Email'), value: row.email },
+                    { label: t('Country'), value: row.country },
+                    { label: t('City'), value: row.city },
+                    { label: t('Opening Time'), value: row.opening_time },
+                    { label: t('Closing Time'), value: row.closing_time },
+                    { label: t('Weekly Schedule'), value: row.open_days.join('، ') },
+                    { label: t('Address'), value: row.address },
+                    { label: t('Description'), value: row.description },
+                ]"
+                :edit-href="route('branches.edit', row.id)"
+                @delete="remove(row.id, row.name)"
+            />
         </template>
         <template #bulk="{ selected }">
             <Button variant="danger" size="sm" @click="removeMany(selected)">{{ t('Delete') }}</Button>

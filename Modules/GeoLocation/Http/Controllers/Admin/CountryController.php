@@ -4,14 +4,17 @@ namespace Modules\GeoLocation\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Support\Locales;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 use Modules\Core\Entities\Currency;
 use Modules\Core\Repositories\Contracts\CurrencyRepositoryInterface;
+use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
+use Modules\Core\Support\RecordInfo;
 use Modules\GeoLocation\Entities\Country;
 use Modules\GeoLocation\Http\Requests\Admin\CountryRequest;
 use Modules\GeoLocation\Repositories\Contracts\CountryRepositoryInterface;
@@ -20,6 +23,8 @@ use Modules\GeoLocation\Support\GeoFilters;
 
 class CountryController extends Controller
 {
+    use ReordersRecords;
+
     public function __construct(
         private readonly CountryRepositoryInterface $countries,
         private readonly CountryService $countryService,
@@ -40,6 +45,8 @@ class CountryController extends Controller
                     ...AdminFilter::dateRange('created_at'),
                 )
                 ->sorts(GeoFilters::nameSort(), 'code', 'phone_code', 'created_at', 'id')
+                ->reorderable()
+                ->withCreator()
                 ->rows(fn (Country $country) => [
                     'id' => $country->id,
                     'name' => $country->name,
@@ -113,6 +120,16 @@ class CountryController extends Controller
         $this->countryService->deleteMany($ids);
 
         return back()->with('success', __('Countries deleted successfully'));
+    }
+
+    public function info(int $country): JsonResponse
+    {
+        return response()->json(RecordInfo::of($this->countries->findOrFail($country)));
+    }
+
+    protected function sortableModel(): string
+    {
+        return Country::class;
     }
 
     /**

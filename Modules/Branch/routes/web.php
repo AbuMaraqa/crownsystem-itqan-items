@@ -15,6 +15,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 Route::get('/add', 'add')->name('add')->can('Branch Create');
                 Route::post('/', 'store')->name('store')->can('Branch Create');
                 Route::delete('/', 'destroyMany')->name('destroy-many')->can('Branch Delete');
+                Route::post('/reorder', 'reorder')->name('reorder')->can('Branch Update');
+                Route::get('/{branch}/info', 'info')->whereNumber('branch')->name('info')->can('Branch View List');
                 Route::get('/{branch}/edit', 'edit')->whereNumber('branch')->name('edit')->can('Branch Update');
                 Route::put('/{branch}', 'update')->whereNumber('branch')->name('update')->can('Branch Update');
                 Route::delete('/{branch}', 'destroy')->whereNumber('branch')->name('destroy')->can('Branch Delete');

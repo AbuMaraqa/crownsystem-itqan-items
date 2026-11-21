@@ -271,7 +271,8 @@ class CategoryPriceListProfilePagesTest extends TestCase
         $this->put(route('categories.update', $category->id), ['name' => 'x'])->assertForbidden();
         $this->delete(route('categories.destroy', $category->id))->assertForbidden();
         $this->delete(route('categories.destroy-many'), ['ids' => [$category->id]])->assertForbidden();
-        $this->getJson(route('categories.info', $category->id))->assertForbidden();
+        // Info is basic: whoever sees the list sees the row's history (View List).
+        $this->getJson(route('categories.info', $category->id))->assertOk();
 
         $this->signIn([]);
         $this->get(route('categories.index'))->assertForbidden();
@@ -354,7 +355,8 @@ class CategoryPriceListProfilePagesTest extends TestCase
         $this->put(route('price-lists.update', $list->id), ['name' => 'x', 'sort_order' => 0])->assertForbidden();
         $this->delete(route('price-lists.destroy', $list->id))->assertForbidden();
         $this->delete(route('price-lists.destroy-many'), ['ids' => [$list->id]])->assertForbidden();
-        $this->getJson(route('price-lists.info', $list->id))->assertForbidden();
+        // Info is basic: whoever sees the list sees the row's history (View List).
+        $this->getJson(route('price-lists.info', $list->id))->assertOk();
 
         $this->signIn([]);
         $this->get(route('price-lists.index'))->assertForbidden();
@@ -472,7 +474,8 @@ class CategoryPriceListProfilePagesTest extends TestCase
         $this->put(route('item-type-profiles.update', $profile->id), $this->profilePayload())->assertForbidden();
         $this->delete(route('item-type-profiles.destroy', $profile->id))->assertForbidden();
         $this->delete(route('item-type-profiles.destroy-many'), ['ids' => [$profile->id]])->assertForbidden();
-        $this->getJson(route('item-type-profiles.info', $profile->id))->assertForbidden();
+        // Info is basic: whoever sees the list sees the row's history (View List).
+        $this->getJson(route('item-type-profiles.info', $profile->id))->assertOk();
 
         $this->signIn([]);
         $this->get(route('item-type-profiles.index'))->assertForbidden();

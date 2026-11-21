@@ -8,6 +8,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
 use Modules\Core\Support\SafeDelete;
@@ -15,12 +16,14 @@ use Modules\Items\Entities\Manufacturer;
 use Modules\Items\Http\Requests\Admin\ManufacturerRequest;
 use Modules\Items\Repositories\Contracts\ManufacturerRepositoryInterface;
 use Modules\Items\Services\ManufacturerService;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 use Modules\Items\Support\TranslatedSort;
 use Spatie\QueryBuilder\AllowedSort;
 
 class ManufacturerController extends Controller
 {
+    use ReordersRecords;
+
     public function __construct(
         private readonly ManufacturerRepositoryInterface $manufacturers,
         private readonly ManufacturerService $manufacturerService,
@@ -33,6 +36,8 @@ class ManufacturerController extends Controller
                 ->search(['slug'])
                 ->filters(AdminFilter::translated('name'), ...AdminFilter::dateRange('created_at'))
                 ->sorts(AllowedSort::custom('name', new TranslatedSort), 'slug', 'id')
+                ->reorderable()
+                ->withCreator()
                 ->rows(function (Manufacturer $manufacturer) {
                     $media = $manufacturer->getFirstMedia('manufacturer');
 
@@ -93,6 +98,11 @@ class ManufacturerController extends Controller
         }
 
         return back()->with('success', __('Manufacturers deleted successfully'));
+    }
+
+    protected function sortableModel(): string
+    {
+        return Manufacturer::class;
     }
 
     public function info(int $manufacturer): JsonResponse

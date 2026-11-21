@@ -192,13 +192,16 @@ class MasterDataPagesTest extends TestCase
         $this->assertSoftDeleted($tax);
     }
 
-    public function test_tax_info_needs_its_own_permission(): void
+    public function test_tax_info_follows_the_list_permission(): void
     {
         $tax = Tax::create(['name' => 'ضريبة', 'rate' => 16]);
 
-        $this->signIn(['Tax View List']);
-
+        $this->signIn([]);
         $this->getJson(route('accounting.taxes.info', $tax->id))->assertForbidden();
+
+        // Info is basic: whoever sees the list sees the row's history (View List).
+        $this->signIn(['Tax View List']);
+        $this->getJson(route('accounting.taxes.info', $tax->id))->assertOk();
     }
 
     public function test_a_customer_group_moves_customers_into_and_out_of_it(): void
@@ -379,7 +382,8 @@ class MasterDataPagesTest extends TestCase
         $this->post(route('accounting.currency-exchange-rates.store'), ['currency_id' => $currency->id, 'rate_date' => '2026-11-05', 'exchange_rate' => 1])->assertForbidden();
         $this->put(route('accounting.currency-exchange-rates.update', $rate->id), ['currency_id' => $currency->id, 'rate_date' => '2026-11-05', 'exchange_rate' => 1])->assertForbidden();
         $this->delete(route('accounting.currency-exchange-rates.destroy', $rate->id))->assertForbidden();
-        $this->getJson(route('accounting.currency-exchange-rates.info', $rate->id))->assertForbidden();
+        // Info is basic: whoever sees the list sees the row's history (View List).
+        $this->getJson(route('accounting.currency-exchange-rates.info', $rate->id))->assertOk();
     }
 
     public function test_an_account_mapping_points_to_a_postable_account(): void

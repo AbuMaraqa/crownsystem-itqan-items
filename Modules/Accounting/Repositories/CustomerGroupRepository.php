@@ -20,7 +20,7 @@ class CustomerGroupRepository extends BaseEloquentRepository implements Customer
     public function tableQuery(): Builder
     {
         return $this->query()
-            ->with(['createdBy.media', 'customers' => fn ($query) => $query->select(['id', 'name', 'customer_group_id'])->orderBy('name')])
+            ->with(['customers' => fn ($query) => $query->select(['id', 'name', 'customer_group_id'])->orderBy('name')])
             ->withCount('customers');
     }
 

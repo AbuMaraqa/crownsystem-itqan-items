@@ -3,21 +3,26 @@
 namespace Modules\Core\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 use Modules\Core\Entities\Currency;
 use Modules\Core\Enums\SymbolPosition;
+use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Http\Requests\Admin\CurrencyRequest;
 use Modules\Core\Repositories\Contracts\CurrencyRepositoryInterface;
 use Modules\Core\Services\CurrencyService;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
+use Modules\Core\Support\RecordInfo;
 use Modules\Core\Support\SafeDelete;
 
 class CurrencyController extends Controller
 {
+    use ReordersRecords;
+
     public function __construct(
         private readonly CurrencyRepositoryInterface $currencies,
         private readonly CurrencyService $currencyService,
@@ -30,6 +35,8 @@ class CurrencyController extends Controller
                 ->search(['code', 'symbol'])
                 ->filters(AdminFilter::boolean('is_active'), AdminFilter::exact('symbol_position'), ...AdminFilter::dateRange('created_at'), ...AdminFilter::numberRange('exchange_rate'))
                 ->sorts('code', 'symbol', 'exchange_rate', 'id')
+                ->reorderable()
+                ->withCreator()
                 ->rows(fn (Currency $currency) => [
                     'id' => $currency->id,
                     'name' => $currency->name,
@@ -108,6 +115,16 @@ class CurrencyController extends Controller
         }
 
         return back()->with('success', __('Currencies deleted successfully'));
+    }
+
+    public function info(int $currency): JsonResponse
+    {
+        return response()->json(RecordInfo::of($this->currencies->findOrFail($currency)));
+    }
+
+    protected function sortableModel(): string
+    {
+        return Currency::class;
     }
 
     /**

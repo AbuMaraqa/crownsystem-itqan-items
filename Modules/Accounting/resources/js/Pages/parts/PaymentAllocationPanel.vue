@@ -156,7 +156,7 @@ const cell = 'px-4 py-2.5';
                                     :placeholder="invoice.suggested"
                                     :aria-label="`${t('Amount to Allocate')} - ${invoice.reference_no}`"
                                     :aria-invalid="errorFor?.invoiceId === invoice.id"
-                                    class="h-9 w-32 rounded-control border bg-card px-2 text-end text-sm outline-none focus:border-brand"
+                                    class="h-control w-32 rounded-control border bg-card px-2 text-end text-sm outline-none focus:border-brand"
                                     :class="errorFor?.invoiceId === invoice.id ? 'border-danger' : 'border-line'"
                                 />
                                 <p v-if="errorFor?.invoiceId === invoice.id" class="mt-1 text-xs text-danger" role="alert">{{ errorFor.message }}</p>

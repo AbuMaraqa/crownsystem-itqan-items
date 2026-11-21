@@ -9,6 +9,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
 use Modules\Core\Support\SafeDelete;
@@ -16,12 +17,14 @@ use Modules\Items\Entities\Brand;
 use Modules\Items\Http\Requests\Admin\BrandRequest;
 use Modules\Items\Repositories\Contracts\BrandRepositoryInterface;
 use Modules\Items\Services\BrandService;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 use Modules\Items\Support\TranslatedSort;
 use Spatie\QueryBuilder\AllowedSort;
 
 class BrandController extends Controller
 {
+    use ReordersRecords;
+
     public function __construct(
         private readonly BrandRepositoryInterface $brands,
         private readonly BrandService $brandService,
@@ -34,6 +37,8 @@ class BrandController extends Controller
                 ->search(['slug'])
                 ->filters(AdminFilter::translated('name'), ...AdminFilter::dateRange('created_at'))
                 ->sorts(AllowedSort::custom('name', new TranslatedSort), 'slug', 'id')
+                ->reorderable()
+                ->withCreator()
                 ->rows(function (Brand $brand) {
                     $media = $brand->getFirstMedia('brand');
 
@@ -98,6 +103,11 @@ class BrandController extends Controller
         }
 
         return back()->with('success', __('Brands deleted successfully'));
+    }
+
+    protected function sortableModel(): string
+    {
+        return Brand::class;
     }
 
     public function info(int $brand): JsonResponse

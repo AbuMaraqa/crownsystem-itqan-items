@@ -4,12 +4,15 @@ namespace Modules\GeoLocation\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Support\Locales;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
+use Modules\Core\Support\RecordInfo;
 use Modules\GeoLocation\Entities\District;
 use Modules\GeoLocation\Enums\DistrictType;
 use Modules\GeoLocation\Http\Requests\Admin\DistrictRequest;
@@ -22,6 +25,8 @@ use Modules\GeoLocation\Support\GeoFilters;
 
 class DistrictController extends Controller
 {
+    use ReordersRecords;
+
     public function __construct(
         private readonly DistrictRepositoryInterface $districts,
         private readonly DistrictService $districtService,
@@ -45,6 +50,8 @@ class DistrictController extends Controller
                     ...AdminFilter::dateRange('created_at'),
                 )
                 ->sorts(GeoFilters::nameSort(), 'type', 'created_at', 'id')
+                ->reorderable()
+                ->withCreator()
                 ->rows(fn (District $district) => [
                     'id' => $district->id,
                     'name' => $district->name,
@@ -124,6 +131,16 @@ class DistrictController extends Controller
         $this->districtService->deleteMany($ids);
 
         return back()->with('success', __('Districts deleted successfully'));
+    }
+
+    public function info(int $district): JsonResponse
+    {
+        return response()->json(RecordInfo::of($this->districts->findOrFail($district)));
+    }
+
+    protected function sortableModel(): string
+    {
+        return District::class;
     }
 
     /**

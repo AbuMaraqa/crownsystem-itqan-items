@@ -246,7 +246,8 @@ class PurchaseOrderPagesTest extends TestCase
         $this->post(route('accounting.purchase-orders.cancel', $order->id))->assertForbidden();
         $this->delete(route('accounting.purchase-orders.destroy', $order->id))->assertForbidden();
         $this->get(route('accounting.purchase-orders.pdf', $order->id))->assertForbidden();
-        $this->getJson(route('accounting.purchase-orders.info', $order->id))->assertForbidden();
+        // Info is basic: whoever sees the list sees the row's history (View List).
+        $this->getJson(route('accounting.purchase-orders.info', $order->id))->assertOk();
     }
 
     /**

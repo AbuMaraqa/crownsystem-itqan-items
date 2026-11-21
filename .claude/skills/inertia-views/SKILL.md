@@ -50,6 +50,9 @@ Every route has `->can(...)`; the Vue page hides what `can('...')` (from `@/lib/
 
 Server: `Modules\Core\Support\AdminTable::for($repo->tableQuery())->search([...])->filters(...)->sorts(...)->rows(fn)`,
 filters from `Modules\Core\Support\AdminFilter` (exact, boolean, text, relation, dateRange, numberRange).
+Every table has the same row actions (`RecordActions`: Info · View · Edit · Delete + a `<routes>.info` route), the shared
+«Created By» column (`->withCreator()` + `createdByColumn()`) when the model has `createdBy()`, and setup tables
+(lookups, not documents) are drag-and-drop ordered (`->reorderable()` + `:reorder-url`) — see `global-components` §9.
 Client: `<DataTable :table :columns :filters>` from `@/Components/table`, with a non-empty `filters` list,
 `#cell-<key>`, `#actions` (`RowMenu` + `DropdownItem`), `#bulk`.
 
@@ -71,6 +74,8 @@ Add and Edit share one `<Entity>Fields.vue`. Files go with `forceFormData: true`
 Shell: `resources/js/Layouts/AdminLayout.vue` (`defineOptions({ layout: AdminLayout })`) and `PageHeader`.
 Design tokens in `resources/css/admin.css` and `panel.css`: `ink`, `muted`, `line`, `surface`, `card`, `canvas`,
 `brand-*` (the panel color from Settings). Cards `rounded-xl border border-line bg-card shadow-card`.
+Sizes are tokens too: sidebar 280px (`w-sidebar`), header 70px (`h-header`), page `max-w-page` + `px-gutter`,
+fields and buttons `h-control` (34px) with `rounded-control` (6px). Never hard-code `h-10`/`h-9` on a field.
 RTL: logical utilities only (`ms-`, `pe-`, `start-`, `text-start`). Dark mode: `dark:` or the tokens.
 Icons: Solar through `resources/js/lib/icons.ts`; sidebar icons are the providers' `solar-*` names,
 imported in `Components/layout/navIcons.ts`. Heavy libraries (FullCalendar, ApexCharts, Tiptap, Leaflet)

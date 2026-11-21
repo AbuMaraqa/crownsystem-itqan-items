@@ -33,7 +33,7 @@ use Modules\Core\Services\ReferenceNumberService;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
 use Modules\Core\Support\UserCellData;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 use Spatie\QueryBuilder\AllowedFilter;
 
 /**
@@ -91,6 +91,7 @@ class SalesOrderController extends Controller
                 )
                 ->sorts('reference_no', 'order_date', 'expected_delivery_date', 'total_amount', 'status', 'id')
                 ->defaultSort('-order_date')
+                ->withCreator()
                 ->rows(fn (SalesOrder $order) => [
                     'id' => $order->id,
                     'reference_no' => $order->reference_no,
@@ -329,7 +330,7 @@ class SalesOrderController extends Controller
 
     public function info(int $salesOrder): JsonResponse
     {
-        return response()->json(RecordInfo::of($this->find($salesOrder)));
+        return response()->json(RecordInfo::of($this->orders->query()->withTrashed()->findOrFail($salesOrder)));
     }
 
     public function pdf(int $salesOrder, AccountingPdfService $pdf): mixed

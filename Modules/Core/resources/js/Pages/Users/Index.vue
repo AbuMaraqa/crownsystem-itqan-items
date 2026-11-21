@@ -1,24 +1,19 @@
 <script setup lang="ts">
-import RowMenu from '@/Components/table/RowMenu.vue';
-import DropdownItem from '@/Components/ui/DropdownItem.vue';
-import DropdownSeparator from '@/Components/ui/DropdownSeparator.vue';
-import { router } from '@inertiajs/vue3';
-import { Eye, Pencil, Trash2 } from '@/lib/icons';
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 
 import type { Option } from '@/Components/form/SelectInput.vue';
 import DataTable from '@/Components/table/DataTable.vue';
+import RecordActions from '@/Components/table/RecordActions.vue';
 import UserCell from '@/Components/table/UserCell.vue';
 import Badge from '@/Components/ui/Badge.vue';
 import Button from '@/Components/ui/Button.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
-import { confirm } from '@/lib/confirm';
 import { can, t } from '@/lib/i18n';
 import { route } from '@/lib/route';
+import { createdByColumn } from '@/lib/tableColumns';
+import { useRecordDelete } from '@/lib/useRecordDelete';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
-
-import UserViewModal from './parts/UserViewModal.vue';
 
 defineOptions({ layout: AdminLayout });
 
@@ -37,14 +32,6 @@ interface Row {
 
 const props = defineProps<{ table: TablePayload<Row>; roleOptions: Option[]; branchOptions: Option[] | null }>();
 
-const viewing = ref<Row | null>(null);
-const viewOpen = computed({
-    get: () => viewing.value !== null,
-    set: (open: boolean) => {
-        if (!open) viewing.value = null;
-    },
-});
-
 const columns = computed<TableColumn[]>(() => [
     { key: 'name', label: t('Name'), sort: 'name' },
     { key: 'email', label: t('Email'), sort: 'email' },
@@ -53,6 +40,7 @@ const columns = computed<TableColumn[]>(() => [
     ...(props.branchOptions ? [{ key: 'branch', label: t('Branch'), toggleable: true }] : []),
     { key: 'created_at', label: t('Created At'), sort: 'created_at', toggleable: true },
     { key: 'updated_at', label: t('Updated At'), sort: 'updated_at', toggleable: true, hidden: true },
+    createdByColumn(),
 ]);
 
 const filters = computed<TableFilter[]>(() => [
@@ -64,11 +52,7 @@ const filters = computed<TableFilter[]>(() => [
     { type: 'date-range', key: 'created_at', label: t('Registration Date') },
 ]);
 
-async function remove(row: Row): Promise<void> {
-    if (await confirm({ title: t('Delete :name?', { name: row.name }), description: t('This cannot be undone.') })) {
-        router.delete(route('users.destroy', row.id), { preserveScroll: true });
-    }
-}
+const { remove } = useRecordDelete('users');
 </script>
 
 <template>
@@ -94,14 +78,24 @@ async function remove(row: Row): Promise<void> {
             </span>
         </template>
         <template #actions="{ row }">
-            <RowMenu>
-                <DropdownItem v-if="can('User View')" @select="viewing = row"><Eye />{{ t('View') }}</DropdownItem>
-                <DropdownItem v-if="can('User Update') && row.can_manage" :href="route('users.edit', row.id)"><Pencil />{{ t('Edit') }}</DropdownItem>
-                <DropdownSeparator v-if="can('User Delete') && row.can_manage" />
-                <DropdownItem v-if="can('User Delete') && row.can_manage" destructive @select="remove(row)"><Trash2 />{{ t('Delete') }}</DropdownItem>
-            </RowMenu>
+            <RecordActions
+                entity="User"
+                routes="users"
+                :id="row.id"
+                :title="row.name"
+                :fields="[
+                    { label: t('Name'), value: row.name },
+                    { label: t('Email'), value: row.email },
+                    { label: t('Phone'), value: row.phone },
+                    { label: t('Roles'), value: row.roles.map((role) => role.label).join('، ') },
+                    ...(branchOptions ? [{ label: t('Branch'), value: row.branch }] : []),
+                    { label: t('Created At'), value: row.created_at },
+                ]"
+                :edit-href="route('users.edit', row.id)"
+                :editable="row.can_manage"
+                :deletable="row.can_manage"
+                @delete="remove(row.id, row.name)"
+            />
         </template>
     </DataTable>
-
-    <UserViewModal v-if="viewing" v-model:open="viewOpen" :user="viewing" />
 </template>

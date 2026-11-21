@@ -16,9 +16,10 @@ import { confirm } from '@/lib/confirm';
 import { can, t } from '@/lib/i18n';
 import { Clock, Returns, ShieldCheck } from '@/lib/icons';
 import { route } from '@/lib/route';
+import { createdByColumn } from '@/lib/tableColumns';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
-import RecordActions from '@modules/Items/resources/js/Pages/parts/RecordActions.vue';
-import { useRecordModal } from '@modules/Items/resources/js/Pages/parts/useRecordModal';
+import RecordActions from '@/Components/table/RecordActions.vue';
+import { useRecordModal } from '@/lib/useRecordModal';
 
 import type { StatusBadge } from '../parts/statusBadge';
 
@@ -52,6 +53,7 @@ const columns = computed<TableColumn[]>(() => [
     { key: 'status', label: t('Status') },
     { key: 'is_default', label: t('Default') },
     { key: 'periods_count', label: t('Periods') },
+    createdByColumn(),
 ]);
 
 const filters = computed<TableFilter[]>(() => [
@@ -119,6 +121,7 @@ async function reopen(row: Row): Promise<void> {
                     { label: t('Default'), value: row.is_default ? t('Yes') : t('No') },
                     { label: t('Periods'), value: row.periods_count },
                 ]"
+                :deletable="false"
                 @edit="edit(row.id, row.form)"
             >
                 <DropdownItem :href="route('accounting.fiscal-years.periods', row.id)"><Clock />{{ t('Accounting Periods') }}</DropdownItem>

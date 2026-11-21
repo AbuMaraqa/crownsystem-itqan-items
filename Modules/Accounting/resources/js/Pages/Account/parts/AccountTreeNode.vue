@@ -6,7 +6,7 @@ import Badge from '@/Components/ui/Badge.vue';
 import { can, t } from '@/lib/i18n';
 import { ChevronDown, ChevronRight, Layers, MinusSmall, Plus } from '@/lib/icons';
 import { route } from '@/lib/route';
-import RecordActions from '@modules/Items/resources/js/Pages/parts/RecordActions.vue';
+import RecordActions from '@/Components/table/RecordActions.vue';
 
 import type { AccountNode } from './types';
 

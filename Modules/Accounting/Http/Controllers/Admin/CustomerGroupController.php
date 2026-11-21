@@ -13,10 +13,11 @@ use Modules\Accounting\Http\Requests\Admin\CustomerGroupRequest;
 use Modules\Accounting\Repositories\Contracts\CustomerGroupRepositoryInterface;
 use Modules\Accounting\Services\CustomerGroupService;
 use Modules\Accounting\Support\SelectOptions;
-use Modules\Core\Support\UserCellData;
 use Modules\Core\Entities\User;
+use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
+use Modules\Core\Support\RecordInfo;
 use Modules\Core\Support\SafeDelete;
 use Modules\Items\Entities\PriceList;
 
@@ -25,6 +26,8 @@ use Modules\Items\Entities\PriceList;
  */
 class CustomerGroupController extends Controller
 {
+    use ReordersRecords;
+
     public function __construct(
         private readonly CustomerGroupRepositoryInterface $groups,
         private readonly CustomerGroupService $groupService,
@@ -43,7 +46,8 @@ class CustomerGroupController extends Controller
                     ...AdminFilter::dateRange('created_at'),
                 )
                 ->sorts('name', 'profit_margin', 'customers_count', 'created_at', 'id')
-                ->defaultSort('-created_at')
+                ->reorderable()
+                ->withCreator()
                 ->rows(fn (CustomerGroup $group) => [
                     'id' => $group->id,
                     'name' => $group->name,
@@ -53,7 +57,6 @@ class CustomerGroupController extends Controller
                     'use_last_price' => (bool) $group->use_last_price,
                     'notes' => $group->notes,
                     'is_active' => (bool) $group->is_active,
-                    'created_by' => UserCellData::of($group->createdBy),
                     // The saved members with their names, so the customers field shows them.
                     'customers' => $group->customers
                         ->map(fn (User $customer) => ['value' => (int) $customer->id, 'label' => (string) $customer->name])
@@ -111,5 +114,15 @@ class CustomerGroupController extends Controller
     public function customers(Request $request): JsonResponse
     {
         return response()->json($this->groups->customerOptions((string) $request->query('q', '')));
+    }
+
+    protected function sortableModel(): string
+    {
+        return CustomerGroup::class;
+    }
+
+    public function info(int $group): JsonResponse
+    {
+        return response()->json(RecordInfo::of($this->groups->findOrFail($group)));
     }
 }

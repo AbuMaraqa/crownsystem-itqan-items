@@ -14,7 +14,7 @@
     "Locale": "اللغة",
     "Description": "وصف",
     "Slug": "الاسم المستعار",
-    "Created By": "تم الإنشاء بواسطة",
+    "Created By": "أضيف بواسطة",
     "Image": "الصورة",
     "Images": "الصور",
     "Gallary": "معرض الصور",
@@ -517,5 +517,11 @@
     "Package activated": "فُعِّلت الباقة",
     "Activate": "تفعيل",
     "Confirm": "تأكيد",
-    "Core Store": "المتجر الأساسي"
+    "Core Store": "المتجر الأساسي",
+    "By the system": "بواسطة النظام",
+    "Show less": "عرض أقل",
+    "Show all (:count)": "عرض الكل (:count)",
+    "Order saved": "تم حفظ الترتيب",
+    "Row order": "ترتيب الصفوف",
+    "Some rows no longer exist. Refresh the page and try again.": "بعض الصفوف لم تعد موجودة. حدّث الصفحة وحاول مرة أخرى."
 }

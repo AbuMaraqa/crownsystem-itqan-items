@@ -301,8 +301,39 @@ class CatalogLookupPagesTest extends TestCase
 
         $this->getJson(route('units.info', $unit->id))
             ->assertOk()
-            ->assertJsonPath('created_by', $user->name)
-            ->assertJsonStructure(['created_by', 'created_at', 'updated_at', 'activities' => ['*' => ['id', 'description', 'causer', 'old', 'new', 'created_at', 'created_ago']]]);
+            ->assertJsonPath('created_by.name', $user->name)
+            ->assertJsonPath('activities.0.event', 'created')
+            ->assertJsonPath('activities.0.causer.id', $user->id)
+            ->assertJsonStructure([
+                'created_by' => ['id', 'name', 'avatar', 'detail'],
+                'created_at',
+                'updated_at',
+                'activities' => ['*' => ['id', 'event', 'description', 'causer', 'changes' => ['*' => ['field', 'label', 'old', 'new', 'changed']], 'created_at', 'created_ago']],
+            ]);
+    }
+
+    public function test_each_list_shows_who_added_the_row_and_is_ordered_by_hand(): void
+    {
+        $user = $this->signIn();
+        $first = $this->record(Tag::class, 'أول');
+        $second = $this->record(Tag::class, 'ثان');
+        $third = $this->record(Tag::class, 'ثالث');
+
+        // A new row goes last.
+        $this->assertTrue($first->sort_order < $second->sort_order && $second->sort_order < $third->sort_order);
+
+        $this->get(route('tags.index'))->assertInertia(fn (Assert $page) => $page
+            ->where('table.reorder', 'sort_order')
+            ->where('table.query.sort', 'sort_order')
+            ->where('table.data.0.id', $first->id)
+            ->where('table.data.0.created_by.name', $user->name));
+
+        $this->post(route('tags.reorder'), ['ids' => [$third->id, $first->id, $second->id]])->assertSessionHas('success');
+
+        $this->get(route('tags.index'))->assertInertia(fn (Assert $page) => $page
+            ->where('table.data.0.id', $third->id)
+            ->where('table.data.1.id', $first->id)
+            ->where('table.data.2.id', $second->id));
     }
 
     public function test_every_action_needs_its_permission(): void
@@ -323,7 +354,8 @@ class CatalogLookupPagesTest extends TestCase
             $this->put(route("{$routes}.update", $record->id), ['name' => 'س'])->assertForbidden();
             $this->delete(route("{$routes}.destroy", $record->id))->assertForbidden();
             $this->delete(route("{$routes}.destroy-many"), ['ids' => [$record->id]])->assertForbidden();
-            $this->getJson(route("{$routes}.info", $record->id))->assertForbidden();
+            // Info is basic: whoever sees the list sees a row's history.
+            $this->getJson(route("{$routes}.info", $record->id))->assertOk();
             $this->assertNotNull($record->fresh());
         }
 

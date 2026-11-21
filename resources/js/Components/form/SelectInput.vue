@@ -31,7 +31,7 @@ const id = useId();
             v-model="model"
             :disabled="disabled"
             :aria-invalid="!!error"
-            :class="[controlClasses, 'h-10 pe-8']"
+            :class="[controlClasses, 'h-control pe-8']"
         >
             <option v-if="placeholder !== undefined" :value="null">{{ placeholder }}</option>
             <option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option>

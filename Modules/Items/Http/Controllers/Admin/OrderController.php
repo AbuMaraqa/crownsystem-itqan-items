@@ -22,7 +22,7 @@ use Modules\Items\Enums\PaymentStatus;
 use Modules\Items\Http\Requests\Admin\OrderRequest;
 use Modules\Items\Repositories\Contracts\OrderRepositoryInterface;
 use Modules\Items\Services\OrderService;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 use Spatie\QueryBuilder\AllowedFilter;
 
 /**
@@ -47,6 +47,7 @@ class OrderController extends Controller
                     ...AdminFilter::dateRange('created_at'),
                 )
                 ->sorts('order_number', 'sub_total', 'discount', 'delivery_fee', 'total', 'status', 'payment_status', 'created_at', 'id')
+                ->withCreator()
                 ->rows(fn (Order $order) => [
                     'id' => (int) $order->id,
                     'order_number' => $order->order_number,

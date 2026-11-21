@@ -25,7 +25,7 @@ use Modules\Core\Services\ReferenceNumberService;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
 use Modules\Core\Support\UserCellData;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 use Spatie\QueryBuilder\AllowedFilter;
 
 /**
@@ -63,6 +63,7 @@ class PurchaseReturnController extends Controller
                 )
                 ->sorts('reference_no', 'return_date', 'total_amount', 'status', 'id')
                 ->defaultSort('-return_date')
+                ->withCreator()
                 ->rows(fn (PurchaseReturn $return) => [
                     'id' => $return->id,
                     'reference_no' => $return->reference_no,
@@ -230,7 +231,7 @@ class PurchaseReturnController extends Controller
 
     public function info(int $purchaseReturn): JsonResponse
     {
-        return response()->json(RecordInfo::of($this->find($purchaseReturn)));
+        return response()->json(RecordInfo::of($this->returns->query()->withTrashed()->findOrFail($purchaseReturn)));
     }
 
     public function print(int $purchaseReturn, AccountingPdfService $pdf): mixed

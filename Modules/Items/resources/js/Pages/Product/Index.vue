@@ -16,10 +16,11 @@ import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { can, t } from '@/lib/i18n';
 import { DollarSign, QrCode, Tag } from '@/lib/icons';
 import { route } from '@/lib/route';
+import { createdByColumn } from '@/lib/tableColumns';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
 
-import RecordActions from '../parts/RecordActions.vue';
-import { useRecordDelete } from '../parts/useRecordDelete';
+import RecordActions from '@/Components/table/RecordActions.vue';
+import { useRecordDelete } from '@/lib/useRecordDelete';
 import BarcodeModal from './parts/BarcodeModal.vue';
 
 defineOptions({ layout: AdminLayout });
@@ -61,6 +62,7 @@ const columns = computed<TableColumn[]>(() => [
     { key: 'is_active', label: t('Active'), sort: 'is_active' },
     { key: 'base_price', label: t('Base Price'), sort: 'base_price', class: 'tabular', toggleable: true },
     { key: 'locales', label: t('Locale'), toggleable: true },
+    createdByColumn(),
 ]);
 
 const filters = computed<TableFilter[]>(() => [

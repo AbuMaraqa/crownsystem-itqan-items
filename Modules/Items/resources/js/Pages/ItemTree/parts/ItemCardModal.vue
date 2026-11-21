@@ -330,7 +330,7 @@ function submit(): void {
                         <TextInput v-model="form.min_limit_2" type="number" step="any" min="0" :label="t('Min Limit 2')" :error="form.errors.min_limit_2" :disabled="!payload.can_edit_limits" />
                         <TextInput v-model="form.max_limit" type="number" step="any" min="0" :label="t('Max Limit')" :error="form.errors.max_limit" :disabled="!payload.can_edit_limits" />
                         <Field :label="t('Color')" :error="form.errors.color" :hint="t('On the aluminum type')">
-                            <input v-model="form.color" :list="colorsListId" :maxlength="50" :class="[controlClasses, 'h-10']" />
+                            <input v-model="form.color" :list="colorsListId" :maxlength="50" :class="[controlClasses, 'h-control']" />
                             <datalist :id="colorsListId">
                                 <option v-for="color in options.colors" :key="color" :value="color" />
                             </datalist>

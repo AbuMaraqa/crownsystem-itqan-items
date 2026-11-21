@@ -1,22 +1,22 @@
 <script setup lang="ts">
 import { Link, router } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 
 import DataTable from '@/Components/table/DataTable.vue';
-import RowMenu from '@/Components/table/RowMenu.vue';
+import RecordActions from '@/Components/table/RecordActions.vue';
+import type { ViewField } from '@/Components/table/RecordViewModal.vue';
 import UserCell from '@/Components/table/UserCell.vue';
 import Badge from '@/Components/ui/Badge.vue';
 import Button from '@/Components/ui/Button.vue';
 import DropdownItem from '@/Components/ui/DropdownItem.vue';
-import DropdownSeparator from '@/Components/ui/DropdownSeparator.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { confirm } from '@/lib/confirm';
 import { can, t } from '@/lib/i18n';
-import { Eye, Pencil, Trash2 } from '@/lib/icons';
+import { ExternalLink } from '@/lib/icons';
 import { route } from '@/lib/route';
+import { createdByColumn } from '@/lib/tableColumns';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
-import RecordViewModal from '@modules/Items/resources/js/Pages/parts/RecordViewModal.vue';
 
 import type { StatusBadge } from '../parts/statusBadge';
 import type { Option, UserCellData } from '../parts/types';
@@ -39,6 +39,7 @@ interface Row {
     currency: string | null;
     status: StatusBadge | null;
     notes: string | null;
+    editable: boolean;
     can_delete: boolean;
 }
 
@@ -57,6 +58,7 @@ const columns = computed<TableColumn[]>(() => [
     { key: 'margin', label: t('Margin'), class: 'tabular', toggleable: true },
     { key: 'currency', label: t('Currency'), toggleable: true },
     { key: 'status', label: t('Status'), sort: 'status' },
+    createdByColumn(),
 ]);
 
 const filters = computed<TableFilter[]>(() => [
@@ -70,13 +72,23 @@ const filters = computed<TableFilter[]>(() => [
     { type: 'number-range', key: 'total_cost', label: t('Total Cost') },
 ]);
 
-const viewing = ref<Row | null>(null);
-const viewOpen = computed({
-    get: () => viewing.value !== null,
-    set: (open: boolean) => {
-        if (!open) viewing.value = null;
-    },
-});
+function viewFields(row: Row): ViewField[] {
+    return [
+        { label: t('Reference No'), value: row.reference_no },
+        { label: t('Order Date'), value: row.order_date },
+        { label: t('Due Date'), value: row.due_date },
+        { label: t('Status'), value: row.status?.label },
+        { label: t('Sales Order'), value: row.sales_order?.reference_no },
+        { label: t('Client'), value: row.client?.name },
+        { label: t('Produced Quantity'), value: row.produced_quantity },
+        { label: t('Total Cost'), value: row.total_cost },
+        { label: t('Unit Cost'), value: row.unit_cost },
+        { label: t('Sales Value'), value: row.sales_amount },
+        { label: t('Margin'), value: row.margin },
+        { label: t('Currency'), value: row.currency },
+        { label: t('Notes'), value: row.notes },
+    ];
+}
 
 async function remove(row: Row): Promise<void> {
     if (await confirm({ title: t('Delete :name?', { name: row.reference_no }), description: t('This cannot be undone.') })) {
@@ -125,35 +137,21 @@ async function remove(row: Row): Promise<void> {
             <Button v-if="can('Production Order Create')" variant="primary" :href="route('accounting.production-orders.add')">{{ t('Add Production Order') }}</Button>
         </template>
         <template #actions="{ row }">
-            <RowMenu v-if="can('Production Order View') || can('Production Order Update') || (row.can_delete && can('Production Order Delete'))">
-                <DropdownItem v-if="can('Production Order View')" @select="viewing = row"><Eye />{{ t('View') }}</DropdownItem>
-                <DropdownItem v-if="can('Production Order Update')" :href="route('accounting.production-orders.edit', row.id)"><Pencil />{{ t('Edit') }}</DropdownItem>
-                <template v-if="row.can_delete && can('Production Order Delete')">
-                    <DropdownSeparator />
-                    <DropdownItem destructive @select="remove(row)"><Trash2 />{{ t('Delete') }}</DropdownItem>
+            <RecordActions
+                entity="Production Order"
+                routes="accounting.production-orders"
+                :id="row.id"
+                :title="row.reference_no"
+                :fields="viewFields(row)"
+                :edit-href="route('accounting.production-orders.edit', row.id)"
+                :editable="row.editable"
+                :deletable="row.can_delete"
+                @delete="remove(row)"
+            >
+                <template v-if="!row.editable && can('Production Order Update')" #default>
+                    <DropdownItem :href="route('accounting.production-orders.edit', row.id)"><ExternalLink />{{ t('Open document') }}</DropdownItem>
                 </template>
-            </RowMenu>
+            </RecordActions>
         </template>
     </DataTable>
-
-    <RecordViewModal
-        v-if="viewing"
-        v-model:open="viewOpen"
-        :title="viewing.reference_no"
-        :fields="[
-            { label: t('Reference No'), value: viewing.reference_no },
-            { label: t('Order Date'), value: viewing.order_date },
-            { label: t('Due Date'), value: viewing.due_date },
-            { label: t('Status'), value: viewing.status?.label },
-            { label: t('Sales Order'), value: viewing.sales_order?.reference_no },
-            { label: t('Client'), value: viewing.client?.name },
-            { label: t('Produced Quantity'), value: viewing.produced_quantity },
-            { label: t('Total Cost'), value: viewing.total_cost },
-            { label: t('Unit Cost'), value: viewing.unit_cost },
-            { label: t('Sales Value'), value: viewing.sales_amount },
-            { label: t('Margin'), value: viewing.margin },
-            { label: t('Currency'), value: viewing.currency },
-            { label: t('Notes'), value: viewing.notes },
-        ]"
-    />
 </template>

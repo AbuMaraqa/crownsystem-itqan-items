@@ -12,16 +12,19 @@ use Modules\Accounting\Entities\Tax;
 use Modules\Accounting\Http\Requests\Admin\TaxRequest;
 use Modules\Accounting\Repositories\Contracts\TaxRepositoryInterface;
 use Modules\Accounting\Services\TaxService;
+use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
 use Modules\Core\Support\SafeDelete;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 
 /**
  * الضرائب: الاضافة والتعديل في نافذة على صفحة القائمة، والتفعيل من الجدول.
  */
 class TaxController extends Controller
 {
+    use ReordersRecords;
+
     public function __construct(
         private readonly TaxRepositoryInterface $taxes,
         private readonly TaxService $taxService,
@@ -39,7 +42,8 @@ class TaxController extends Controller
                     ...AdminFilter::dateRange('created_at'),
                 )
                 ->sorts('name', 'code', 'rate', 'created_at', 'id')
-                ->defaultSort('-created_at')
+                ->reorderable()
+                ->withCreator()
                 ->rows(fn (Tax $tax) => [
                     'id' => $tax->id,
                     'name' => $tax->name,
@@ -95,5 +99,10 @@ class TaxController extends Controller
     public function info(int $tax): JsonResponse
     {
         return response()->json(RecordInfo::of($this->taxes->findOrFail($tax)));
+    }
+
+    protected function sortableModel(): string
+    {
+        return Tax::class;
     }
 }

@@ -28,7 +28,7 @@ use Modules\Core\Services\ReferenceNumberService;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
 use Modules\GeoLocation\Support\GeoFilters;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 use Spatie\QueryBuilder\AllowedFilter;
 
 /**
@@ -86,6 +86,7 @@ abstract class VoucherController extends Controller
                 )
                 ->sorts('reference_no', 'voucher_date', 'amount', 'status', 'id')
                 ->defaultSort('-voucher_date')
+                ->withCreator()
                 ->rows(fn (PaymentVoucher|ReceiptVoucher $voucher) => [
                     'id' => $voucher->id,
                     'reference_no' => $voucher->reference_no,
@@ -238,7 +239,7 @@ abstract class VoucherController extends Controller
 
     public function info(int $voucher): JsonResponse
     {
-        return response()->json(RecordInfo::of($this->vouchers->findForPage($voucher)));
+        return response()->json(RecordInfo::of($this->vouchers->query()->withTrashed()->findOrFail($voucher)));
     }
 
     /**

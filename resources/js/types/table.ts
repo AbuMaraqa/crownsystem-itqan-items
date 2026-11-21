@@ -12,6 +12,8 @@ export interface TablePayload<Row> {
     data: Row[];
     meta: TableMeta;
     query: { filter: Record<string, string>; sort: string };
+    /** The column rows are dragged by (`AdminTable::reorderable()`), or null. */
+    reorder?: string | null;
 }
 
 export interface TableColumn {
@@ -23,6 +25,8 @@ export interface TableColumn {
     /** The column can be hidden from the columns menu. Hidden by default when `hidden` is true. */
     toggleable?: boolean;
     hidden?: boolean;
+    /** `user`: the cell is a `UserCellData` drawn by `UserCell` (e.g. `createdByColumn()`). */
+    type?: 'user';
 }
 
 export interface FilterOption {

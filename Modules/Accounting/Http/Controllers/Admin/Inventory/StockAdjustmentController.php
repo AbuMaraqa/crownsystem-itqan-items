@@ -27,7 +27,7 @@ use Modules\Accounting\Support\StatusBadge;
 use Modules\Core\Support\AdminFilter;
 use Modules\Items\Entities\Product;
 use Modules\Items\Support\ProductSearch;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 
 /**
  * رصيد افتتاحي / جرد / تسوية. في الجرد يُحمَّل كشف الاصناف برصيد النظام ويُدخل العدد الفعلي،

@@ -10,12 +10,13 @@ import Button from '@/Components/ui/Button.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { can, t } from '@/lib/i18n';
+import { route } from '@/lib/route';
+import { createdByColumn } from '@/lib/tableColumns';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
 import type { UserCellData } from '@/types/user';
-import { route } from '@/lib/route';
 
-import RecordActions from '../parts/RecordActions.vue';
-import { useRecordDelete } from '../parts/useRecordDelete';
+import RecordActions from '@/Components/table/RecordActions.vue';
+import { useRecordDelete } from '@/lib/useRecordDelete';
 
 defineOptions({ layout: AdminLayout });
 
@@ -51,6 +52,7 @@ const columns = computed<TableColumn[]>(() => [
     { key: 'status', label: t('Status'), sort: 'status' },
     { key: 'payment_status', label: t('Payment Status'), sort: 'payment_status' },
     { key: 'created_at', label: t('Order Date'), sort: 'created_at', toggleable: true, hidden: true },
+    createdByColumn(),
 ]);
 
 const filters = computed<TableFilter[]>(() => [

@@ -23,7 +23,7 @@ use Modules\Accounting\Support\InventoryLines;
 use Modules\Accounting\Support\SelectOptions;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\UserCellData;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 
 /**
  * سند التسليم: يُختار طلب البيع فتظهر سطوره المتبقية مع الرصيد المتاح ومكان الصنف، ويُطبع

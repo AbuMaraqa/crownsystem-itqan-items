@@ -20,7 +20,7 @@ use Modules\Accounting\Support\StatusBadge;
 use Modules\Core\Entities\Currency;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 
 /**
  * القيود اليومية اليدوية: مسودة تُعدَّل وتُحذف، ثم ترحيل، ثم الغاء بقيد عكسي.
@@ -40,6 +40,7 @@ class JournalEntryController extends Controller
                 ->filters(AdminFilter::exact('status'), AdminFilter::text('reference_no'), ...AdminFilter::dateRange('entry_date'))
                 ->sorts('entry_number', 'entry_date', 'id')
                 ->defaultSort('-entry_date')
+                ->withCreator()
                 ->rows(fn (JournalEntry $entry) => [
                     'id' => $entry->id,
                     'entry_number' => $entry->entry_number,

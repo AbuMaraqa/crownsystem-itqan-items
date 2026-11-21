@@ -8,10 +8,12 @@ import Modal from '@/Components/ui/Modal.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { can, t } from '@/lib/i18n';
+import { route } from '@/lib/route';
+import { createdByColumn } from '@/lib/tableColumns';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
-import RecordActions from '@modules/Items/resources/js/Pages/parts/RecordActions.vue';
-import { useRecordDelete } from '@modules/Items/resources/js/Pages/parts/useRecordDelete';
-import { useRecordModal } from '@modules/Items/resources/js/Pages/parts/useRecordModal';
+import RecordActions from '@/Components/table/RecordActions.vue';
+import { useRecordDelete } from '@/lib/useRecordDelete';
+import { useRecordModal } from '@/lib/useRecordModal';
 
 defineOptions({ layout: AdminLayout });
 
@@ -24,6 +26,7 @@ defineProps<{ table: TablePayload<Row> }>();
 
 const columns = computed<TableColumn[]>(() => [
     { key: 'name', label: t('Name'), sort: 'name' },
+    createdByColumn(),
 ]);
 
 const filters = computed<TableFilter[]>(() => [
@@ -47,7 +50,7 @@ function editRow(row: Row): void {
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :empty-title="t('No data available')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :reorder-url="can('Clearance Attachment Type Update') ? route('accounting.clearance-attachment-types.reorder') : undefined" :empty-title="t('No data available')">
         <template #cell-name="{ row }">
             <button v-if="can('Clearance Attachment Type Update')" type="button" class="font-medium text-brand-600 hover:underline dark:text-brand-400" @click="editRow(row)">{{ row.name }}</button>
             <span v-else class="font-medium">{{ row.name }}</span>

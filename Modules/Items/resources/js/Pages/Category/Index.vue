@@ -11,9 +11,10 @@ import { confirm } from '@/lib/confirm';
 import { can, t } from '@/lib/i18n';
 import { Package } from '@/lib/icons';
 import { route } from '@/lib/route';
+import { createdByColumn } from '@/lib/tableColumns';
 import type { FilterOption, TableColumn, TableFilter, TablePayload } from '@/types/table';
 
-import RecordActions from '../parts/RecordActions.vue';
+import RecordActions from '@/Components/table/RecordActions.vue';
 
 defineOptions({ layout: AdminLayout });
 
@@ -39,6 +40,7 @@ const columns = computed<TableColumn[]>(() => [
     { key: 'parent', label: t('Parent Category') },
     { key: 'active', label: t('Status'), toggleable: true },
     { key: 'locales', label: t('Locale'), toggleable: true },
+    createdByColumn(),
 ]);
 
 const filters = computed<TableFilter[]>(() => [
@@ -76,7 +78,7 @@ async function removeMany(ids: (number | string)[]): Promise<void> {
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Category Delete')" :empty-title="t('No categories found')" :empty-text="t('Add the categories your items belong to.')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Category Delete')" :reorder-url="can('Category Update') ? route('categories.reorder') : undefined" :empty-title="t('No categories found')" :empty-text="t('Add the categories your items belong to.')">
         <template #cell-image="{ row }">
             <img v-if="row.image" :src="row.image" alt="" class="size-12 rounded-control object-cover" />
         </template>

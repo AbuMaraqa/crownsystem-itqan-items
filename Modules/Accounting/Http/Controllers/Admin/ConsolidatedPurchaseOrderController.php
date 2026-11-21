@@ -35,7 +35,7 @@ use Modules\Core\Entities\User;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
 use Modules\Core\Support\UserCellData;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 use Spatie\QueryBuilder\AllowedFilter;
 
 /**
@@ -81,6 +81,7 @@ class ConsolidatedPurchaseOrderController extends Controller
                 )
                 ->sorts('reference_no', 'order_date', 'expected_delivery_date', 'total_amount', 'status', 'id')
                 ->defaultSort('-order_date')
+                ->withCreator()
                 ->rows(fn (ConsolidatedPurchaseOrder $order) => [
                     'id' => $order->id,
                     'reference_no' => $order->reference_no,
@@ -196,6 +197,14 @@ class ConsolidatedPurchaseOrderController extends Controller
         }
 
         return to_route('accounting.consolidated-purchase-orders.index')->with('success', __('Consolidated purchase order deleted successfully'));
+    }
+
+    /**
+     * The list's «Info» window; a deleted order stays in the list, so it is found too.
+     */
+    public function info(int $consolidatedPurchaseOrder): JsonResponse
+    {
+        return response()->json(RecordInfo::of($this->orders->query()->withTrashed()->findOrFail($consolidatedPurchaseOrder)));
     }
 
     /**

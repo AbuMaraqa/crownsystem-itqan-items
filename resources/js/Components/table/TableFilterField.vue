@@ -9,7 +9,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{ change: [key: string, value: string] }>();
 
-const control = 'h-9 w-full rounded-control border border-line bg-card px-2 text-sm outline-none focus:border-brand';
+const control = 'h-control w-full rounded-control border border-line bg-card px-2 text-sm outline-none focus:border-brand';
 
 function value(key: string): string {
     return props.values[key] ?? '';

@@ -28,6 +28,7 @@ use Modules\Accounting\Support\StatusBadge;
 use Modules\Core\Services\ReferenceNumberService;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
+use Modules\Core\Support\RecordInfo;
 use Modules\Core\Support\UserCellData;
 use Modules\Items\Enums\ItemType;
 use Modules\Items\Enums\ServiceCostSource;
@@ -64,6 +65,7 @@ class ProductionOrderController extends Controller
                 )
                 ->sorts('reference_no', 'order_date', 'due_date', 'total_cost', 'unit_cost', 'status', 'id')
                 ->defaultSort('-order_date')
+                ->withCreator()
                 ->rows(fn (ProductionOrder $order) => [
                     'id' => $order->id,
                     'reference_no' => $order->reference_no,
@@ -80,6 +82,7 @@ class ProductionOrderController extends Controller
                     'currency' => $order->currency?->code,
                     'status' => StatusBadge::of($order->status),
                     'notes' => $order->notes,
+                    'editable' => $order->canBeEdited(),
                     'can_delete' => $order->canBeDeleted(),
                 ]),
             'statusOptions' => SelectOptions::from(ProductionOrderStatus::options()),
@@ -208,6 +211,11 @@ class ProductionOrderController extends Controller
         }
 
         return to_route('accounting.production-orders.index')->with('success', __('Production order deleted successfully'));
+    }
+
+    public function info(int $productionOrder): JsonResponse
+    {
+        return response()->json(RecordInfo::of($this->find($productionOrder)));
     }
 
     /**

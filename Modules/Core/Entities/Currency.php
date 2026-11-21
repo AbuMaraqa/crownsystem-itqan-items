@@ -4,6 +4,8 @@ namespace Modules\Core\Entities;
 
 use Astrotomic\Translatable\Translatable;
 use Astrotomic\Translatable\Contracts\Translatable as TranslatableContract;
+use Modules\Core\Entities\Concerns\HasCreator;
+use Modules\Core\Entities\Concerns\HasSortOrder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use Modules\Core\Entities\User;
@@ -19,6 +21,8 @@ class Currency extends Model implements TranslatableContract
 {
     use LogsActivity;
     use Translatable;
+    use HasCreator;
+    use HasSortOrder;
 
     public function __construct(array $attributes = [])
     {

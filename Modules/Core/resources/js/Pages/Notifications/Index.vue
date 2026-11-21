@@ -2,12 +2,10 @@
 import { router } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
+import ActionButton from '@/Components/table/ActionButton.vue';
 import DataTable from '@/Components/table/DataTable.vue';
-import RowMenu from '@/Components/table/RowMenu.vue';
 import Badge from '@/Components/ui/Badge.vue';
 import Button from '@/Components/ui/Button.vue';
-import DropdownItem from '@/Components/ui/DropdownItem.vue';
-import DropdownSeparator from '@/Components/ui/DropdownSeparator.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { confirm } from '@/lib/confirm';
@@ -111,15 +109,13 @@ function readAll(): void {
             <span class="tabular">{{ row.read_at ?? '—' }}</span>
         </template>
         <template #actions="{ row }">
-            <RowMenu>
-                <DropdownItem v-if="row.url" @select="open(row)"><Eye />{{ t('View') }}</DropdownItem>
-                <DropdownItem @select="toggle(row)">
-                    <template v-if="row.read"><EnvelopeUnread />{{ t('Mark as unread') }}</template>
-                    <template v-else><CheckRead />{{ t('Mark as read') }}</template>
-                </DropdownItem>
-                <DropdownSeparator />
-                <DropdownItem destructive @select="remove(row)"><Trash2 />{{ t('Delete') }}</DropdownItem>
-            </RowMenu>
+            <!-- Not RecordActions: a notification is the user's own message (uuid, no Update/Delete permission, no edit). Same buttons and look. -->
+            <div class="inline-flex items-center gap-1.5">
+                <ActionButton v-if="row.url" :label="t('View')" tone="view" @click="open(row)"><Eye /></ActionButton>
+                <ActionButton v-if="row.read" :label="t('Mark as unread')" @click="toggle(row)"><EnvelopeUnread /></ActionButton>
+                <ActionButton v-else :label="t('Mark as read')" @click="toggle(row)"><CheckRead /></ActionButton>
+                <ActionButton :label="t('Delete')" tone="delete" @click="remove(row)"><Trash2 /></ActionButton>
+            </div>
         </template>
         <template #bulk="{ selected }">
             <Button size="sm" @click="bulk('read', selected)">{{ t('Mark as read') }}</Button>

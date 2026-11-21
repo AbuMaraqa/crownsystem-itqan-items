@@ -9,10 +9,11 @@ import PageHeader from '@/Components/ui/PageHeader.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { can, t } from '@/lib/i18n';
 import { route } from '@/lib/route';
+import { createdByColumn } from '@/lib/tableColumns';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
 
-import RecordActions from '../parts/RecordActions.vue';
-import { useRecordDelete } from '../parts/useRecordDelete';
+import RecordActions from '@/Components/table/RecordActions.vue';
+import { useRecordDelete } from '@/lib/useRecordDelete';
 
 defineOptions({ layout: AdminLayout });
 
@@ -33,6 +34,7 @@ const columns = computed<TableColumn[]>(() => [
     { key: 'configuration', label: t('Configure Attribute') },
     { key: 'type', label: t('Type'), sort: 'type' },
     { key: 'locales', label: t('Locale'), toggleable: true },
+    createdByColumn(),
 ]);
 
 const filters = computed<TableFilter[]>(() => [
@@ -51,7 +53,7 @@ const { remove, removeMany } = useRecordDelete('attributes');
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Attribute Delete')" :empty-title="t('No attributes found')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Attribute Delete')" :reorder-url="can('Attribute Update') ? route('attributes.reorder') : undefined" :empty-title="t('No attributes found')">
         <template #cell-name="{ row }">
             <Link v-if="can('Attribute Update')" :href="route('attributes.edit', row.id)" class="font-medium text-brand-600 hover:underline dark:text-brand-400">{{ row.name }}</Link>
             <template v-else>{{ row.name }}</template>

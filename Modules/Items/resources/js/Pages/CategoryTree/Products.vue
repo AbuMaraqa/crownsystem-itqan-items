@@ -2,14 +2,15 @@
 import { computed } from 'vue';
 
 import DataTable from '@/Components/table/DataTable.vue';
-import RowMenu from '@/Components/table/RowMenu.vue';
-import DropdownItem from '@/Components/ui/DropdownItem.vue';
+import RecordActions from '@/Components/table/RecordActions.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { can, t } from '@/lib/i18n';
-import { Pencil } from '@/lib/icons';
 import { route } from '@/lib/route';
+import { createdByColumn } from '@/lib/tableColumns';
+import { useRecordDelete } from '@/lib/useRecordDelete';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
+import type { UserCellData } from '@/types/user';
 
 defineOptions({ layout: AdminLayout });
 
@@ -21,6 +22,7 @@ interface Row {
     base_price: string | number | null;
     categories: string;
     parent: string | null;
+    created_by: UserCellData | null;
 }
 
 /** The items linked to a category; variations show their parent item to tell them apart. */
@@ -33,6 +35,7 @@ const columns = computed<TableColumn[]>(() => [
     { key: 'base_price', label: t('Base Price'), sort: 'base_price', class: 'tabular' },
     { key: 'categories', label: t('Category'), toggleable: true },
     { key: 'parent', label: t('Parent Product'), toggleable: true },
+    createdByColumn(),
 ]);
 
 const filters = computed<TableFilter[]>(() => [
@@ -40,6 +43,9 @@ const filters = computed<TableFilter[]>(() => [
     { type: 'boolean', key: 'is_active', label: t('Status'), trueLabel: t('Active'), falseLabel: t('Inactive') },
     { type: 'number-range', key: 'base_price', label: t('Base Price') },
 ]);
+
+// The rows are items: their actions and permissions are the items list's (products.*).
+const { remove } = useRecordDelete('products');
 </script>
 
 <template>
@@ -63,9 +69,21 @@ const filters = computed<TableFilter[]>(() => [
         <template #cell-sku="{ row }"><bdi dir="ltr">{{ row.sku ?? '-' }}</bdi></template>
         <template #cell-parent="{ row }">{{ row.parent ?? '—' }}</template>
         <template #actions="{ row }">
-            <RowMenu v-if="can('Product Update')">
-                <DropdownItem :href="route('products.edit', row.id)"><Pencil />{{ t('Edit') }}</DropdownItem>
-            </RowMenu>
+            <RecordActions
+                entity="Product"
+                routes="products"
+                :id="row.id"
+                :title="row.name"
+                :edit-href="route('products.edit', row.id)"
+                :fields="[
+                    { label: t('Name'), value: row.name },
+                    { label: t('SKU'), value: row.sku },
+                    { label: t('Base Price'), value: row.base_price },
+                    { label: t('Category'), value: row.categories },
+                    { label: t('Parent Product'), value: row.parent },
+                ]"
+                @delete="remove(row.id, row.name)"
+            />
         </template>
     </DataTable>
 </template>

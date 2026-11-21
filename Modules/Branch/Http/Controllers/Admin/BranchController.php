@@ -4,6 +4,7 @@ namespace Modules\Branch\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Support\Locales;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -15,14 +16,18 @@ use Modules\Branch\Enums\WeekDay;
 use Modules\Branch\Http\Requests\Admin\BranchRequest;
 use Modules\Branch\Repositories\Contracts\BranchRepositoryInterface;
 use Modules\Branch\Services\BranchService;
+use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
+use Modules\Core\Support\RecordInfo;
 use Modules\GeoLocation\Repositories\Contracts\CityRepositoryInterface;
 use Modules\GeoLocation\Repositories\Contracts\CountryRepositoryInterface;
 use Modules\GeoLocation\Support\GeoFilters;
 
 class BranchController extends Controller
 {
+    use ReordersRecords;
+
     public function __construct(
         private readonly BranchRepositoryInterface $branches,
         private readonly BranchService $branchService,
@@ -46,6 +51,8 @@ class BranchController extends Controller
                     ...AdminFilter::dateRange('created_at'),
                 )
                 ->sorts(GeoFilters::nameSort(), 'status', 'opening_time', 'closing_time', 'created_at', 'id')
+                ->reorderable()
+                ->withCreator()
                 ->rows(fn (Branch $branch) => [
                     'id' => $branch->id,
                     'name' => $branch->name,
@@ -144,6 +151,16 @@ class BranchController extends Controller
         $this->branchService->deleteMany($ids);
 
         return back()->with('success', __('Branches deleted successfully'));
+    }
+
+    public function info(int $branch): JsonResponse
+    {
+        return response()->json(RecordInfo::of($this->branches->findOrFail($branch)));
+    }
+
+    protected function sortableModel(): string
+    {
+        return Branch::class;
     }
 
     /**

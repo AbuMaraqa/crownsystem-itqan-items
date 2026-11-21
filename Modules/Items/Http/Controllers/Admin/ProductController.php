@@ -25,7 +25,7 @@ use Modules\Items\Services\ProductService;
 use Modules\Items\Support\ItemCardRules;
 use Modules\Items\Support\ProductSearch;
 use Modules\Items\Support\ProductStockSummary;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 use Modules\Items\Support\Search\SearchHighlighter;
 use Modules\Items\Support\Search\SearchQuery;
 use Modules\Items\Support\Search\TextNormalizer;
@@ -80,6 +80,7 @@ class ProductController extends Controller
                     ...AdminFilter::dateRange('created_at'),
                 )
                 ->sorts(AllowedSort::custom('name', new TranslatedSort), 'sku', 'slug', 'is_active', 'base_price', 'id')
+                ->withCreator()
                 ->rows(fn (Product $product) => [
                     'id' => $product->id,
                     'image' => $product->image ?: null,

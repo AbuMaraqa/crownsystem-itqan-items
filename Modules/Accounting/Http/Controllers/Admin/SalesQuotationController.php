@@ -28,7 +28,7 @@ use Modules\Core\Services\ReferenceNumberService;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
 use Modules\Core\Support\UserCellData;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 use Spatie\QueryBuilder\AllowedFilter;
 
 /**
@@ -69,6 +69,7 @@ class SalesQuotationController extends Controller
                 )
                 ->sorts('reference_no', 'quotation_date', 'valid_until', 'total_amount', 'status', 'id')
                 ->defaultSort('-quotation_date')
+                ->withCreator()
                 ->rows(fn (SalesQuotation $quotation) => [
                     'id' => $quotation->id,
                     'reference_no' => $quotation->reference_no,
@@ -236,7 +237,7 @@ class SalesQuotationController extends Controller
 
     public function info(int $salesQuotation): JsonResponse
     {
-        return response()->json(RecordInfo::of($this->find($salesQuotation)));
+        return response()->json(RecordInfo::of($this->quotations->query()->withTrashed()->findOrFail($salesQuotation)));
     }
 
     public function pdf(int $salesQuotation, AccountingPdfService $pdf): mixed

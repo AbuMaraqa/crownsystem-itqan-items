@@ -46,7 +46,7 @@ function hover(value: boolean): void {
         @mouseenter="hover(true)"
         @mouseleave="hover(false)"
     >
-        <div class="relative flex h-header shrink-0 items-center px-5" :class="{ 'lg:justify-center lg:px-0': !showText }">
+        <div class="relative flex h-header shrink-0 items-center px-6" :class="{ 'lg:justify-center lg:px-0': !showText }">
             <SidebarBrand :show-text="showText" />
 
             <button
@@ -62,13 +62,13 @@ function hover(value: boolean): void {
             </button>
         </div>
 
-        <nav class="custom-scrollbar flex-1 overflow-x-hidden overflow-y-auto px-3 pt-2 pb-6">
+        <nav class="custom-scrollbar flex-1 overflow-x-hidden overflow-y-auto px-5 pt-1 pb-6" :class="{ 'lg:px-3': !showText }">
             <ul class="flex flex-col gap-0.5">
                 <template v-for="(entry, index) in entries" :key="entry.title">
                     <!-- A section's heading, before its first entry: "Sales", "Catalog"... -->
                     <li
                         v-if="entry.section && entry.section !== entries[index - 1]?.section"
-                        class="mt-4 mb-1 flex h-6 items-center px-2.5 text-xs font-medium text-gray-400 first:mt-0 dark:text-gray-500"
+                        class="mt-4 mb-1 flex h-4 items-center px-2.5 text-xs font-medium text-gray-500 uppercase first:mt-0 dark:text-gray-400"
                         :class="{ 'justify-center': !showText }"
                         role="presentation"
                     >
@@ -76,15 +76,7 @@ function hover(value: boolean): void {
                         <span v-else class="h-px w-5 bg-line" aria-hidden="true" />
                     </li>
                     <SidebarLink v-if="entry.type === 'item'" :entry="entry" :href="hrefOf(entry)" :active="isActive(entry)" :show-text="showText" />
-                    <SidebarLinkGroup
-                        v-else
-                        :entry="entry"
-                        :open="openGroup === entry.title"
-                        :show-text="showText"
-                        :href-of="hrefOf"
-                        :is-active="isActive"
-                        @toggle="toggleGroup(entry.title)"
-                    />
+                    <SidebarLinkGroup v-else :entry="entry" :open="openGroup === entry.title" :show-text="showText" :href-of="hrefOf" :is-active="isActive" @toggle="toggleGroup(entry.title)" />
                 </template>
             </ul>
         </nav>

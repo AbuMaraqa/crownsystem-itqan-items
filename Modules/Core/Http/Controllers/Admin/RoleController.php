@@ -5,6 +5,7 @@ namespace Modules\Core\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use DomainException;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -14,6 +15,7 @@ use Modules\Core\Services\RoleService;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
 use Modules\Core\Support\PermissionLabels;
+use Modules\Core\Support\RecordInfo;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -91,5 +93,10 @@ class RoleController extends Controller
         }
 
         return back()->with('success', __('Role deleted successfully.'));
+    }
+
+    public function info(int $role): JsonResponse
+    {
+        return response()->json(RecordInfo::of($this->roles->findOrFail($role)));
     }
 }

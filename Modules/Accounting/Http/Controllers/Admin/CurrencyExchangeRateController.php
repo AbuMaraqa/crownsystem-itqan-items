@@ -17,7 +17,7 @@ use Modules\Core\Entities\Currency;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
 use Modules\Core\Support\SafeDelete;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 use Spatie\QueryBuilder\AllowedSort;
 
 /**
@@ -51,6 +51,7 @@ class CurrencyExchangeRateController extends Controller
                     'id',
                 )
                 ->defaultSort('-rate_date')
+                ->withCreator()
                 ->rows(fn (CurrencyExchangeRate $rate) => [
                     'id' => $rate->id,
                     'base_currency' => $rate->baseCurrency?->code,

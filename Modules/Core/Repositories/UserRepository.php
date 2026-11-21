@@ -15,7 +15,7 @@ class UserRepository extends BaseEloquentRepository implements UserRepositoryInt
 
     public function tableQuery(): Builder
     {
-        return $this->query()->with(['roles', 'branch.translations']);
+        return $this->query()->with(['roles', 'branch.translations', 'media']);
     }
 
     public function findWithRoles(int $id): User

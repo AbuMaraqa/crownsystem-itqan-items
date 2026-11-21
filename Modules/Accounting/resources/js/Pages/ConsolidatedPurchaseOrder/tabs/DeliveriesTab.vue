@@ -110,8 +110,8 @@ function editRow(row: TabRecord): void {
                     </div>
                     <div v-for="item in form.cost_items" :key="item.cost_element_id" class="grid grid-cols-[1fr_8rem_1fr] items-center gap-2 border-t border-line px-3 py-2">
                         <span class="text-sm">{{ elementName(item.cost_element_id) }}</span>
-                        <input v-model="item.amount" type="number" step="0.0001" min="0" dir="ltr" :aria-label="t('Amount')" :class="[controlClasses, 'h-9 text-end']" />
-                        <input v-model="item.notes" :placeholder="t('Optional')" :aria-label="t('Notes')" :class="[controlClasses, 'h-9']" />
+                        <input v-model="item.amount" type="number" step="0.0001" min="0" dir="ltr" :aria-label="t('Amount')" :class="[controlClasses, 'h-control text-end']" />
+                        <input v-model="item.notes" :placeholder="t('Optional')" :aria-label="t('Notes')" :class="[controlClasses, 'h-control']" />
                     </div>
                 </div>
             </div>

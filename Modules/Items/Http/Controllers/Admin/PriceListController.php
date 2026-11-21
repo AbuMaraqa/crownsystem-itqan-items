@@ -9,6 +9,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
 use Modules\Core\Support\SafeDelete;
@@ -16,7 +17,7 @@ use Modules\Items\Entities\PriceList;
 use Modules\Items\Http\Requests\Admin\PriceListRequest;
 use Modules\Items\Repositories\Contracts\PriceListRepositoryInterface;
 use Modules\Items\Services\PriceListService;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 
 /**
  * قوائم الاسعار: الاضافة والتعديل في نافذة على صفحة القائمة. اسعار كل صنف تُدخل من
@@ -24,6 +25,8 @@ use Modules\Items\Support\RecordInfo;
  */
 class PriceListController extends Controller
 {
+    use ReordersRecords;
+
     public function __construct(
         private readonly PriceListRepositoryInterface $lists,
         private readonly PriceListService $priceListService,
@@ -41,7 +44,8 @@ class PriceListController extends Controller
                     ...AdminFilter::dateRange('created_at'),
                 )
                 ->sorts('sort_order', 'prices_count', 'id')
-                ->defaultSort('sort_order')
+                ->reorderable()
+                ->withCreator()
                 ->rows(fn (PriceList $list) => [
                     'id' => $list->id,
                     'name' => (string) $list->name,
@@ -84,6 +88,11 @@ class PriceListController extends Controller
         }
 
         return back()->with('success', __('Price list deleted successfully'));
+    }
+
+    protected function sortableModel(): string
+    {
+        return PriceList::class;
     }
 
     public function info(int $priceList): JsonResponse

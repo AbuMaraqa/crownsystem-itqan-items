@@ -24,7 +24,7 @@ use Modules\Accounting\Support\Number;
 use Modules\Accounting\Support\SelectOptions;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\UserCellData;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 
 /**
  * سند الاستلام: يُختار طلب الشراء فتظهر سطوره المتبقية (الصنف الموزون بقطعه)، ويُدخل امين

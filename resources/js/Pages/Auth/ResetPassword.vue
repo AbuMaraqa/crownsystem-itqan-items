@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { Head, useForm } from '@inertiajs/vue3';
+import { useForm } from '@inertiajs/vue3';
 
+import AuthHeading from '@/Components/auth/AuthHeading.vue';
+import PasswordInput from '@/Components/form/PasswordInput.vue';
 import TextInput from '@/Components/form/TextInput.vue';
 import Button from '@/Components/ui/Button.vue';
 import GuestLayout from '@/Layouts/GuestLayout.vue';
@@ -10,16 +12,20 @@ defineOptions({ layout: GuestLayout });
 
 const props = defineProps<{ email: string; token: string }>();
 
-const form = useForm({ token: props.token, email: props.email, password: '', password_confirmation: '' });
+const form = useForm({
+    token: props.token,
+    email: props.email,
+    password: '',
+    password_confirmation: '',
+});
 </script>
 
 <template>
-    <Head :title="t('Choose a new password')" />
-    <h1 class="mb-4 text-base font-semibold">{{ t('Choose a new password') }}</h1>
-    <form class="space-y-4" @submit.prevent="form.post('/reset-password')">
+    <AuthHeading :title="t('Choose a new password')" />
+    <form class="flex flex-col gap-5" @submit.prevent="form.post('/reset-password')">
         <TextInput v-model="form.email" :label="t('Email')" type="email" autocomplete="username" dir="ltr" required :error="form.errors.email" />
-        <TextInput v-model="form.password" :label="t('New password')" type="password" autocomplete="new-password" dir="ltr" required :error="form.errors.password" />
-        <TextInput v-model="form.password_confirmation" :label="t('Confirm the password')" type="password" autocomplete="new-password" dir="ltr" required />
+        <PasswordInput v-model="form.password" :label="t('New password')" autocomplete="new-password" required :error="form.errors.password" />
+        <PasswordInput v-model="form.password_confirmation" :label="t('Confirm the password')" autocomplete="new-password" required />
         <Button type="submit" variant="primary" class="w-full" :loading="form.processing">{{ t('Save the new password') }}</Button>
     </form>
 </template>

@@ -1,19 +1,17 @@
 <script setup lang="ts">
-import RowMenu from '@/Components/table/RowMenu.vue';
-import DropdownItem from '@/Components/ui/DropdownItem.vue';
-import DropdownSeparator from '@/Components/ui/DropdownSeparator.vue';
-import { Link, router } from '@inertiajs/vue3';
-import { Pencil, Trash2 } from '@/lib/icons';
+import { Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 import DataTable from '@/Components/table/DataTable.vue';
+import RecordActions from '@/Components/table/RecordActions.vue';
 import Badge from '@/Components/ui/Badge.vue';
 import Button from '@/Components/ui/Button.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
-import { confirm } from '@/lib/confirm';
 import { can, t } from '@/lib/i18n';
 import { route } from '@/lib/route';
+import { createdByColumn } from '@/lib/tableColumns';
+import { useRecordDelete } from '@/lib/useRecordDelete';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
 
 defineOptions({ layout: AdminLayout });
@@ -37,6 +35,7 @@ const columns = computed<TableColumn[]>(() => [
     { key: 'exchange_rate', label: t('Exchange rate'), sort: 'exchange_rate', class: 'tabular' },
     { key: 'is_active', label: t('Status') },
     { key: 'locales', label: t('Locale'), toggleable: true },
+    createdByColumn(),
 ]);
 
 const filters = computed<TableFilter[]>(() => [
@@ -46,17 +45,7 @@ const filters = computed<TableFilter[]>(() => [
     { type: 'date-range', key: 'created_at', label: t('Created at') },
 ]);
 
-async function remove(row: Row): Promise<void> {
-    if (await confirm({ title: t('Delete :name?', { name: row.name }), description: t('This cannot be undone.') })) {
-        router.delete(route('currencies.destroy', row.id), { preserveScroll: true });
-    }
-}
-
-async function removeMany(ids: (number | string)[]): Promise<void> {
-    if (await confirm({ title: t('Delete :count items?', { count: ids.length }), description: t('This cannot be undone.') })) {
-        router.delete(route('currencies.destroy-many'), { data: { ids }, preserveScroll: true });
-    }
-}
+const { remove, removeMany } = useRecordDelete('currencies');
 </script>
 
 <template>
@@ -66,7 +55,7 @@ async function removeMany(ids: (number | string)[]): Promise<void> {
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Currency Delete')" :empty-title="t('No currencies found')" :empty-text="t('Add the currencies the system works with.')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Currency Delete')" :reorder-url="can('Currency Update') ? route('currencies.reorder') : undefined" :empty-title="t('No currencies found')" :empty-text="t('Add the currencies the system works with.')">
         <template #cell-name="{ row }">
             <Link v-if="can('Currency Update')" :href="route('currencies.edit', row.id)" class="font-medium text-brand-600 dark:text-brand-400 hover:underline">{{ row.name }}</Link>
             <template v-else>{{ row.name }}</template>
@@ -78,11 +67,21 @@ async function removeMany(ids: (number | string)[]): Promise<void> {
             <span class="text-muted uppercase">{{ row.locales.join(', ') }}</span>
         </template>
         <template #actions="{ row }">
-            <RowMenu>
-                <DropdownItem v-if="can('Currency Update')" :href="route('currencies.edit', row.id)"><Pencil />{{ t('Edit') }}</DropdownItem>
-                <DropdownSeparator v-if="can('Currency Delete')" />
-                <DropdownItem v-if="can('Currency Delete')" destructive @select="remove(row)"><Trash2 />{{ t('Delete') }}</DropdownItem>
-            </RowMenu>
+            <RecordActions
+                entity="Currency"
+                routes="currencies"
+                :id="row.id"
+                :title="row.name"
+                :fields="[
+                    { label: t('Name'), value: row.name },
+                    { label: t('Code'), value: row.code },
+                    { label: t('Symbol'), value: row.symbol },
+                    { label: t('Exchange rate'), value: row.exchange_rate },
+                    { label: t('Status'), value: row.is_active ? t('Active') : t('Inactive') },
+                ]"
+                :edit-href="route('currencies.edit', row.id)"
+                @delete="remove(row.id, row.name)"
+            />
         </template>
         <template #bulk="{ selected }">
             <Button variant="danger" size="sm" @click="removeMany(selected)">{{ t('Delete') }}</Button>

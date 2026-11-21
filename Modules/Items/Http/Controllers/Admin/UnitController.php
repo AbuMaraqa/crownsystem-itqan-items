@@ -9,6 +9,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
 use Modules\Core\Support\SafeDelete;
@@ -16,12 +17,14 @@ use Modules\Items\Entities\Unit;
 use Modules\Items\Http\Requests\Admin\UnitRequest;
 use Modules\Items\Repositories\Contracts\UnitRepositoryInterface;
 use Modules\Items\Services\UnitService;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 use Modules\Items\Support\TranslatedSort;
 use Spatie\QueryBuilder\AllowedSort;
 
 class UnitController extends Controller
 {
+    use ReordersRecords;
+
     public function __construct(
         private readonly UnitRepositoryInterface $units,
         private readonly UnitService $unitService,
@@ -34,6 +37,8 @@ class UnitController extends Controller
                 ->search(['slug'])
                 ->filters(AdminFilter::translated('name'), ...AdminFilter::dateRange('created_at'))
                 ->sorts(AllowedSort::custom('name', new TranslatedSort), 'slug', 'id')
+                ->reorderable()
+                ->withCreator()
                 ->rows(fn (Unit $unit) => [
                     'id' => $unit->id,
                     'name' => (string) $unit->name,
@@ -91,6 +96,11 @@ class UnitController extends Controller
         }
 
         return back()->with('success', __('Units deleted successfully'));
+    }
+
+    protected function sortableModel(): string
+    {
+        return Unit::class;
     }
 
     public function info(int $unit): JsonResponse

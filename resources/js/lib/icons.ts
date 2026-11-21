@@ -31,6 +31,7 @@ export { default as Columns3 } from '~icons/solar/columns-3-linear';
 export { default as Copy } from '~icons/solar/copy-linear';
 export { default as ExternalLink } from '~icons/solar/square-top-down-linear';
 export { default as Eye } from '~icons/solar/eye-linear';
+export { default as EyeClosed } from '~icons/solar/eye-closed-linear';
 export { default as Globe } from '~icons/solar/global-linear';
 export { default as GripVertical } from '~icons/solar/reorder-linear';
 export { default as Heading2 } from '~icons/solar/text-linear';

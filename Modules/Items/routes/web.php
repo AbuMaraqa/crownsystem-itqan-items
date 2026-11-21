@@ -37,10 +37,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::post('/', 'store')->name('store')->can('Category Create');
                     Route::post('/quick', 'quickStore')->name('quick-store')->can('Category Create');
                     Route::delete('/', 'destroyMany')->name('destroy-many')->can('Category Delete');
+                    Route::post('/reorder', 'reorder')->name('reorder')->can('Category Update');
                     Route::get('/{category}/edit', 'edit')->whereNumber('category')->name('edit')->can('Category Update');
                     Route::put('/{category}', 'update')->whereNumber('category')->name('update')->can('Category Update');
                     Route::delete('/{category}', 'destroy')->whereNumber('category')->name('destroy')->can('Category Delete');
-                    Route::get('/{category}/info', 'info')->whereNumber('category')->name('info')->can('Category Info');
+                    Route::get('/{category}/info', 'info')->whereNumber('category')->name('info')->can('Category View List');
                 });
 
                 Route::prefix('attributes')->name('attributes.')->controller(AttributeController::class)->group(function () {
@@ -48,17 +49,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::get('/add', 'add')->name('add')->can('Attribute Create');
                     Route::post('/', 'store')->name('store')->can('Attribute Create');
                     Route::delete('/', 'destroyMany')->name('destroy-many')->can('Attribute Delete');
+                    Route::post('/reorder', 'reorder')->name('reorder')->can('Attribute Update');
                     Route::get('/{attribute}/edit', 'edit')->whereNumber('attribute')->name('edit')->can('Attribute Update');
                     Route::put('/{attribute}', 'update')->whereNumber('attribute')->name('update')->can('Attribute Update');
                     Route::delete('/{attribute}', 'destroy')->whereNumber('attribute')->name('destroy')->can('Attribute Delete');
-                    Route::get('/{attribute}/info', 'info')->whereNumber('attribute')->name('info')->can('Attribute Info');
+                    Route::get('/{attribute}/info', 'info')->whereNumber('attribute')->name('info')->can('Attribute View List');
                 });
 
                 Route::prefix('tags')->name('tags.')->controller(TagController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Tag View List');
                     Route::post('/', 'store')->name('store')->can('Tag Create');
                     Route::delete('/', 'destroyMany')->name('destroy-many')->can('Tag Delete');
-                    Route::get('/{tag}/info', 'info')->whereNumber('tag')->name('info')->can('Tag Info');
+                    Route::post('/reorder', 'reorder')->name('reorder')->can('Tag Update');
+                    Route::get('/{tag}/info', 'info')->whereNumber('tag')->name('info')->can('Tag View List');
                     Route::put('/{tag}', 'update')->whereNumber('tag')->name('update')->can('Tag Update');
                     Route::delete('/{tag}', 'destroy')->whereNumber('tag')->name('destroy')->can('Tag Delete');
                 });
@@ -67,7 +70,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::get('/', 'index')->name('index')->can('Label View List');
                     Route::post('/', 'store')->name('store')->can('Label Create');
                     Route::delete('/', 'destroyMany')->name('destroy-many')->can('Label Delete');
-                    Route::get('/{label}/info', 'info')->whereNumber('label')->name('info')->can('Label Info');
+                    Route::post('/reorder', 'reorder')->name('reorder')->can('Label Update');
+                    Route::get('/{label}/info', 'info')->whereNumber('label')->name('info')->can('Label View List');
                     Route::put('/{label}', 'update')->whereNumber('label')->name('update')->can('Label Update');
                     Route::delete('/{label}', 'destroy')->whereNumber('label')->name('destroy')->can('Label Delete');
                 });
@@ -77,7 +81,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::get('/', 'index')->name('index')->can('Brand View List');
                     Route::post('/', 'store')->name('store')->can('Brand Create');
                     Route::delete('/', 'destroyMany')->name('destroy-many')->can('Brand Delete');
-                    Route::get('/{brand}/info', 'info')->whereNumber('brand')->name('info')->can('Brand Info');
+                    Route::post('/reorder', 'reorder')->name('reorder')->can('Brand Update');
+                    Route::get('/{brand}/info', 'info')->whereNumber('brand')->name('info')->can('Brand View List');
                     Route::put('/{brand}', 'update')->whereNumber('brand')->name('update')->can('Brand Update');
                     Route::delete('/{brand}', 'destroy')->whereNumber('brand')->name('destroy')->can('Brand Delete');
                 });
@@ -86,7 +91,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::get('/', 'index')->name('index')->can('Manufacturer View List');
                     Route::post('/', 'store')->name('store')->can('Manufacturer Create');
                     Route::delete('/', 'destroyMany')->name('destroy-many')->can('Manufacturer Delete');
-                    Route::get('/{manufacturer}/info', 'info')->whereNumber('manufacturer')->name('info')->can('Manufacturer Info');
+                    Route::post('/reorder', 'reorder')->name('reorder')->can('Manufacturer Update');
+                    Route::get('/{manufacturer}/info', 'info')->whereNumber('manufacturer')->name('info')->can('Manufacturer View List');
                     Route::put('/{manufacturer}', 'update')->whereNumber('manufacturer')->name('update')->can('Manufacturer Update');
                     Route::delete('/{manufacturer}', 'destroy')->whereNumber('manufacturer')->name('destroy')->can('Manufacturer Delete');
                 });
@@ -95,7 +101,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::get('/', 'index')->name('index')->can('Unit View List');
                     Route::post('/', 'store')->name('store')->can('Unit Create');
                     Route::delete('/', 'destroyMany')->name('destroy-many')->can('Unit Delete');
-                    Route::get('/{unit}/info', 'info')->whereNumber('unit')->name('info')->can('Unit Info');
+                    Route::post('/reorder', 'reorder')->name('reorder')->can('Unit Update');
+                    Route::get('/{unit}/info', 'info')->whereNumber('unit')->name('info')->can('Unit View List');
                     Route::put('/{unit}', 'update')->whereNumber('unit')->name('update')->can('Unit Update');
                     Route::delete('/{unit}', 'destroy')->whereNumber('unit')->name('destroy')->can('Unit Delete');
                 });
@@ -104,18 +111,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::get('/', 'index')->name('index')->can('Item Type Profile View List');
                     Route::post('/', 'store')->name('store')->can('Item Type Profile Create');
                     Route::delete('/', 'destroyMany')->name('destroy-many')->can('Item Type Profile Delete');
+                    Route::post('/reorder', 'reorder')->name('reorder')->can('Item Type Profile Update');
                     Route::put('/{profile}', 'update')->whereNumber('profile')->name('update')->can('Item Type Profile Update');
                     Route::delete('/{profile}', 'destroy')->whereNumber('profile')->name('destroy')->can('Item Type Profile Delete');
-                    Route::get('/{profile}/info', 'info')->whereNumber('profile')->name('info')->can('Item Type Profile Info');
+                    Route::get('/{profile}/info', 'info')->whereNumber('profile')->name('info')->can('Item Type Profile View List');
                 });
 
                 Route::prefix('price-lists')->name('price-lists.')->controller(PriceListController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Price List View List');
                     Route::post('/', 'store')->name('store')->can('Price List Create');
                     Route::delete('/', 'destroyMany')->name('destroy-many')->can('Price List Delete');
+                    Route::post('/reorder', 'reorder')->name('reorder')->can('Price List Update');
                     Route::put('/{priceList}', 'update')->whereNumber('priceList')->name('update')->can('Price List Update');
                     Route::delete('/{priceList}', 'destroy')->whereNumber('priceList')->name('destroy')->can('Price List Delete');
-                    Route::get('/{priceList}/info', 'info')->whereNumber('priceList')->name('info')->can('Price List Info');
+                    Route::get('/{priceList}/info', 'info')->whereNumber('priceList')->name('info')->can('Price List View List');
                 });
 
                 Route::prefix('offers')->name('offers.')->controller(OfferController::class)->group(function () {
@@ -126,10 +135,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     // منتقي الهدف (?model=items_category|items_product&branches[]=..&q=)، مسار لكل نموذج.
                     Route::get('/targets', 'targets')->name('targets')->can('Offer Create');
                     Route::get('/edit-targets', 'targets')->name('edit-targets')->can('Offer Update');
+                    Route::post('/reorder', 'reorder')->name('reorder')->can('Offer Update');
                     Route::get('/{offer}/edit', 'edit')->whereNumber('offer')->name('edit')->can('Offer Update');
                     Route::put('/{offer}', 'update')->whereNumber('offer')->name('update')->can('Offer Update');
                     Route::delete('/{offer}', 'destroy')->whereNumber('offer')->name('destroy')->can('Offer Delete');
-                    Route::get('/{offer}/info', 'info')->whereNumber('offer')->name('info')->can('Offer Info');
+                    Route::get('/{offer}/info', 'info')->whereNumber('offer')->name('info')->can('Offer View List');
                 });
 
                 Route::prefix('addons')->name('addons.')->controller(AddonController::class)->group(function () {
@@ -137,10 +147,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::get('/add', 'add')->name('add')->can('Addon Create');
                     Route::post('/', 'store')->name('store')->can('Addon Create');
                     Route::delete('/', 'destroyMany')->name('destroy-many')->can('Addon Delete');
+                    Route::post('/reorder', 'reorder')->name('reorder')->can('Addon Update');
                     Route::get('/{addon}/edit', 'edit')->whereNumber('addon')->name('edit')->can('Addon Update');
                     Route::put('/{addon}', 'update')->whereNumber('addon')->name('update')->can('Addon Update');
                     Route::delete('/{addon}', 'destroy')->whereNumber('addon')->name('destroy')->can('Addon Delete');
-                    Route::get('/{addon}/info', 'info')->whereNumber('addon')->name('info')->can('Addon Info');
+                    Route::get('/{addon}/info', 'info')->whereNumber('addon')->name('info')->can('Addon View List');
                 });
 
                 // شجرة التصنيفات وصفحة اصناف التصنيف.
@@ -190,7 +201,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::put('/{product}', 'update')->whereNumber('product')->name('update')->can('Product Update');
                     Route::put('/{product}/active', 'active')->whereNumber('product')->name('active')->can('Product Update');
                     Route::delete('/{product}', 'destroy')->whereNumber('product')->name('destroy')->can('Product Delete');
-                    Route::get('/{product}/info', 'info')->whereNumber('product')->name('info')->can('Product Info');
+                    Route::get('/{product}/info', 'info')->whereNumber('product')->name('info')->can('Product View List');
                     Route::get('/{product}/barcodes', 'barcodes')->whereNumber('product')->name('barcodes')->can('Product View List');
                     Route::get('/{product}/barcodes/pdf', 'barcodesPdf')->whereNumber('product')->name('barcodes.pdf')->can('Product View List');
                 });
@@ -220,7 +231,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::delete('/', 'destroyMany')->name('destroy-many')->can('Order Delete');
                     Route::get('/lookup/{type}', 'lookup')->whereIn('type', ['customers', 'products', 'cities', 'districts'])->name('lookup')->can('Order Create');
                     Route::get('/edit-lookup/{type}', 'lookup')->whereIn('type', ['customers', 'products', 'cities', 'districts'])->name('edit-lookup')->can('Order Update');
-                    Route::get('/{order}/info', 'info')->whereNumber('order')->name('info')->can('Order Info');
+                    Route::get('/{order}/info', 'info')->whereNumber('order')->name('info')->can('Order View List');
                     Route::get('/{order}/edit', 'edit')->whereNumber('order')->name('edit')->can('Order Update');
                     Route::put('/{order}', 'update')->whereNumber('order')->name('update')->can('Order Update');
                     Route::delete('/{order}', 'destroy')->whereNumber('order')->name('destroy')->can('Order Delete');

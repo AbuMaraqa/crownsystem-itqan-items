@@ -4,7 +4,7 @@ import { computed } from 'vue';
 
 import type { Option } from '@/Components/form/SelectInput.vue';
 import DataTable from '@/Components/table/DataTable.vue';
-import RowMenu from '@/Components/table/RowMenu.vue';
+import RecordActions from '@/Components/table/RecordActions.vue';
 import Badge from '@/Components/ui/Badge.vue';
 import DropdownItem from '@/Components/ui/DropdownItem.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
@@ -13,6 +13,7 @@ import { confirm } from '@/lib/confirm';
 import { can, t } from '@/lib/i18n';
 import { Returns, ShieldCheck } from '@/lib/icons';
 import { route } from '@/lib/route';
+import { createdByColumn } from '@/lib/tableColumns';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
 
 import type { StatusBadge } from '../parts/statusBadge';
@@ -35,6 +36,7 @@ const columns = computed<TableColumn[]>(() => [
     { key: 'starts_at', label: t('Start Date'), sort: 'starts_at' },
     { key: 'ends_at', label: t('End Date'), sort: 'ends_at' },
     { key: 'status', label: t('Status') },
+    createdByColumn(),
 ]);
 
 const filters = computed<TableFilter[]>(() => [{ key: 'status', label: t('Status'), options: props.statuses }]);
@@ -62,10 +64,26 @@ const canAct = (row: Row): boolean => (row.is_open ? can('Accounting Period Clos
             <Badge v-if="row.status" :tone="row.status.tone">{{ row.status.label }}</Badge>
         </template>
         <template #actions="{ row }">
-            <RowMenu v-if="canAct(row)">
-                <DropdownItem v-if="row.is_open" @select="close(row)"><ShieldCheck />{{ t('Close') }}</DropdownItem>
-                <DropdownItem v-else @select="reopen(row)"><Returns />{{ t('Reopen') }}</DropdownItem>
-            </RowMenu>
+            <!-- Periods have no permissions of their own to view, edit or delete: they are seen with the fiscal year. -->
+            <RecordActions
+                entity="Fiscal Year"
+                routes="accounting.fiscal-years.periods"
+                :id="row.id"
+                :title="row.name"
+                :editable="false"
+                :deletable="false"
+                :fields="[
+                    { label: t('Name'), value: row.name },
+                    { label: t('Start Date'), value: row.starts_at },
+                    { label: t('End Date'), value: row.ends_at },
+                    { label: t('Status'), value: row.status?.label ?? null },
+                ]"
+            >
+                <template v-if="canAct(row)" #default>
+                    <DropdownItem v-if="row.is_open" @select="close(row)"><ShieldCheck />{{ t('Close') }}</DropdownItem>
+                    <DropdownItem v-else @select="reopen(row)"><Returns />{{ t('Reopen') }}</DropdownItem>
+                </template>
+            </RecordActions>
         </template>
     </DataTable>
 </template>

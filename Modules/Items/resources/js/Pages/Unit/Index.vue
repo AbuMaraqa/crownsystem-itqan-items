@@ -7,11 +7,13 @@ import Modal from '@/Components/ui/Modal.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { can, t } from '@/lib/i18n';
+import { route } from '@/lib/route';
+import { createdByColumn } from '@/lib/tableColumns';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
 
-import RecordActions from '../parts/RecordActions.vue';
-import { useRecordDelete } from '../parts/useRecordDelete';
-import { useRecordModal } from '../parts/useRecordModal';
+import RecordActions from '@/Components/table/RecordActions.vue';
+import { useRecordDelete } from '@/lib/useRecordDelete';
+import { useRecordModal } from '@/lib/useRecordModal';
 import UnitFields, { type UnitForm } from './UnitFields.vue';
 
 defineOptions({ layout: AdminLayout });
@@ -31,6 +33,7 @@ const columns = computed<TableColumn[]>(() => [
     { key: 'name', label: t('Name'), sort: 'name' },
     { key: 'slug', label: t('Slug'), sort: 'slug' },
     { key: 'locales', label: t('Locale'), toggleable: true },
+    createdByColumn(),
 ]);
 
 const filters = computed<TableFilter[]>(() => [
@@ -55,7 +58,7 @@ function editRow(row: Row): void {
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Unit Delete')" :empty-title="t('No units found')" :empty-text="t('Create a new unit by clicking the button below')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Unit Delete')" :reorder-url="can('Unit Update') ? route('units.reorder') : undefined" :empty-title="t('No units found')" :empty-text="t('Create a new unit by clicking the button below')">
         <template #cell-name="{ row }">
             <button v-if="can('Unit Update')" type="button" class="font-medium text-brand-600 dark:text-brand-400 hover:underline" @click="editRow(row)">{{ row.name }}</button>
             <template v-else>{{ row.name }}</template>

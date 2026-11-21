@@ -16,6 +16,6 @@ class AttachmentCategoryRepository extends BaseEloquentRepository implements Att
 
     public function tableQuery(): Builder
     {
-        return $this->query()->with(['createdBy.media']);
+        return $this->query();
     }
 }

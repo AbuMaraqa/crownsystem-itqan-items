@@ -114,7 +114,7 @@ const columns = computed(() => (props.canSeeCost ? 7 : 6));
                 <div class="sm:col-span-2">
                     <div v-if="order" class="grid gap-1.5">
                         <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Sales Order') }}</span>
-                        <div class="flex h-10 items-center justify-between gap-2 rounded-lg border border-line bg-gray-50 px-3.5 text-sm dark:bg-white/[0.03]">
+                        <div class="flex h-control items-center justify-between gap-2 rounded-control border border-line bg-gray-50 px-3 text-[13px] dark:bg-white/[0.03]">
                             <span class="truncate">
                                 <bdi class="font-semibold text-brand-600 dark:text-brand-400" dir="ltr">{{ order.reference_no }}</bdi>
                                 <span class="text-muted"> — {{ order.party }} · {{ order.date }}</span>

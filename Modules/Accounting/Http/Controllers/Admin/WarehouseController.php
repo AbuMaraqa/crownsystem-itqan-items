@@ -17,18 +17,21 @@ use Modules\Accounting\Support\SelectOptions;
 use Modules\Branch\Enums\BranchStatus;
 use Modules\Branch\Http\Requests\Admin\BranchRequest;
 use Modules\Branch\Services\BranchService;
+use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
 use Modules\Core\Support\SafeDelete;
 use Modules\GeoLocation\Repositories\Contracts\CityRepositoryInterface;
 use Modules\GeoLocation\Repositories\Contracts\CountryRepositoryInterface;
 use Modules\GeoLocation\Support\GeoFilters;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 use Modules\Items\Support\TranslatedSort;
 use Spatie\QueryBuilder\AllowedSort;
 
 class WarehouseController extends Controller
 {
+    use ReordersRecords;
+
     public function __construct(
         private readonly WarehouseRepositoryInterface $warehouses,
         private readonly WarehouseService $warehouseService,
@@ -48,6 +51,8 @@ class WarehouseController extends Controller
                     ...AdminFilter::dateRange('created_at'),
                 )
                 ->sorts(AllowedSort::custom('name', new TranslatedSort), 'code', 'is_active', 'created_at', 'id')
+                ->reorderable()
+                ->withCreator()
                 ->rows(fn (Warehouse $warehouse) => [
                     'id' => $warehouse->id,
                     'name' => (string) $warehouse->name,
@@ -141,6 +146,11 @@ class WarehouseController extends Controller
     public function info(int $warehouse): JsonResponse
     {
         return response()->json(RecordInfo::of($this->warehouses->findOrFail($warehouse)));
+    }
+
+    protected function sortableModel(): string
+    {
+        return Warehouse::class;
     }
 
     /**

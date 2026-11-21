@@ -8,6 +8,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
 use Modules\Core\Support\SafeDelete;
@@ -17,12 +18,14 @@ use Modules\Items\Enums\AddonType;
 use Modules\Items\Http\Requests\Admin\AddonRequest;
 use Modules\Items\Repositories\Contracts\AddonRepositoryInterface;
 use Modules\Items\Services\AddonService;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 use Modules\Items\Support\TranslatedSort;
 use Spatie\QueryBuilder\AllowedSort;
 
 class AddonController extends Controller
 {
+    use ReordersRecords;
+
     public function __construct(
         private readonly AddonRepositoryInterface $addons,
         private readonly AddonService $addonService,
@@ -35,6 +38,8 @@ class AddonController extends Controller
                 ->search()
                 ->filters(AdminFilter::translated('name'), AdminFilter::exact('type'), ...AdminFilter::dateRange('created_at'))
                 ->sorts(AllowedSort::custom('name', new TranslatedSort), 'type', 'id')
+                ->reorderable()
+                ->withCreator()
                 ->rows(fn (Addon $addon) => [
                     'id' => $addon->id,
                     'image' => $addon->getImageAttribute(),
@@ -121,6 +126,11 @@ class AddonController extends Controller
         }
 
         return back()->with('success', __('Addons deleted successfully'));
+    }
+
+    protected function sortableModel(): string
+    {
+        return Addon::class;
     }
 
     public function info(int $addon): JsonResponse

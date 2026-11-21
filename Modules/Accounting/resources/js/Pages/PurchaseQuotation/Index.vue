@@ -1,21 +1,22 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
-import { computed, nextTick, ref } from 'vue';
+import { Link, router } from '@inertiajs/vue3';
+import { computed } from 'vue';
 
 import DataTable from '@/Components/table/DataTable.vue';
-import RowMenu from '@/Components/table/RowMenu.vue';
+import RecordActions from '@/Components/table/RecordActions.vue';
+import type { ViewField } from '@/Components/table/RecordViewModal.vue';
 import UserCell from '@/Components/table/UserCell.vue';
 import Badge from '@/Components/ui/Badge.vue';
 import Button from '@/Components/ui/Button.vue';
 import DropdownItem from '@/Components/ui/DropdownItem.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
+import { confirm } from '@/lib/confirm';
 import { can, t } from '@/lib/i18n';
-import { Eye, Info, Pencil, Printer } from '@/lib/icons';
+import { ExternalLink, Printer } from '@/lib/icons';
 import { route } from '@/lib/route';
+import { createdByColumn } from '@/lib/tableColumns';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
-import RecordInfoModal from '@modules/Items/resources/js/Pages/parts/RecordInfoModal.vue';
-import RecordViewModal from '@modules/Items/resources/js/Pages/parts/RecordViewModal.vue';
 
 import type { StatusBadge } from '../parts/statusBadge';
 import type { Option, UserCellData } from '../parts/types';
@@ -34,9 +35,10 @@ interface QuotationRow {
     total_amount_full: string;
     currency: string | null;
     status: StatusBadge | null;
-    created_by: UserCellData | null;
     notes: string | null;
     deleted: boolean;
+    editable: boolean;
+    can_delete: boolean;
 }
 
 const props = defineProps<{
@@ -55,7 +57,7 @@ const columns = computed<TableColumn[]>(() => [
     { key: 'valid_until', label: t('Valid Until'), sort: 'valid_until', toggleable: true },
     { key: 'total_amount', label: t('Total Amount'), sort: 'total_amount', class: 'tabular' },
     { key: 'status', label: t('Status'), sort: 'status' },
-    { key: 'created_by', label: t('Created By'), toggleable: true, hidden: true },
+    createdByColumn(),
 ]);
 
 const filters = computed<TableFilter[]>(() => [
@@ -81,21 +83,24 @@ const filters = computed<TableFilter[]>(() => [
 
 const canOpen = (row: QuotationRow): boolean => !row.deleted;
 
-const viewing = ref<QuotationRow | null>(null);
-const viewOpen = computed({
-    get: () => viewing.value !== null,
-    set: (open: boolean) => {
-        if (!open) viewing.value = null;
-    },
-});
+function viewFields(row: QuotationRow): ViewField[] {
+    return [
+        { label: t('Reference No'), value: row.reference_no },
+        { label: t('Quotation Date'), value: row.quotation_date },
+        { label: t('Purchase Order'), value: row.purchase_order },
+        { label: t('Supplier'), value: row.client?.name },
+        { label: t('Supplier Quotation No'), value: row.supplier_reference },
+        { label: t('Valid Until'), value: row.valid_until },
+        { label: t('Status'), value: row.status?.label },
+        { label: t('Total Amount'), value: `${row.total_amount_full} ${row.currency ?? ''}` },
+        { label: t('Notes'), value: row.notes },
+    ];
+}
 
-const informing = ref<QuotationRow | null>(null);
-const infoOpen = ref(false);
-
-function showInfo(row: QuotationRow): void {
-    informing.value = row;
-    infoOpen.value = false;
-    nextTick(() => (infoOpen.value = true));
+async function remove(row: QuotationRow): Promise<void> {
+    if (await confirm({ title: t('Delete :name?', { name: row.reference_no }), description: t('This cannot be undone.') })) {
+        router.delete(route('accounting.purchase-quotations.destroy', row.id), { preserveScroll: true });
+    }
 }
 </script>
 
@@ -123,38 +128,26 @@ function showInfo(row: QuotationRow): void {
         <template #cell-status="{ row }">
             <Badge v-if="row.status" :tone="row.status.tone" dot>{{ row.status.label }}</Badge>
         </template>
-        <template #cell-created_by="{ row }">
-            <UserCell v-if="row.created_by" :name="row.created_by.name" :avatar="row.created_by.avatar" :detail="row.created_by.detail" />
-            <span v-else class="text-muted">-</span>
-        </template>
         <template #empty>
             <Button v-if="can('Purchase Quotation Create')" variant="primary" :href="route('accounting.purchase-quotations.add')">{{ t('Add Purchase Quotation') }}</Button>
         </template>
         <template #actions="{ row }">
-            <RowMenu>
-                <DropdownItem @select="viewing = row"><Eye />{{ t('View') }}</DropdownItem>
-                <DropdownItem v-if="!row.deleted" @select="showInfo(row)"><Info />{{ t('Info') }}</DropdownItem>
-                <DropdownItem v-if="canOpen(row)" :href="route('accounting.purchase-quotations.edit', row.id)"><Pencil />{{ t('Open') }}</DropdownItem>
-                <DropdownItem v-if="!row.deleted" external :href="route('accounting.purchase-quotations.pdf', row.id)"><Printer />{{ t('Print') }}</DropdownItem>
-            </RowMenu>
+            <RecordActions
+                entity="Purchase Quotation"
+                routes="accounting.purchase-quotations"
+                :id="row.id"
+                :title="row.reference_no"
+                :fields="viewFields(row)"
+                :edit-href="route('accounting.purchase-quotations.edit', row.id)"
+                :editable="row.editable"
+                :deletable="row.can_delete"
+                @delete="remove(row)"
+            >
+                <template v-if="!row.deleted" #default>
+                    <DropdownItem v-if="!(row.editable && can('Purchase Quotation Update'))" :href="route('accounting.purchase-quotations.edit', row.id)"><ExternalLink />{{ t('Open document') }}</DropdownItem>
+                    <DropdownItem external :href="route('accounting.purchase-quotations.pdf', row.id)"><Printer />{{ t('Print') }}</DropdownItem>
+                </template>
+            </RecordActions>
         </template>
     </DataTable>
-
-    <RecordViewModal
-        v-if="viewing"
-        v-model:open="viewOpen"
-        :title="viewing.reference_no"
-        :fields="[
-            { label: t('Reference No'), value: viewing.reference_no },
-            { label: t('Quotation Date'), value: viewing.quotation_date },
-            { label: t('Purchase Order'), value: viewing.purchase_order },
-            { label: t('Supplier'), value: viewing.client?.name },
-            { label: t('Supplier Quotation No'), value: viewing.supplier_reference },
-            { label: t('Valid Until'), value: viewing.valid_until },
-            { label: t('Status'), value: viewing.status?.label },
-            { label: t('Total Amount'), value: `${viewing.total_amount_full} ${viewing.currency ?? ''}` },
-            { label: t('Notes'), value: viewing.notes },
-        ]"
-    />
-    <RecordInfoModal v-if="informing" v-model:open="infoOpen" :title="informing.reference_no" :url="route('accounting.purchase-quotations.info', informing.id)" />
 </template>

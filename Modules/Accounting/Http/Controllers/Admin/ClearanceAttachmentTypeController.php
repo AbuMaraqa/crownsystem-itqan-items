@@ -3,6 +3,7 @@
 namespace Modules\Accounting\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -10,8 +11,10 @@ use Modules\Accounting\Entities\ClearanceAttachmentType;
 use Modules\Accounting\Http\Requests\Admin\ClearanceAttachmentTypeRequest;
 use Modules\Accounting\Repositories\Contracts\ClearanceAttachmentTypeRepositoryInterface;
 use Modules\Accounting\Services\ClearanceAttachmentTypeService;
+use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
+use Modules\Core\Support\RecordInfo;
 use Modules\Core\Support\SafeDelete;
 
 /**
@@ -19,6 +22,8 @@ use Modules\Core\Support\SafeDelete;
  */
 class ClearanceAttachmentTypeController extends Controller
 {
+    use ReordersRecords;
+
     public function __construct(
         private readonly ClearanceAttachmentTypeRepositoryInterface $records,
         private readonly ClearanceAttachmentTypeService $service,
@@ -31,7 +36,8 @@ class ClearanceAttachmentTypeController extends Controller
                 ->search(['name'], translated: null)
                 ->filters(AdminFilter::text('name'), ...AdminFilter::dateRange('created_at'))
                 ->sorts('name', 'created_at', 'id')
-                ->defaultSort('-created_at')
+                ->reorderable()
+                ->withCreator()
                 ->rows(fn (ClearanceAttachmentType $type) => [
                     'id' => $type->id,
                     'name' => $type->name,
@@ -66,5 +72,15 @@ class ClearanceAttachmentTypeController extends Controller
         }
 
         return back()->with('success', __('Attachment type deleted successfully'));
+    }
+
+    protected function sortableModel(): string
+    {
+        return ClearanceAttachmentType::class;
+    }
+
+    public function info(int $type): JsonResponse
+    {
+        return response()->json(RecordInfo::of($this->records->findOrFail($type)));
     }
 }

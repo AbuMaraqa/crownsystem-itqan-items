@@ -125,13 +125,13 @@ const itemError = (index: number, field: string): string | undefined => (form.er
                             <td class="px-3 py-2">{{ item.description }}</td>
                             <td class="px-3 py-2 text-end font-mono tabular-nums" dir="ltr">{{ item.quantity }}</td>
                             <td class="px-3 py-2">
-                                <input v-model="item.unit_price" type="number" step="0.0001" min="0" dir="ltr" :aria-label="t('Price')" :class="[controlClasses, 'h-9 text-end']" />
+                                <input v-model="item.unit_price" type="number" step="0.0001" min="0" dir="ltr" :aria-label="t('Price')" :class="[controlClasses, 'h-control text-end']" />
                                 <p v-if="itemError(index, 'unit_price')" class="mt-1 text-xs text-danger">{{ itemError(index, 'unit_price') }}</p>
                             </td>
                             <td class="px-3 py-2">
-                                <input v-model="item.discount_rate" type="number" step="0.01" min="0" max="100" dir="ltr" :aria-label="t('Discount')" :class="[controlClasses, 'h-9 text-end']" />
+                                <input v-model="item.discount_rate" type="number" step="0.01" min="0" max="100" dir="ltr" :aria-label="t('Discount')" :class="[controlClasses, 'h-control text-end']" />
                             </td>
-                            <td class="px-3 py-2"><input v-model="item.bonus_note" :placeholder="t('Optional')" :aria-label="t('Bonus')" :class="[controlClasses, 'h-9']" /></td>
+                            <td class="px-3 py-2"><input v-model="item.bonus_note" :placeholder="t('Optional')" :aria-label="t('Bonus')" :class="[controlClasses, 'h-control']" /></td>
                         </tr>
                     </tbody>
                 </table>

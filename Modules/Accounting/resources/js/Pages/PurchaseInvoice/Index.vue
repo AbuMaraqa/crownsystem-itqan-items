@@ -1,23 +1,22 @@
 <script setup lang="ts">
 import { Link, router } from '@inertiajs/vue3';
-import { computed, nextTick, ref } from 'vue';
+import { computed } from 'vue';
 
 import DataTable from '@/Components/table/DataTable.vue';
-import RowMenu from '@/Components/table/RowMenu.vue';
+import RecordActions from '@/Components/table/RecordActions.vue';
+import type { ViewField } from '@/Components/table/RecordViewModal.vue';
 import UserCell from '@/Components/table/UserCell.vue';
 import Badge from '@/Components/ui/Badge.vue';
 import Button from '@/Components/ui/Button.vue';
 import DropdownItem from '@/Components/ui/DropdownItem.vue';
-import DropdownSeparator from '@/Components/ui/DropdownSeparator.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { confirm } from '@/lib/confirm';
 import { can, t } from '@/lib/i18n';
-import { Eye, Info, Pencil, Printer, Trash2 } from '@/lib/icons';
+import { ExternalLink, Printer } from '@/lib/icons';
 import { route } from '@/lib/route';
+import { createdByColumn } from '@/lib/tableColumns';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
-import RecordInfoModal from '@modules/Items/resources/js/Pages/parts/RecordInfoModal.vue';
-import RecordViewModal from '@modules/Items/resources/js/Pages/parts/RecordViewModal.vue';
 
 import type { StatusBadge } from '../parts/statusBadge';
 import type { Option, UserCellData } from '../parts/types';
@@ -64,6 +63,7 @@ const columns = computed<TableColumn[]>(() => [
     { key: 'tax', label: t('Tax'), toggleable: true },
     { key: 'due_date', label: t('Due Date'), sort: 'due_date', toggleable: true, hidden: true },
     { key: 'status', label: t('Status'), sort: 'status' },
+    createdByColumn(),
 ]);
 
 const filters = computed<TableFilter[]>(() => [
@@ -133,21 +133,20 @@ const filters = computed<TableFilter[]>(() => [
     },
 ]);
 
-const viewing = ref<InvoiceRow | null>(null);
-const viewOpen = computed({
-    get: () => viewing.value !== null,
-    set: (open: boolean) => {
-        if (!open) viewing.value = null;
-    },
-});
-
-const informing = ref<InvoiceRow | null>(null);
-const infoOpen = ref(false);
-
-function showInfo(row: InvoiceRow): void {
-    informing.value = row;
-    infoOpen.value = false;
-    nextTick(() => (infoOpen.value = true));
+function viewFields(row: InvoiceRow): ViewField[] {
+    return [
+        { label: t('Reference No'), value: row.reference_no },
+        { label: t('Invoice Date'), value: row.invoice_date },
+        { label: t('Status'), value: row.status?.label },
+        { label: t('Supplier'), value: row.client?.name },
+        { label: t('Warehouse'), value: row.warehouse },
+        { label: t('Currency'), value: row.currency },
+        { label: t('Exchange Rate'), value: row.exchange_rate },
+        { label: t('Tax'), value: row.tax },
+        { label: t('Tax Rate'), value: row.tax_rate },
+        { label: t('Balance Due'), value: row.total_amount_full },
+        { label: t('Notes'), value: row.notes },
+    ];
 }
 
 async function remove(row: InvoiceRow): Promise<void> {
@@ -187,36 +186,22 @@ async function remove(row: InvoiceRow): Promise<void> {
             <Button v-if="can('Purchase Invoice Create')" variant="primary" :href="route('accounting.purchase-invoices.add')">{{ t('Add Purchase Invoice') }}</Button>
         </template>
         <template #actions="{ row }">
-            <RowMenu>
-                <DropdownItem v-if="can('Purchase Invoice View')" @select="viewing = row"><Eye />{{ t('View') }}</DropdownItem>
-                <DropdownItem v-if="can('Purchase Invoice Info') && !row.deleted" @select="showInfo(row)"><Info />{{ t('Info') }}</DropdownItem>
-                <DropdownItem v-if="row.editable && can('Purchase Invoice Update')" :href="route('accounting.purchase-invoices.edit', row.id)"><Pencil />{{ t('Edit') }}</DropdownItem>
-                <DropdownItem v-if="can('Purchase Invoice View') && !row.deleted" external :href="route('accounting.purchase-invoices.pdf', row.id)"><Printer />{{ t('Print') }}</DropdownItem>
-                <template v-if="row.editable && can('Purchase Invoice Delete')">
-                    <DropdownSeparator />
-                    <DropdownItem destructive @select="remove(row)"><Trash2 />{{ t('Delete') }}</DropdownItem>
+            <RecordActions
+                entity="Purchase Invoice"
+                routes="accounting.purchase-invoices"
+                :id="row.id"
+                :title="row.reference_no"
+                :fields="viewFields(row)"
+                :edit-href="route('accounting.purchase-invoices.edit', row.id)"
+                :editable="row.editable"
+                :deletable="row.editable"
+                @delete="remove(row)"
+            >
+                <template v-if="!row.deleted" #default>
+                    <DropdownItem v-if="!(row.editable && can('Purchase Invoice Update'))" :href="route('accounting.purchase-invoices.edit', row.id)"><ExternalLink />{{ t('Open document') }}</DropdownItem>
+                    <DropdownItem v-if="can('Purchase Invoice View')" external :href="route('accounting.purchase-invoices.pdf', row.id)"><Printer />{{ t('Print') }}</DropdownItem>
                 </template>
-            </RowMenu>
+            </RecordActions>
         </template>
     </DataTable>
-
-    <RecordViewModal
-        v-if="viewing"
-        v-model:open="viewOpen"
-        :title="viewing.reference_no"
-        :fields="[
-            { label: t('Reference No'), value: viewing.reference_no },
-            { label: t('Invoice Date'), value: viewing.invoice_date },
-            { label: t('Status'), value: viewing.status?.label },
-            { label: t('Supplier'), value: viewing.client?.name },
-            { label: t('Warehouse'), value: viewing.warehouse },
-            { label: t('Currency'), value: viewing.currency },
-            { label: t('Exchange Rate'), value: viewing.exchange_rate },
-            { label: t('Tax'), value: viewing.tax },
-            { label: t('Tax Rate'), value: viewing.tax_rate },
-            { label: t('Balance Due'), value: viewing.total_amount_full },
-            { label: t('Notes'), value: viewing.notes },
-        ]"
-    />
-    <RecordInfoModal v-if="informing" v-model:open="infoOpen" :title="informing.reference_no" :url="route('accounting.purchase-invoices.info', informing.id)" />
 </template>

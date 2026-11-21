@@ -28,14 +28,18 @@ const crumbs = computed(() => [{ title: t('Home'), href: route('dashboard') }, .
     </Teleport>
 
     <!-- The page toolbar: title and description, then the page's actions on the far edge. -->
-    <div class="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 pt-1">
-        <div class="min-w-0">
-            <PageBreadcrumb :crumbs="crumbs" :current="title" class="mb-1.5 lg:hidden" />
-            <h1 class="text-xl leading-8 font-semibold text-gray-900 dark:text-white">
+    <div class="mb-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 lg:mb-[30px]">
+        <div class="flex min-w-0 flex-col justify-center gap-2">
+            <PageBreadcrumb :crumbs="crumbs" :current="title" class="lg:hidden" />
+            <h1 class="text-xl leading-5 font-medium text-gray-950 dark:text-white">
                 {{ title }}<span v-if="count !== undefined" class="tabular ms-1 font-normal text-muted">({{ count.toLocaleString('en') }})</span>
             </h1>
-            <p v-if="description" class="mt-0.5 max-w-3xl text-sm text-muted">{{ description }}</p>
+            <p v-if="description" class="max-w-3xl text-sm text-gray-700 dark:text-gray-300">
+                {{ description }}
+            </p>
         </div>
-        <div v-if="$slots.actions" class="flex flex-wrap items-center gap-2.5"><slot name="actions" /></div>
+        <div v-if="$slots.actions" class="flex flex-wrap items-center gap-2.5">
+            <slot name="actions" />
+        </div>
     </div>
 </template>

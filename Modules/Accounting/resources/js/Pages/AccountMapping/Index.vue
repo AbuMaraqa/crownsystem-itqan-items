@@ -8,9 +8,10 @@ import Modal from '@/Components/ui/Modal.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { can, t } from '@/lib/i18n';
+import { createdByColumn } from '@/lib/tableColumns';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
-import RecordActions from '@modules/Items/resources/js/Pages/parts/RecordActions.vue';
-import { useRecordModal } from '@modules/Items/resources/js/Pages/parts/useRecordModal';
+import RecordActions from '@/Components/table/RecordActions.vue';
+import { useRecordModal } from '@/lib/useRecordModal';
 
 import type { Option } from '../parts/types';
 
@@ -30,6 +31,7 @@ const columns = computed<TableColumn[]>(() => [
     { key: 'source_module', label: t('Source Module'), sort: 'source_module' },
     { key: 'source_key', label: t('Source Key'), sort: 'source_key' },
     { key: 'account', label: t('Account') },
+    createdByColumn(),
 ]);
 
 const filters = computed<TableFilter[]>(() => [
@@ -76,6 +78,7 @@ const title = (row: Row): string => `${row.source_module} / ${row.source_key}`;
                     { label: t('Source Key'), value: row.source_key },
                     { label: t('Account'), value: row.account ?? t('Not mapped') },
                 ]"
+                :deletable="false"
                 @edit="editRow(row)"
             />
         </template>

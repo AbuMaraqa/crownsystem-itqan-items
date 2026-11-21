@@ -4,6 +4,7 @@ namespace Modules\Accounting\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -14,6 +15,7 @@ use Modules\Accounting\Services\AccountMappingService;
 use Modules\Accounting\Support\SelectOptions;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
+use Modules\Core\Support\RecordInfo;
 use Spatie\QueryBuilder\AllowedFilter;
 
 /**
@@ -39,6 +41,7 @@ class AccountMappingController extends Controller
                 )
                 ->sorts('source_module', 'source_key', 'id')
                 ->defaultSort('source_module')
+                ->withCreator()
                 ->rows(fn (AccountMapping $mapping) => [
                     'id' => $mapping->id,
                     'source_module' => $mapping->source_module,
@@ -60,5 +63,10 @@ class AccountMappingController extends Controller
         $this->mappingService->setAccount($model, $accountId !== null ? (int) $accountId : null);
 
         return back()->with('success', __('Account mapping updated successfully'));
+    }
+
+    public function info(int $mapping): JsonResponse
+    {
+        return response()->json(RecordInfo::of($this->mappings->findOrFail($mapping)));
     }
 }

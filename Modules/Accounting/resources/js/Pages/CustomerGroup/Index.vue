@@ -7,7 +7,6 @@ import TextareaInput from '@/Components/form/TextareaInput.vue';
 import TextInput from '@/Components/form/TextInput.vue';
 import Toggle from '@/Components/form/Toggle.vue';
 import DataTable from '@/Components/table/DataTable.vue';
-import UserCell from '@/Components/table/UserCell.vue';
 import Badge from '@/Components/ui/Badge.vue';
 import Button from '@/Components/ui/Button.vue';
 import Modal from '@/Components/ui/Modal.vue';
@@ -16,12 +15,13 @@ import Switch from '@/Components/ui/Switch.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { can, t } from '@/lib/i18n';
 import { route } from '@/lib/route';
+import { createdByColumn } from '@/lib/tableColumns';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
-import RecordActions from '@modules/Items/resources/js/Pages/parts/RecordActions.vue';
-import { useRecordDelete } from '@modules/Items/resources/js/Pages/parts/useRecordDelete';
-import { useRecordModal } from '@modules/Items/resources/js/Pages/parts/useRecordModal';
+import RecordActions from '@/Components/table/RecordActions.vue';
+import { useRecordDelete } from '@/lib/useRecordDelete';
+import { useRecordModal } from '@/lib/useRecordModal';
 
-import type { Option, UserCellData } from '../parts/types';
+import type { Option } from '../parts/types';
 import { useActiveToggle } from '../parts/useActiveToggle';
 
 defineOptions({ layout: AdminLayout });
@@ -35,7 +35,6 @@ interface Row {
     use_last_price: boolean;
     notes: string | null;
     is_active: boolean;
-    created_by: UserCellData | null;
     customers: Option[];
 }
 
@@ -59,7 +58,7 @@ const columns = computed<TableColumn[]>(() => [
     { key: 'customers_count', label: t('Customers'), sort: 'customers_count' },
     { key: 'price_list_id', label: t('Price List'), toggleable: true, hidden: true },
     { key: 'is_active', label: t('Active') },
-    { key: 'created_by', label: t('Added By'), toggleable: true },
+    createdByColumn(),
 ]);
 
 const filters = computed<TableFilter[]>(() => [
@@ -123,7 +122,7 @@ function viewFields(row: Row): { label: string; value: string | number | null }[
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :empty-title="t('No data available')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :reorder-url="can('Customer Group Update') ? route('accounting.customer-groups.reorder') : undefined" :empty-title="t('No data available')">
         <template #cell-name="{ row }">
             <button v-if="can('Customer Group Update')" type="button" class="font-medium text-brand-600 hover:underline dark:text-brand-400" @click="editRow(row)">{{ row.name }}</button>
             <span v-else class="font-medium">{{ row.name }}</span>
@@ -140,10 +139,6 @@ function viewFields(row: Row): { label: string; value: string | number | null }[
         </template>
         <template #cell-is_active="{ row }">
             <Switch :model-value="row.is_active" :disabled="!can('Customer Group Update')" :aria-label="t('Active')" @update:model-value="(value: boolean) => toggleActive(row.id, value)" />
-        </template>
-        <template #cell-created_by="{ row }">
-            <UserCell v-if="row.created_by" :name="row.created_by.name" :avatar="row.created_by.avatar" :detail="row.created_by.detail" />
-            <span v-else class="text-muted">—</span>
         </template>
         <template #empty>
             <Button v-if="can('Customer Group Create')" variant="primary" @click="addGroup">{{ t('Add Customer Group') }}</Button>

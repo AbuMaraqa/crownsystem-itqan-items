@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 use Modules\Branch\Entities\Branch;
+use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
 use Modules\Core\Support\SafeDelete;
@@ -18,13 +19,15 @@ use Modules\Items\Enums\OfferType;
 use Modules\Items\Http\Requests\Admin\OfferRequest;
 use Modules\Items\Repositories\Contracts\OfferRepositoryInterface;
 use Modules\Items\Services\OfferService;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 use Modules\Items\Support\TranslatedSort;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 
 class OfferController extends Controller
 {
+    use ReordersRecords;
+
     public function __construct(
         private readonly OfferRepositoryInterface $offers,
         private readonly OfferService $offerService,
@@ -52,6 +55,8 @@ class OfferController extends Controller
                     ...AdminFilter::dateRange('created_at'),
                 )
                 ->sorts(AllowedSort::custom('name', new TranslatedSort), 'type', 'value', 'is_active', 'start_date', 'end_date', 'id')
+                ->reorderable()
+                ->withCreator()
                 ->rows(fn (Offer $offer) => [
                     'id' => $offer->id,
                     'image' => $offer->getImageAttribute(),
@@ -152,6 +157,11 @@ class OfferController extends Controller
         }
 
         return back()->with('success', __('Offers deleted successfully'));
+    }
+
+    protected function sortableModel(): string
+    {
+        return Offer::class;
     }
 
     public function info(int $offer): JsonResponse

@@ -8,6 +8,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
 use Modules\Core\Support\SafeDelete;
@@ -15,12 +16,14 @@ use Modules\Items\Entities\Tag;
 use Modules\Items\Http\Requests\Admin\TagRequest;
 use Modules\Items\Repositories\Contracts\TagRepositoryInterface;
 use Modules\Items\Services\TagService;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 use Modules\Items\Support\TranslatedSort;
 use Spatie\QueryBuilder\AllowedSort;
 
 class TagController extends Controller
 {
+    use ReordersRecords;
+
     public function __construct(
         private readonly TagRepositoryInterface $tags,
         private readonly TagService $tagService,
@@ -33,6 +36,8 @@ class TagController extends Controller
                 ->search(['slug'])
                 ->filters(AdminFilter::translated('name'), ...AdminFilter::dateRange('created_at'))
                 ->sorts(AllowedSort::custom('name', new TranslatedSort), 'slug', 'id')
+                ->reorderable()
+                ->withCreator()
                 ->rows(fn (Tag $tag) => [
                     'id' => $tag->id,
                     'name' => (string) $tag->name,
@@ -88,6 +93,11 @@ class TagController extends Controller
         }
 
         return back()->with('success', __('Tags deleted successfully'));
+    }
+
+    protected function sortableModel(): string
+    {
+        return Tag::class;
     }
 
     public function info(int $tag): JsonResponse

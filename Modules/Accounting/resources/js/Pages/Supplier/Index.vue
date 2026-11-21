@@ -1,18 +1,16 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 
 import DataTable from '@/Components/table/DataTable.vue';
-import RowMenu from '@/Components/table/RowMenu.vue';
+import RecordActions from '@/Components/table/RecordActions.vue';
 import UserCell from '@/Components/table/UserCell.vue';
 import Button from '@/Components/ui/Button.vue';
-import DropdownItem from '@/Components/ui/DropdownItem.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { can, t } from '@/lib/i18n';
-import { Eye, Pencil } from '@/lib/icons';
 import { route } from '@/lib/route';
+import { createdByColumn } from '@/lib/tableColumns';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
-import RecordViewModal from '@modules/Items/resources/js/Pages/parts/RecordViewModal.vue';
 
 defineOptions({ layout: AdminLayout });
 
@@ -34,6 +32,7 @@ const columns = computed<TableColumn[]>(() => [
     { key: 'phone', label: t('Phone') },
     { key: 'address', label: t('Address'), toggleable: true },
     { key: 'tax_number', label: t('Tax Number'), toggleable: true },
+    createdByColumn(),
 ]);
 
 const filters = computed<TableFilter[]>(() => [
@@ -43,14 +42,6 @@ const filters = computed<TableFilter[]>(() => [
     { type: 'text', key: 'tax_number', label: t('Tax Number') },
     { type: 'date-range', key: 'created_at', label: t('Created at') },
 ]);
-
-const viewing = ref<Row | null>(null);
-const viewOpen = computed({
-    get: () => viewing.value !== null,
-    set: (open: boolean) => {
-        if (!open) viewing.value = null;
-    },
-});
 </script>
 
 <template>
@@ -80,23 +71,21 @@ const viewOpen = computed({
             <Button v-if="can('Supplier Create')" variant="primary" :href="route('accounting.suppliers.add')">{{ t('Add Supplier') }}</Button>
         </template>
         <template #actions="{ row }">
-            <RowMenu v-if="can('Supplier View') || can('Supplier Update')">
-                <DropdownItem v-if="can('Supplier View')" @select="viewing = row"><Eye />{{ t('View') }}</DropdownItem>
-                <DropdownItem v-if="can('Supplier Update')" :href="route('accounting.suppliers.edit', row.id)"><Pencil />{{ t('Edit') }}</DropdownItem>
-            </RowMenu>
+            <RecordActions
+                entity="Supplier"
+                routes="accounting.suppliers"
+                :id="row.id"
+                :title="row.name"
+                :edit-href="route('accounting.suppliers.edit', row.id)"
+                :deletable="false"
+                :fields="[
+                    { label: t('Name'), value: row.name },
+                    { label: t('Email'), value: row.email },
+                    { label: t('Phone'), value: row.phone },
+                    { label: t('Tax Number'), value: row.tax_number },
+                    { label: t('Address'), value: row.address },
+                ]"
+            />
         </template>
     </DataTable>
-
-    <RecordViewModal
-        v-if="viewing"
-        v-model:open="viewOpen"
-        :title="viewing.name"
-        :fields="[
-            { label: t('Name'), value: viewing.name },
-            { label: t('Email'), value: viewing.email },
-            { label: t('Phone'), value: viewing.phone },
-            { label: t('Tax Number'), value: viewing.tax_number },
-            { label: t('Address'), value: viewing.address },
-        ]"
-    />
 </template>

@@ -70,7 +70,7 @@ function confirmMove(): void {
 
 <template>
     <Modal v-model:open="open" :title="t('Move')" :description="node?.label">
-        <input v-model="search" type="search" :placeholder="t('Search categories')" autocomplete="off" :class="[controlClasses, 'h-10']" />
+        <input v-model="search" type="search" :placeholder="t('Search categories')" autocomplete="off" :class="[controlClasses, 'h-control']" />
 
         <div class="mt-3 max-h-64 overflow-auto rounded-lg border border-line" role="radiogroup" :aria-label="t('Move')">
             <label v-if="node?.kind === 'category'" class="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm hover:bg-surface">

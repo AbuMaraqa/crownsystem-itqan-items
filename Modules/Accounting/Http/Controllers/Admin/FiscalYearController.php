@@ -19,7 +19,7 @@ use Modules\Accounting\Support\SelectOptions;
 use Modules\Accounting\Support\StatusBadge;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 
 /**
  * السنوات المالية وفتراتها الشهرية: اضافة وتعديل في نافذة، واقفال السنة (بقيد الاقفال)
@@ -40,6 +40,7 @@ class FiscalYearController extends Controller
                 ->filters(AdminFilter::exact('status'), AdminFilter::boolean('is_default'), ...AdminFilter::dateRange('starts_at'))
                 ->sorts('name', 'starts_at', 'ends_at', 'id')
                 ->defaultSort('-starts_at')
+                ->withCreator()
                 ->rows(fn (FiscalYear $year) => [
                     'id' => $year->id,
                     'name' => $year->name,
@@ -113,6 +114,7 @@ class FiscalYearController extends Controller
                 ->filters(AdminFilter::exact('status'))
                 ->sorts('name', 'starts_at', 'ends_at')
                 ->defaultSort('starts_at')
+                ->withCreator()
                 ->rows(fn (AccountingPeriod $period) => [
                     'id' => $period->id,
                     'name' => $period->name,
@@ -137,6 +139,11 @@ class FiscalYearController extends Controller
         $model = $this->years->findPeriodOrFail($period);
 
         return $this->attempt(fn () => $this->fiscalYearService->reopenPeriod($model), __('Accounting period reopened successfully'));
+    }
+
+    public function periodInfo(int $period): JsonResponse
+    {
+        return response()->json(RecordInfo::of($this->years->findPeriodOrFail($period)));
     }
 
     /**

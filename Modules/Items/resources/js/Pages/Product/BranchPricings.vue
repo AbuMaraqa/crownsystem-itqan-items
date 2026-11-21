@@ -62,7 +62,7 @@ function submit(): void {
                                     inputmode="decimal"
                                     :aria-label="`${row.name} - ${branch.name}`"
                                     :placeholder="t('Price')"
-                                    class="h-9 w-full rounded-lg border bg-card px-2 text-sm"
+                                    class="h-control w-full rounded-control border bg-card px-2 text-sm"
                                     :class="errors[`prices.${row.id}.${branch.id}`] ? 'border-error-400' : 'border-line'"
                                 />
                                 <p v-if="errors[`prices.${row.id}.${branch.id}`]" class="mt-1 text-xs text-danger" role="alert">{{ errors[`prices.${row.id}.${branch.id}`] }}</p>

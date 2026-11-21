@@ -69,7 +69,7 @@ function onBlur(): void {
 <template>
     <Field :id="id" :label="label" :error="error" :hint="hint">
         <div class="relative">
-            <div class="flex min-h-10 w-full flex-wrap items-center gap-1 rounded-lg border bg-card px-2 py-1 focus-within:border-brand-300" :class="error ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'">
+            <div class="flex min-h-control w-full flex-wrap items-center gap-1 rounded-control border bg-card px-2 py-1 focus-within:border-brand-300" :class="error ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'">
                 <span v-for="tag in model" :key="tag" class="inline-flex items-center gap-1 rounded bg-surface px-1.5 py-0.5 text-sm">
                     {{ tag }}
                     <button type="button" class="text-muted hover:text-ink" :aria-label="t('Remove')" @click="remove(tag)"><X class="size-3" /></button>

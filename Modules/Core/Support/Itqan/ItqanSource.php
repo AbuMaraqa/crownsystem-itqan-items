@@ -24,10 +24,15 @@ final class ItqanSource
 
     public static function fromConfig(?string $path = null): self
     {
-        $path = $path ?: config('core.itqan.data_path');
+        // المكان الافتراضي داخل storage، وهو خارج المجلد العام فلا تُنزَّل البيانات من المتصفح.
+        $default = storage_path('app'.DIRECTORY_SEPARATOR.'itqan'.DIRECTORY_SEPARATOR.'almamoun2015');
+        $path = $path ?: config('core.itqan.data_path') ?: (is_dir($default) ? $default : null);
 
         if (! is_string($path) || $path === '') {
-            throw new RuntimeException('Set ITQAN_DATA_PATH or pass --path to the Itqan data folder (almamoun2015).');
+            throw new RuntimeException(
+                "Itqan data folder not set. Upload the almamoun2015 folder to {$default}, "
+                .'or set ITQAN_DATA_PATH in .env (then run php artisan config:clear), or pass --path.'
+            );
         }
 
         return new self($path);

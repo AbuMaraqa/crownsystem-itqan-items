@@ -9,6 +9,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
 use Modules\Core\Support\SafeDelete;
@@ -20,7 +21,7 @@ use Modules\Items\Enums\ItemSubItemMode;
 use Modules\Items\Http\Requests\Admin\ItemTypeProfileRequest;
 use Modules\Items\Repositories\Contracts\ItemTypeProfileRepositoryInterface;
 use Modules\Items\Services\ItemTypeProfileService;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 
 /**
  * انواع الاصناف: مصفوفة الخصائص التي تحدد شكل سطر الصنف. الاضافة والتعديل في نافذة
@@ -28,6 +29,8 @@ use Modules\Items\Support\RecordInfo;
  */
 class ItemTypeProfileController extends Controller
 {
+    use ReordersRecords;
+
     public function __construct(
         private readonly ItemTypeProfileRepositoryInterface $profiles,
         private readonly ItemTypeProfileService $profileService,
@@ -47,7 +50,8 @@ class ItemTypeProfileController extends Controller
                     ...AdminFilter::dateRange('created_at'),
                 )
                 ->sorts('code', 'sort_order', 'id')
-                ->defaultSort('sort_order')
+                ->reorderable()
+                ->withCreator()
                 ->rows(fn (ItemTypeProfile $profile) => [
                     'id' => $profile->id,
                     'code' => $profile->code,
@@ -105,6 +109,11 @@ class ItemTypeProfileController extends Controller
         }
 
         return back()->with('success', __('Item type deleted successfully'));
+    }
+
+    protected function sortableModel(): string
+    {
+        return ItemTypeProfile::class;
     }
 
     public function info(int $profile): JsonResponse

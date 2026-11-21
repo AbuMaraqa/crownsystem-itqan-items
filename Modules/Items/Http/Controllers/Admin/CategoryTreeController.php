@@ -114,6 +114,7 @@ class CategoryTreeController extends Controller
                 )
                 ->sorts(AllowedSort::custom('name', new TranslatedSort), 'sku', 'base_price', 'id')
                 ->defaultSort('sku')
+                ->withCreator()
                 ->rows(fn (Product $product) => [
                     'id' => (int) $product->id,
                     'image' => $product->image ?: null,

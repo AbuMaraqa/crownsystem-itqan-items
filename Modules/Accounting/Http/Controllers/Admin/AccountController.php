@@ -18,7 +18,7 @@ use Modules\Accounting\Services\AccountService;
 use Modules\Accounting\Support\AccountTree;
 use Modules\Accounting\Support\SelectOptions;
 use Modules\Core\Support\SafeDelete;
-use Modules\Items\Support\RecordInfo;
+use Modules\Core\Support\RecordInfo;
 
 /**
  * دليل الحسابات: شجرة الحسابات بارصدتها، واضافة حساب (او حساب فرعي) وتعديله وحذفه.

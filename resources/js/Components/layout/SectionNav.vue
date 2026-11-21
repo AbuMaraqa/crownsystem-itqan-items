@@ -14,7 +14,7 @@ const group = computed(() => entries.value.find((entry) => entry.type === 'group
 
 <template>
     <nav v-if="group && (group.children ?? []).length > 1" class="border-b border-line bg-canvas" :aria-label="t(group.title)">
-        <ul class="no-scrollbar mx-auto flex w-full max-w-[1440px] gap-6 overflow-x-auto px-4 md:px-6 lg:px-8">
+        <ul class="no-scrollbar mx-auto flex w-full max-w-page gap-6 overflow-x-auto px-4 md:px-6 lg:px-gutter">
             <li v-for="child in group.children" :key="child.title" class="shrink-0">
                 <Link
                     :href="hrefOf(child)"

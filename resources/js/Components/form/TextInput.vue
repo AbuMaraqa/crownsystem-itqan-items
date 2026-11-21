@@ -42,7 +42,7 @@ const id = useId();
             :maxlength="maxlength"
             :dir="dir"
             :aria-invalid="!!error"
-            :class="[controlClasses, 'h-10']"
+            :class="[controlClasses, 'h-control']"
             @input="model = ($event.target as HTMLInputElement).value"
         />
     </Field>

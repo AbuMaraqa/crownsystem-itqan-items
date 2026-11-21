@@ -1,19 +1,16 @@
 <script setup lang="ts">
-import RowMenu from '@/Components/table/RowMenu.vue';
-import DropdownItem from '@/Components/ui/DropdownItem.vue';
-import DropdownSeparator from '@/Components/ui/DropdownSeparator.vue';
-import { router } from '@inertiajs/vue3';
-import { Pencil, ShieldCheck, Trash2 } from '@/lib/icons';
 import { computed, ref } from 'vue';
 
 import type { Option } from '@/Components/form/SelectInput.vue';
 import DataTable from '@/Components/table/DataTable.vue';
+import RecordActions from '@/Components/table/RecordActions.vue';
 import Button from '@/Components/ui/Button.vue';
+import DropdownItem from '@/Components/ui/DropdownItem.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
-import { confirm } from '@/lib/confirm';
 import { can, t } from '@/lib/i18n';
-import { route } from '@/lib/route';
+import { ShieldCheck } from '@/lib/icons';
+import { useRecordDelete } from '@/lib/useRecordDelete';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
 
 import RoleFormModal from './parts/RoleFormModal.vue';
@@ -52,11 +49,7 @@ function openForm(role: RoleRow | null): void {
     formOpen.value = true;
 }
 
-async function remove(row: RoleRow): Promise<void> {
-    if (await confirm({ title: t('Delete :name?', { name: row.label }), description: t('This cannot be undone.') })) {
-        router.delete(route('roles.destroy', row.id), { preserveScroll: true });
-    }
-}
+const { remove } = useRecordDelete('roles');
 </script>
 
 <template>
@@ -71,12 +64,24 @@ async function remove(row: RoleRow): Promise<void> {
             <RoleSummaryCell :summary="row.summary" />
         </template>
         <template #actions="{ row }">
-            <RowMenu>
+            <RecordActions
+                entity="Roles And Permissions"
+                routes="roles"
+                :id="row.id"
+                :title="row.label"
+                :fields="[
+                    { label: t('Role Name'), value: row.label },
+                    { label: t('Users'), value: row.users_count },
+                    { label: t('Permissions'), value: row.summary.total },
+                    { label: t('Permission Groups'), value: row.summary.groups.map((group) => group.label).join('، ') },
+                ]"
+                :editable="row.editable"
+                :deletable="!row.protected"
+                @edit="openForm(row)"
+                @delete="remove(row.id, row.label)"
+            >
                 <DropdownItem @select="viewing = row"><ShieldCheck />{{ t('View Permissions') }}</DropdownItem>
-                <DropdownItem v-if="can('Roles And Permissions Update') && row.editable" @select="openForm(row)"><Pencil />{{ t('Edit') }}</DropdownItem>
-                <DropdownSeparator v-if="can('Roles And Permissions Delete') && !row.protected" />
-                <DropdownItem v-if="can('Roles And Permissions Delete') && !row.protected" destructive @select="remove(row)"><Trash2 />{{ t('Delete') }}</DropdownItem>
-            </RowMenu>
+            </RecordActions>
         </template>
     </DataTable>
 

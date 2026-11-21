@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Str;
+use Modules\Core\Entities\Concerns\HasSortOrder;
 use Modules\Core\Entities\User;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -16,6 +17,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 
 class Manufacturer extends Model implements TranslatableContract , HasMedia
 {
+    use HasSortOrder;
     use HasFactory;
     use LogsActivity;
     use Translatable;

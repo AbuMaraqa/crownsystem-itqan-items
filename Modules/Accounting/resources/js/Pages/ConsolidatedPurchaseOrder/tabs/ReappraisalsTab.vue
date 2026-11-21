@@ -170,10 +170,10 @@ const lineError = (index: number, field: string): string | undefined => (form.er
                 <div v-for="(line, index) in form.lines" :key="index" class="grid items-start gap-2 rounded-lg border border-line p-2 sm:grid-cols-[2fr_1fr_2fr_auto]">
                     <LookupSelect v-model="line.reappraisal_element_id" type="reappraisal-element" :options="optionsFor(index)" :error="lineError(index, 'reappraisal_element_id')" />
                     <div>
-                        <input v-model="line.amount" type="number" step="0.0001" min="0" dir="ltr" :placeholder="t('Value')" :aria-label="t('Value')" :class="[controlClasses, 'h-10 text-end']" />
+                        <input v-model="line.amount" type="number" step="0.0001" min="0" dir="ltr" :placeholder="t('Value')" :aria-label="t('Value')" :class="[controlClasses, 'h-control text-end']" />
                         <p v-if="lineError(index, 'amount')" class="mt-1 text-sm text-danger">{{ lineError(index, 'amount') }}</p>
                     </div>
-                    <input v-model="line.notes" :placeholder="t('Optional')" :aria-label="t('Notes')" :class="[controlClasses, 'h-10']" />
+                    <input v-model="line.notes" :placeholder="t('Optional')" :aria-label="t('Notes')" :class="[controlClasses, 'h-control']" />
                     <button type="button" class="mt-2 rounded p-1 text-muted hover:text-danger" :aria-label="t('Remove')" @click="form.lines.splice(index, 1)"><Trash2 class="size-4" /></button>
                 </div>
                 <div class="flex items-center justify-between">

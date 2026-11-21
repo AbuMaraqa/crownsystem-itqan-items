@@ -1,6 +1,8 @@
 /*
  * The admin design system: palette, shadows, motion and a few utilities.
- * Our own theme. The look: a light sidebar, bordered cards, a blue accent, a cool gray scale.
+ * Our own theme, in the style of a classic admin template: a white page, a light 280px sidebar, a 70px header,
+ * hairline-bordered cards, 34px controls, a blue accent and a neutral (zinc) gray scale.
+ * Every size and color below is a token: change it here, never in a page.
  */
 
 @custom-variant dark (&:is(.dark *));
@@ -73,20 +75,20 @@
     --color-brand-900: #10336a;
     --color-brand-950: #0b2045;
 
-    /* A cool gray: text, borders and surfaces. */
-    --color-gray-25: #fcfcfd;
-    --color-gray-50: #f8f9fb;
-    --color-gray-100: #f1f3f7;
-    --color-gray-200: #e4e7ef;
-    --color-gray-300: #d2d7e2;
-    --color-gray-400: #9ba3b8;
-    /* 500/600 are the grey of text: a step darker so it reads more clearly. */
-    --color-gray-500: #5b6480;
-    --color-gray-600: #3f4760;
-    --color-gray-700: #363d55;
-    --color-gray-800: #232a3d;
-    --color-gray-900: #151a28;
-    --color-gray-950: #0d1018;
+    /* A neutral (zinc) gray: text, borders and surfaces. */
+    --color-gray-25: #fcfcfc;
+    --color-gray-50: #fafafa;
+    --color-gray-100: #f4f4f5;
+    --color-gray-200: #e4e4e7;
+    --color-gray-300: #d4d4d8;
+    --color-gray-400: #a1a1aa;
+    /* 500/600 are the grey of text: a step darker than zinc so it reads clearly (owner's request, 2026-11-17). */
+    --color-gray-500: #5f5f6a;
+    --color-gray-600: #46464f;
+    --color-gray-700: #3f3f46;
+    --color-gray-800: #27272a;
+    --color-gray-900: #18181b;
+    --color-gray-950: #09090b;
 
     /* Status scales, on Tailwind's own palettes. */
     --color-success-25: var(--color-emerald-50);
@@ -141,18 +143,26 @@
     --color-blue-light-900: var(--color-sky-900);
     --color-blue-light-950: var(--color-sky-950);
 
-    --shadow-theme-xs: 0 1px 2px 0 rgb(13 16 24 / 0.04);
-    --shadow-theme-sm: 0 1px 3px 0 rgb(13 16 24 / 0.06), 0 1px 2px -1px rgb(13 16 24 / 0.04);
-    --shadow-theme-md: 0 4px 12px -2px rgb(13 16 24 / 0.08);
-    --shadow-theme-lg: 0 12px 28px -6px rgb(13 16 24 / 0.12);
-    --shadow-theme-xl: 0 24px 48px -12px rgb(13 16 24 / 0.18);
-    --shadow-card: 0 3px 4px 0 rgb(13 16 24 / 0.03);
-    --shadow-focus-ring: 0 0 0 4px color-mix(in srgb, var(--color-brand-500) 14%, transparent);
+    --shadow-theme-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-theme-sm: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.04);
+    --shadow-theme-md: 0 4px 12px -2px rgb(0 0 0 / 0.08);
+    --shadow-theme-lg: 0 10px 30px 0 rgb(0 0 0 / 0.08);
+    --shadow-theme-xl: 0 24px 48px -12px rgb(0 0 0 / 0.18);
+    /* Cards sit on a white page: a hairline border and the lightest shadow. */
+    --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-focus-ring: 0 0 0 3px color-mix(in srgb, var(--color-brand-500) 18%, transparent);
 
     /* Shell sizes. */
-    --spacing-sidebar: 270px;
-    --spacing-sidebar-collapsed: 76px;
+    --spacing-sidebar: 280px;
+    --spacing-sidebar-collapsed: 80px;
     --spacing-header: 70px;
+    /* The page's side gutter on a desktop (px-gutter) and the content's widest box (max-w-page). */
+    --spacing-gutter: 30px;
+    --container-page: 1280px;
+
+    /* One height for every field and default button (h-control), and for the small ones (h-control-sm). */
+    --spacing-control: 34px;
+    --spacing-control-sm: 28px;
 }
 
 @layer base {

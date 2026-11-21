@@ -1,24 +1,23 @@
 <script setup lang="ts">
 import { Link, router } from '@inertiajs/vue3';
-import { computed, nextTick, ref } from 'vue';
+import { computed } from 'vue';
 
 import type { Option } from '@/Components/form/SelectInput.vue';
 import DataTable from '@/Components/table/DataTable.vue';
-import RowMenu from '@/Components/table/RowMenu.vue';
-import UserCell from '@/Components/table/UserCell.vue';
+import RecordActions from '@/Components/table/RecordActions.vue';
+import type { ViewField } from '@/Components/table/RecordViewModal.vue';
 import Badge from '@/Components/ui/Badge.vue';
 import DropdownItem from '@/Components/ui/DropdownItem.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { confirm } from '@/lib/confirm';
 import { can, t } from '@/lib/i18n';
-import { Info, X } from '@/lib/icons';
+import { X } from '@/lib/icons';
 import { route } from '@/lib/route';
+import { createdByColumn } from '@/lib/tableColumns';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
-import RecordInfoModal from '@modules/Items/resources/js/Pages/parts/RecordInfoModal.vue';
 
 import type { StatusBadge } from '../parts/statusBadge';
-import type { UserCellData } from '../parts/types';
 
 defineOptions({ layout: AdminLayout });
 
@@ -32,7 +31,6 @@ interface Row {
     journal_entry: { id: number; entry_number: string } | null;
     status: StatusBadge | null;
     is_posted: boolean;
-    created_by: UserCellData | null;
 }
 
 const props = defineProps<{ table: TablePayload<Row>; statuses: Option[]; fiscalYears: Option[] }>();
@@ -44,7 +42,7 @@ const columns = computed<TableColumn[]>(() => [
     { key: 'net_profit', label: t('Net Profit / Loss'), sort: 'net_profit_base', class: 'text-end' },
     { key: 'journal_entry', label: t('Journal Entry') },
     { key: 'status', label: t('Status') },
-    { key: 'created_by', label: t('Created By'), toggleable: true },
+    createdByColumn(),
 ]);
 
 const filters = computed<TableFilter[]>(() => [
@@ -59,14 +57,15 @@ async function cancel(row: Row): Promise<void> {
     }
 }
 
-// The info window of the closing vouchers is open to whoever sees the list, as before.
-const current = ref<Row | null>(null);
-const infoOpen = ref(false);
-
-async function info(row: Row): Promise<void> {
-    current.value = row;
-    await nextTick();
-    infoOpen.value = true;
+function viewFields(row: Row): ViewField[] {
+    return [
+        { label: t('Reference'), value: row.reference_no },
+        { label: t('Fiscal Year'), value: row.fiscal_year },
+        { label: t('Closing Date'), value: row.closing_date },
+        { label: t('Net Profit / Loss'), value: row.net_profit },
+        { label: t('Journal Entry'), value: row.journal_entry?.entry_number },
+        { label: t('Status'), value: row.status?.label },
+    ];
 }
 </script>
 
@@ -90,23 +89,21 @@ async function info(row: Row): Promise<void> {
         <template #cell-status="{ row }">
             <Badge v-if="row.status" :tone="row.status.tone">{{ row.status.label }}</Badge>
         </template>
-        <template #cell-created_by="{ row }">
-            <UserCell v-if="row.created_by" :name="row.created_by.name" :avatar="row.created_by.avatar" :detail="row.created_by.detail" />
-            <span v-else>-</span>
-        </template>
         <template #actions="{ row }">
-            <RowMenu>
-                <DropdownItem v-if="row.is_posted && can('Period Closing Voucher Cancel')" destructive @select="cancel(row)"><X />{{ t('Cancel') }}</DropdownItem>
-                <DropdownItem @select="info(row)"><Info />{{ t('Info') }}</DropdownItem>
-            </RowMenu>
+            <!-- A closing voucher is neither edited nor deleted: it is cancelled (its entry reversed). -->
+            <RecordActions
+                entity="Period Closing Voucher"
+                routes="accounting.period-closing-vouchers"
+                :id="row.id"
+                :title="row.reference_no"
+                :fields="viewFields(row)"
+                :editable="false"
+                :deletable="false"
+            >
+                <template v-if="row.is_posted && can('Period Closing Voucher Cancel')" #default>
+                    <DropdownItem destructive @select="cancel(row)"><X />{{ t('Cancel') }}</DropdownItem>
+                </template>
+            </RecordActions>
         </template>
     </DataTable>
-
-    <RecordInfoModal
-        v-if="current"
-        :key="current.id"
-        v-model:open="infoOpen"
-        :title="current.reference_no"
-        :url="route('accounting.period-closing-vouchers.info', current.id)"
-    />
 </template>

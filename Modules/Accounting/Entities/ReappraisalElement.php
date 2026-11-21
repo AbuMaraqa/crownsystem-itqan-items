@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Entities\Concerns\HasSortOrder;
 use Modules\Core\Entities\User;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -17,6 +18,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 class ReappraisalElement extends Model
 {
     use HasFactory;
+    use HasSortOrder;
     use LogsActivity;
     use SoftDeletes;
 

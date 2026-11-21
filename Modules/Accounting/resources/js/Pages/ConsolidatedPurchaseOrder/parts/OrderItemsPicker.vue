@@ -36,7 +36,7 @@ function selectAll(checked: boolean): void {
             <div v-for="item in items" :key="item.consolidated_purchase_order_item_id" class="grid items-center gap-2 border-b border-line px-3 py-2 last:border-0 sm:grid-cols-[auto_1fr_1fr]">
                 <input v-model="item.selected" type="checkbox" class="size-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800" :aria-label="`${t('Select')} ${labelOf(item.consolidated_purchase_order_item_id)}`" />
                 <span class="text-sm">{{ labelOf(item.consolidated_purchase_order_item_id) }}</span>
-                <input v-model="item.notes" :placeholder="t('Optional')" :aria-label="t('Notes')" :class="[controlClasses, 'h-9']" />
+                <input v-model="item.notes" :placeholder="t('Optional')" :aria-label="t('Notes')" :class="[controlClasses, 'h-control']" />
             </div>
         </div>
     </div>

@@ -4,6 +4,7 @@ namespace Modules\Core\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use DomainException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -18,6 +19,7 @@ use Modules\Core\Repositories\Contracts\UserRepositoryInterface;
 use Modules\Core\Services\UserService;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
+use Modules\Core\Support\RecordInfo;
 use Modules\Items\Entities\PriceList;
 use Nwidart\Modules\Facades\Module;
 use Spatie\Permission\Models\Role;
@@ -44,6 +46,7 @@ class UserController extends Controller
                     ...AdminFilter::dateRange('created_at'),
                 )
                 ->sorts('name', 'email', 'created_at', 'updated_at', 'id')
+                ->withCreator()
                 ->rows(fn (User $user) => [
                     'id' => $user->id,
                     'name' => $user->name,
@@ -123,6 +126,11 @@ class UserController extends Controller
         }
 
         return back()->with('success', __('User deleted successfully.'));
+    }
+
+    public function info(int $user): JsonResponse
+    {
+        return response()->json(RecordInfo::of($this->users->findOrFail($user)));
     }
 
     /**

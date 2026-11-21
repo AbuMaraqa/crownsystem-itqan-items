@@ -10,10 +10,12 @@ import PageHeader from '@/Components/ui/PageHeader.vue';
 import Switch from '@/Components/ui/Switch.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { can, t } from '@/lib/i18n';
+import { route } from '@/lib/route';
+import { createdByColumn } from '@/lib/tableColumns';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
-import RecordActions from '@modules/Items/resources/js/Pages/parts/RecordActions.vue';
-import { useRecordDelete } from '@modules/Items/resources/js/Pages/parts/useRecordDelete';
-import { useRecordModal } from '@modules/Items/resources/js/Pages/parts/useRecordModal';
+import RecordActions from '@/Components/table/RecordActions.vue';
+import { useRecordDelete } from '@/lib/useRecordDelete';
+import { useRecordModal } from '@/lib/useRecordModal';
 
 import { useActiveToggle } from '../parts/useActiveToggle';
 
@@ -44,6 +46,7 @@ const columns = computed<TableColumn[]>(() => [
     { key: 'code', label: t('Tax Code'), sort: 'code' },
     { key: 'rate', label: t('Tax Rate'), sort: 'rate', class: 'tabular' },
     { key: 'is_active', label: t('Active') },
+    createdByColumn(),
 ]);
 
 const filters = computed<TableFilter[]>(() => [
@@ -80,7 +83,7 @@ function viewFields(row: Row): { label: string; value: string | null }[] {
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :empty-title="t('No data available')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :reorder-url="can('Tax Update') ? route('accounting.taxes.reorder') : undefined" :empty-title="t('No data available')">
         <template #cell-name="{ row }">
             <button v-if="can('Tax Update')" type="button" class="font-medium text-brand-600 hover:underline dark:text-brand-400" @click="editRow(row)">{{ row.name }}</button>
             <span v-else class="font-medium">{{ row.name }}</span>
