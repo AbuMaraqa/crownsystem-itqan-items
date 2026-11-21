@@ -100,6 +100,18 @@ class CategoryMapProposerTest extends TestCase
         $this->assertNull($map['000200349']->finish);
     }
 
+    public function test_itqan_tree_root_zero_is_not_a_category(): void
+    {
+        $map = $this->propose([
+            $this->node('0', 'شجرة الأصناف', parent: '0'),
+            $this->node('00009', 'المنيوم الوبين بدون دهان'),
+        ]);
+
+        $this->assertArrayNotHasKey('0', $map);
+        $this->assertSame('ألمنيوم/الوبين', $map['00009']->categoryPath);
+        $this->assertSame('بدون دهان', $map['00009']->finish);
+    }
+
     public function test_child_of_skipped_parent_is_skipped(): void
     {
         $map = $this->propose([

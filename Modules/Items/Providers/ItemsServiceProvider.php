@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Modules\Core\Support\Itqan\ItqanStages;
 use Modules\Items\Console\Commands\BackfillLegacyFields;
+use Modules\Items\Console\Commands\ItqanCategoryMap;
 use Modules\Items\Services\Itqan\ItqanItemsStage;
 use Modules\Items\Services\Itqan\ItqanPricesStage;
 use Modules\Items\Console\Commands\LinkMainProducts;
@@ -103,6 +104,7 @@ class ItemsServiceProvider extends ServiceProvider
     {
         $this->commands([
             BackfillLegacyFields::class,
+            ItqanCategoryMap::class,
             LinkMainProducts::class,
             RebuildSearchIndex::class,
         ]);

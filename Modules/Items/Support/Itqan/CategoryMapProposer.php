@@ -12,6 +12,9 @@ final class CategoryMapProposer
 {
     public const ALUMINUM_ROOT = 'ألمنيوم';
 
+    /** رقم جذر شجرة الاصناف في إتقان. */
+    public const TREE_ROOT = '0';
+
     /** الماركات والأنظمة كما تُكتب في أسماء إتقان بعد التوحيد. الأطول يُطابَق أولاً. */
     public const BRANDS = [
         'الوبين سيستم', 'الوبين', 'رويال سيستم', 'رويال', 'كليل سيستم', 'كليل', 'سبير', 'نابكو سيستم', 'نابكو',
@@ -38,7 +41,12 @@ final class CategoryMapProposer
     {
         $byId = [];
         foreach ($nodes as $node) {
-            $byId[trim((string) $node['ItemId'])] = $node;
+            $id = trim((string) $node['ItemId']);
+
+            // «0» جذر شجرة إتقان («شجرة الأصناف») وليس تصنيفاً؛ أبناؤه هم التصنيفات الجذرية.
+            if ($id !== self::TREE_ROOT) {
+                $byId[$id] = $node;
+            }
         }
 
         $entries = [];
