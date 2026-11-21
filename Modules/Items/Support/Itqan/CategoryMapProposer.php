@@ -1,0 +1,173 @@
+<?php
+
+namespace Modules\Items\Support\Itqan;
+
+/**
+ * يقترح ربط كل عقدة تصنيف في إتقان بالشكل الجديد. في إتقان كان تصنيف الالمنيوم
+ * «المنيوم <ماركة> <لون>» (مثل «المنيوم الوبين بدون دهان»)، فيصبح هنا تصنيف الماركة
+ * «ألمنيوم/الوبين» ولونه «بدون دهان». الاقتراح يراجعه صاحب النظام في ملف CSV قبل
+ * النقل الكامل. التصميم: docs/superpowers/specs/2026-11-21-items-catalog-redesign-design.md §6.1.
+ */
+final class CategoryMapProposer
+{
+    public const ALUMINUM_ROOT = 'ألمنيوم';
+
+    /** الماركات والأنظمة كما تُكتب في أسماء إتقان بعد التوحيد. الأطول يُطابَق أولاً. */
+    public const BRANDS = [
+        'الوبين سيستم', 'الوبين', 'رويال سيستم', 'رويال', 'كليل سيستم', 'كليل', 'سبير', 'نابكو سيستم', 'نابكو',
+        'متسبي', 'الوم جولد', 'جولد', 'بروفال', 'اكستال سيستم', 'اكستال كيرتن', 'اكستال', 'انتوب', 'SDR',
+        'بدرية', 'الفايز', 'فايز', 'يوناني', 'مستر بروفيل', 'ايتان بزنوي', 'البجينو', 'افيزار', 'جولان تساخ',
+        'الرحمن', 'ديلمار', 'مفرومال', 'شرمر', 'باركان', 'تركي', 'اردني', 'مستورد',
+    ];
+
+    /** كلمات تصنيفات ملغاة في إتقان. */
+    public const JUNK = [
+        'حذف', 'حدف', 'غلط', 'تعديل', 'احتياط', 'سكراب', '؟؟؟', 'RenameIt', 'ليس للاستعمال', 'ليس للاستخدام',
+    ];
+
+    /** كلمات في اول اللون لا تميّزه. */
+    private const FINISH_LEADING_WORDS = ['لون', 'دهان'];
+
+    private const DEFAULT_FINISH = 'بدون دهان';
+
+    /**
+     * @param  array<int, array<string, mixed>>  $nodes  صف لكل عقدة تصنيف: ItemId, ItemString, ItemParent, isActive, items
+     * @return array<string, CategoryMapEntry>  بمفتاح رقم العقدة القديمة
+     */
+    public function propose(array $nodes): array
+    {
+        $byId = [];
+        foreach ($nodes as $node) {
+            $byId[trim((string) $node['ItemId'])] = $node;
+        }
+
+        $entries = [];
+        $resolve = function (string $id) use (&$resolve, &$entries, $byId): CategoryMapEntry {
+            if (isset($entries[$id])) {
+                return $entries[$id];
+            }
+
+            $node = $byId[$id];
+            $parentId = trim((string) ($node['ItemParent'] ?? '0'));
+            $parent = ($parentId !== $id && isset($byId[$parentId])) ? $resolve($parentId) : null;
+
+            return $entries[$id] = $parent ? $this->child($node, $parent) : $this->root($node);
+        };
+
+        foreach (array_keys($byId) as $id) {
+            $resolve((string) $id);
+        }
+
+        return $entries;
+    }
+
+    /**
+     * @param  array<string, mixed>  $node
+     */
+    private function root(array $node): CategoryMapEntry
+    {
+        $name = ItqanNames::normalize((string) $node['ItemString']);
+        $remainder = ItqanNames::aluminumRemainder($name);
+
+        if ($remainder === null) {
+            return $this->entry($node, $name, null, str_contains($name, 'بالوزن') ? 'weight' : 'simple');
+        }
+
+        $brand = $this->brand($remainder);
+        $finish = $this->finish($brand === null ? '' : trim(mb_substr($remainder, mb_strlen($brand))));
+
+        return $this->entry(
+            $node,
+            self::ALUMINUM_ROOT.'/'.($brand ?? $remainder),
+            $finish,
+            'weight',
+            $brand === null ? 'brand?' : '',
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $node
+     */
+    private function child(array $node, CategoryMapEntry $parent): CategoryMapEntry
+    {
+        $name = ItqanNames::normalize((string) $node['ItemString']);
+        $entry = $this->entry($node, $parent->categoryPath.'/'.$name, $parent->finish, $parent->pricingType);
+
+        if ($entry->kept() && ! $parent->kept()) {
+            return new CategoryMapEntry(
+                $entry->legacyCode, $entry->legacyName, $entry->items, CategoryMapEntry::SKIP,
+                $entry->categoryPath, $entry->finish, $entry->pricingType, 'parent skipped',
+            );
+        }
+
+        return $entry;
+    }
+
+    /**
+     * @param  array<string, mixed>  $node
+     */
+    private function entry(array $node, string $path, ?string $finish, string $pricingType, string $note = ''): CategoryMapEntry
+    {
+        $reason = $this->skipReason($node);
+
+        return new CategoryMapEntry(
+            trim((string) $node['ItemId']),
+            trim((string) $node['ItemString']),
+            (int) ($node['items'] ?? 0),
+            $reason === null ? CategoryMapEntry::KEEP : CategoryMapEntry::SKIP,
+            $path,
+            $finish,
+            $pricingType,
+            $reason ?? $note,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $node
+     */
+    private function skipReason(array $node): ?string
+    {
+        $name = ItqanNames::normalize((string) $node['ItemString']);
+
+        if (strtoupper(trim((string) ($node['isActive'] ?? 'Y'))) === 'N') {
+            return 'inactive';
+        }
+
+        if ($name === '' || preg_match('/^[0-9\s]+$/u', $name)) {
+            return 'numeric name';
+        }
+
+        foreach (self::JUNK as $word) {
+            if (str_contains($name, ItqanNames::normalize($word))) {
+                return 'junk: '.$word;
+            }
+        }
+
+        return null;
+    }
+
+    private function brand(string $remainder): ?string
+    {
+        $brands = self::BRANDS;
+        usort($brands, fn (string $a, string $b): int => mb_strlen($b) <=> mb_strlen($a));
+
+        foreach ($brands as $brand) {
+            if ($remainder === $brand || str_starts_with($remainder, $brand.' ')) {
+                return $brand;
+            }
+        }
+
+        return null;
+    }
+
+    private function finish(string $rest): string
+    {
+        foreach (self::FINISH_LEADING_WORDS as $word) {
+            if (str_starts_with($rest, $word.' ')) {
+                $rest = trim(mb_substr($rest, mb_strlen($word)));
+            }
+        }
+
+        return $rest === '' ? self::DEFAULT_FINISH : $rest;
+    }
+}
