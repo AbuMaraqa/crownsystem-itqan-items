@@ -80,4 +80,20 @@ class CategoryMapFileTest extends TestCase
         $this->assertSame(2, $nodes['00009']['items']);
         $this->assertSame('المنيوم الوبين بدون دهان', $nodes['00009']['ItemString']);
     }
+
+    public function test_empty_container_types_are_categories(): void
+    {
+        $nodes = ItqanCategoryNodes::fromRows([
+            ['ItemId' => '00014', 'ItemString' => 'بودرة دهان الوبين', 'ItemParent' => '0', 'ItemType' => 'a_al', 'isActive' => 'Y'],
+            ['ItemId' => '000200573', 'ItemString' => 'اكسسوارات وبراغي', 'ItemParent' => '00020', 'ItemType' => 'c_cont', 'isActive' => 'Y'],
+            ['ItemId' => '00020001', 'ItemString' => 'برغي', 'ItemParent' => '00020', 'ItemType' => 'a_storePicture', 'isActive' => 'Y'],
+        ]);
+
+        $this->assertArrayHasKey('00014', $nodes);
+        $this->assertSame(0, $nodes['00014']['items']);
+        $this->assertArrayHasKey('000200573', $nodes);
+        $this->assertArrayNotHasKey('00020001', $nodes);
+        $this->assertFalse(ItqanCategoryNodes::isCategory('00020001', 'a_storePicture', []));
+        $this->assertTrue(ItqanCategoryNodes::isCategory('00014', 'a_al', []));
+    }
 }

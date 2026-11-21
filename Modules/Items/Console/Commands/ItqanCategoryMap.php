@@ -36,7 +36,7 @@ class ItqanCategoryMap extends Command
         try {
             $source = ItqanSource::fromConfig($this->option('path'));
             $this->line('Reading Itqan items ('.$source->count('items').' rows)...');
-            $nodes = ItqanCategoryNodes::fromRows($source->rows('items', ['ItemId', 'ItemString', 'ItemParent', 'isActive']));
+            $nodes = ItqanCategoryNodes::fromRows($source->rows('items', ['ItemId', 'ItemString', 'ItemParent', 'ItemType', 'isActive']));
         } catch (Throwable $exception) {
             $this->error($exception->getMessage());
 
