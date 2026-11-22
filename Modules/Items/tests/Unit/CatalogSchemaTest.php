@@ -71,6 +71,30 @@ class CatalogSchemaTest extends TestCase
         $this->assertTrue($product->fresh()->finish->is($finish));
     }
 
+    /**
+     * مرآة المتجر: كل لون له قيمة في سمة «اللون» النظامية، فيرى المتجر الإلكتروني
+     * الألوان متغيرات عبر نظام السمات (التصميم §10، R-6).
+     */
+    public function test_colour_attribute_exists_and_system_finish_is_mirrored(): void
+    {
+        $colourAttribute = DB::table(config('items.table_prefix').'attributes')->where('slug', 'colour')->first();
+
+        $this->assertNotNull($colourAttribute);
+        $this->assertSame($colourAttribute->id, Finish::colourAttributeId());
+        $this->assertSame((int) $colourAttribute->id, (int) Finish::system()->attributeValue->attribute_id);
+    }
+
+    public function test_product_has_category_finish(): void
+    {
+        $group = CategoryFinish::query()->create([
+            'category_id' => $this->category('00448')->id,
+            'finish_id' => Finish::query()->create(['name' => 'بدون دهان'])->id,
+        ]);
+        $product = Product::query()->create(['slug' => 'w45-raw', 'sku' => '00009001', 'base_price' => 0, 'category_finish_id' => $group->id]);
+
+        $this->assertTrue($product->fresh()->categoryFinish->is($group));
+    }
+
     private function category(string $code): Category
     {
         return Category::query()->create(['slug' => 'cat-'.$code, 'code' => $code, 'status' => 1]);

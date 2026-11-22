@@ -94,6 +94,7 @@ class Product extends Model implements TranslatableContract, HasMedia
         'parent_id',
         'main_product_id',
         'finish_id',
+        'category_finish_id',
         'synonym_product_id',
         'brand_id',
         'unit_id',
@@ -360,6 +361,14 @@ class Product extends Model implements TranslatableContract, HasMedia
     public function finish(): BelongsTo
     {
         return $this->belongsTo(Finish::class, 'finish_id');
+    }
+
+    /**
+     * مجموعة السعر (التصنيف × اللون) التي يُقرأ منها سعر الكيلو لهذا المتغيّر.
+     */
+    public function categoryFinish(): BelongsTo
+    {
+        return $this->belongsTo(CategoryFinish::class, 'category_finish_id');
     }
 
     /**

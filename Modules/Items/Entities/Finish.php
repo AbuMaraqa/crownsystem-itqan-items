@@ -19,12 +19,15 @@ class Finish extends Model
     use LogsActivity;
     use SoftDeletes;
 
+    public const COLOUR_ATTRIBUTE = 'colour';
+
     protected $fillable = [
         'name',
         'code',
         'is_system',
         'is_active',
         'sort_order',
+        'attribute_value_id',
         'created_by',
     ];
 
@@ -72,6 +75,22 @@ class Finish extends Model
             ->orderBy('name')
             ->pluck('name', 'id')
             ->all();
+    }
+
+    /**
+     * سمة «اللون» النظامية التي يقرأ منها المتجر الإلكتروني ألوان المتغيرات (مهاجرة 2026_11_22_000001).
+     */
+    public static function colourAttributeId(): int
+    {
+        return (int) Attribute::query()->where('slug', self::COLOUR_ATTRIBUTE)->value('id');
+    }
+
+    /**
+     * قيمة هذا اللون في سمة «اللون»: صورة منه للمتجر، واللون هو المصدر.
+     */
+    public function attributeValue(): BelongsTo
+    {
+        return $this->belongsTo(AttributeValue::class, 'attribute_value_id');
     }
 
     public function createdBy(): BelongsTo
