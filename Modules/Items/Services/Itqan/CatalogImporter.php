@@ -8,26 +8,32 @@ use Modules\Items\Entities\Category;
 use Modules\Items\Entities\CategoryFinish;
 use Modules\Items\Entities\Finish;
 use Modules\Items\Entities\Product;
+use Modules\Items\Enums\CategoryStatus;
+use Modules\Items\Enums\ProductStatus;
 use Modules\Items\Support\Itqan\CategoryMapEntry;
 use Modules\Items\Support\Itqan\CategoryMapFile;
+use Modules\Items\Support\Itqan\CategoryMapProposer;
 use Modules\Items\Support\Itqan\ItqanCategoryNodes;
 use Modules\Items\Support\Itqan\ItqanNames;
 use Modules\Items\Support\LegacyItemFields;
 use RuntimeException;
 
 /**
- * نقل أصناف إتقان بالشكل الجديد (التصميم: docs/superpowers/specs/2026-11-21-items-catalog-redesign-design.md §6.2):
+ * نقل أصناف إتقان بالشكل الجديد (التصميم: docs/superpowers/specs/2026-11-21-items-catalog-redesign-design.md §6.2 و§10):
  *
- * - التصنيف: مسار من ملف الربط (مثل «ألمنيوم/الوبين»)، يُربط بمساره في legacy_links.
- * - الصنف الاب: المقطع مرة واحدة لكل (تصنيف، اسم موحَّد، باركود، وزن للمتر). اسم واحد
- *   بوزن او باركود مختلف = صنفان، ويُكتب في exceptions.csv؛ لا دمج صامت.
- * - الابن: لون المقطع، رقمه رقم إتقان، ويُنشأ فقط للورقة المستخدمة (او كل الألوان للعيّنة).
+ * - الصنف الاب: المقطع مرة واحدة على مستوى الكل بـ (الاسم الموحَّد، الباركود، الوزن للمتر)
+ *   (R-1). بلا باركود يبقى مسار التصنيف في المفتاح، فلا تُدمج أصناف عامة الاسم من تصنيفات
+ *   مختلفة. تصنيفه أكثر تصنيف «سيستم» تكراراً بين أوراقه، والا «ألمنيوم».
+ * - الابن (المتغيّر): واحد لكل (اب × مجموعة سعر) (R-3)، يحمل category_finish_id ولونه (R-2)،
+ *   ورقمه رقم إتقان، ولا يحمل الباركود (R-11). يُنشأ فقط للورقة المستخدمة (او كل الألوان للعيّنة)؛
  *   الورقة التي لا ابن لها تُربط بالاب.
- * - مجموعة السعر (التصنيف × اللون) لكل عقدة الالمنيوم، و(التصنيف × «بلا لون») للموزون بلا لون (C-3).
+ * - مرآة المتجر: لكل لون قيمة في سمة «اللون»، ولكل ابن صف في product_attribute_value (R-6).
+ * - التعارضات: اسم واحد بباركود او وزن مختلف، وباركود ووزن واحد بأسماء مختلفة (R-9)؛ لا دمج صامت.
  * - كل ورقة قديمة: ربط في legacy_links، او سطر في items-skipped.csv مع سببه.
+ * - إعادة التشغيل تحدّث بالمفاتيح الطبيعية ولا تكرر، وتعطّل ما خرج من الخطة (R-10) الا في النقل الجزئي.
  *
- * رموز التصنيفات الجديدة تبدأ بعد اكبر رقم جذر في إتقان، فلا تتصادم رموز الاباء مع
- * أرقام إتقان التي يحملها الأبناء. إعادة التشغيل تحدّث بالمفاتيح الطبيعية ولا تكرر.
+ * رموز التصنيفات الجديدة تبدأ بعد اكبر رقم جذر في إتقان (R-12)، فلا تتصادم رموز الاباء مع
+ * أرقام إتقان التي يحملها الأبناء.
  */
 class CatalogImporter
 {
@@ -44,15 +50,43 @@ class CatalogImporter
 
     private const LOCALE = 'ar';
 
-    private const PUBLISHED = 2;
+    private const PARENT_SLUG = 'itqan-p-';
+
+    private const CHILD_SLUG = 'itqan-';
+
+    private const SEP = "\x1F";
 
     private ?string $reportDirectory = null;
+
+    private int $codeFloor = 0;
+
+    private bool $partial = false;
 
     public function __construct(private readonly LegacyLinks $links) {}
 
     public function withReportDirectory(string $directory): static
     {
         $this->reportDirectory = $directory;
+
+        return $this;
+    }
+
+    /**
+     * اكبر رقم جذر في ملف الربط كاملاً، فتبدأ رموز التصنيفات الجديدة بعده حتى في العيّنة (R-12).
+     */
+    public function withCodeFloor(int $maxLegacyRoot): static
+    {
+        $this->codeFloor = $maxLegacyRoot;
+
+        return $this;
+    }
+
+    /**
+     * نقل جزء من إتقان (العيّنة): لا يُعطَّل ما ليس فيه.
+     */
+    public function asPartial(): static
+    {
+        $this->partial = true;
 
         return $this;
     }
@@ -67,20 +101,22 @@ class CatalogImporter
     {
         $log ??= fn (string $message) => null;
         [$rows, $leafIds] = $this->readRows($itemRows);
-        [$groups, $skipped, $exceptions] = $this->plan($rows, $leafIds, $map);
+        [$groups, $skipped, $exceptions, $conflicts] = $this->plan($rows, $leafIds, $map);
 
         $this->writeReports($skipped, $exceptions);
 
         $report = [
             'legacy_leaves' => count($leafIds),
             'skipped' => count($skipped),
-            'exceptions' => count(array_unique(array_map(fn (array $row): string => $row[0]."\x1F".$row[1], $exceptions))),
+            'exceptions' => $conflicts,
             'groups' => count($groups),
             'categories_created' => 0,
             'finishes_created' => 0,
             'category_finishes_created' => 0,
             'parents_created' => 0,
             'children_created' => 0,
+            'parents_deactivated' => 0,
+            'children_deactivated' => 0,
             'linked' => 0,
             'dry_run' => $dryRun,
         ];
@@ -95,13 +131,17 @@ class CatalogImporter
             $categoryIds = $this->writeCategories($map, $report);
             $log('Categories: '.count($categoryIds));
             $finishIds = $this->writeFinishes($map, $report);
-            $this->writeCategoryFinishes($map, $categoryIds, $finishIds, $report);
-            $parents = $this->writeParents($groups, $categoryIds, $finishIds, $report);
+            $nodeGroups = $this->writeCategoryFinishes($map, $categoryIds, $finishIds, $report);
+            $parents = $this->writeParents($groups, $categoryIds, $nodeGroups, $finishIds, $report);
             $log('Parents: '.count($parents));
-            $leafTargets = $this->writeChildren($groups, $parents, $finishIds, $usedLegacyIds, $allFinishes, $report);
+            [$leafTargets, $childSlugs] = $this->writeChildren($groups, $parents, $nodeGroups, $finishIds, $usedLegacyIds, $allFinishes, $report);
             $log('Children written: '.$report['children_created']);
             $this->links->remember('items', Product::class, $leafTargets);
             $report['linked'] = count($leafTargets);
+
+            if (! $this->partial) {
+                $this->deactivateRemoved(array_column($parents, 'slug'), $childSlugs, $report);
+            }
         });
 
         return $report;
@@ -130,7 +170,8 @@ class CatalogImporter
 
         $leafIds = array_values(array_filter(
             array_keys($rows),
-            fn ($id): bool => (string) $id !== '0' && ! ItqanCategoryNodes::isCategory((string) $id, (string) ($rows[$id]['ItemType'] ?? ''), $hasChildren),
+            fn ($id): bool => (string) $id !== CategoryMapProposer::TREE_ROOT
+                && ! ItqanCategoryNodes::isCategory((string) $id, (string) ($rows[$id]['ItemType'] ?? ''), $hasChildren),
         ));
 
         return [$rows, array_map('strval', $leafIds)];
@@ -142,13 +183,14 @@ class CatalogImporter
      * @param  array<string, array<string, mixed>>  $rows
      * @param  array<int, string>  $leafIds
      * @param  array<string, CategoryMapEntry>  $map
-     * @return array{0: array<string, array<string, mixed>>, 1: array<int, array<int, string>>, 2: array<int, array<int, string>>}
+     * @return array{0: array<string, array<string, mixed>>, 1: array<int, array<int, string>>, 2: array<int, array<int, string>>, 3: int}
      */
     private function plan(array $rows, array $leafIds, array $map): array
     {
         $groups = [];
         $skipped = [];
-        $keysByName = [];
+        $byName = [];
+        $byBarcode = [];
 
         foreach ($leafIds as $id) {
             $row = $rows[$id];
@@ -172,40 +214,70 @@ class CatalogImporter
             $weight = isset($fields['weight_per_meter']) ? number_format((float) $fields['weight_per_meter'], 3, '.', '') : '';
             $barcode = (string) (LegacyItemFields::barcodes((string) $row['Barcode'], $type, $row)['primary'] ?? '');
             $normalized = ItqanNames::normalize($name);
-            $key = implode("\x1F", [$entry->categoryPath, $normalized, $barcode, $weight]);
+            $scope = $barcode === '' ? $entry->categoryPath : '';
+            $key = implode(self::SEP, [$scope, $normalized, $barcode, $weight]);
 
             $groups[$key] ??= [
                 'key' => $key,
-                'path' => $entry->categoryPath,
                 'name' => $name,
                 'barcode' => $barcode === '' ? null : $barcode,
                 'weight_per_meter' => $fields['weight_per_meter'] ?? null,
                 'length' => $fields['length'] ?? null,
                 'pricing_type' => $entry->pricingType,
                 'colourless_weight' => $entry->finish === null && $entry->pricingType === 'weight',
+                'paths' => [],
                 'leaves' => [],
             ];
-            $groups[$key]['leaves'][] = ['id' => $id, 'finish' => $entry->finish];
-            $keysByName[$entry->categoryPath."\x1F".$normalized][$key] = true;
+            $groups[$key]['paths'][$entry->categoryPath] = ($groups[$key]['paths'][$entry->categoryPath] ?? 0) + 1;
+            $groups[$key]['leaves'][] = ['id' => $id, 'finish' => $entry->finish, 'node' => (string) $row['ItemParent'], 'path' => $entry->categoryPath];
+
+            $byName[$scope.self::SEP.$normalized][$key] = true;
+            if ($barcode !== '') {
+                $byBarcode[$barcode.self::SEP.$weight][$key] = true;
+            }
+        }
+
+        foreach ($groups as $key => $group) {
+            $groups[$key]['path'] = self::dominantPath($group['paths']);
         }
 
         $exceptions = [];
-        foreach ($keysByName as $keys) {
-            if (count($keys) < 2) {
-                continue;
-            }
+        $conflicts = 0;
+        foreach (['same_name' => $byName, 'same_barcode' => $byBarcode] as $kind => $clusters) {
+            foreach ($clusters as $keys) {
+                if (count($keys) < 2) {
+                    continue;
+                }
 
-            foreach (array_keys($keys) as $key) {
-                $group = $groups[$key];
-                $exceptions[] = [
-                    $group['path'], $group['name'],
-                    implode(' ', array_column($group['leaves'], 'id')),
-                    (string) $group['weight_per_meter'], (string) $group['barcode'],
-                ];
+                $conflicts++;
+                foreach (array_keys($keys) as $key) {
+                    $group = $groups[$key];
+                    $exceptions[] = [
+                        $kind, $group['path'], $group['name'],
+                        implode(' ', array_column($group['leaves'], 'id')),
+                        (string) $group['weight_per_meter'], (string) $group['barcode'],
+                    ];
+                }
             }
         }
 
-        return [$groups, $skipped, $exceptions];
+        return [$groups, $skipped, $exceptions, $conflicts];
+    }
+
+    /**
+     * تصنيف الصنف الاب: اكثر مسار «سيستم» تكراراً بين أوراقه (لا جذر «ألمنيوم» وحده)، والأصغر
+     * أبجدياً عند التساوي. اذا لم يكن له الا الجذر فهو الجذر.
+     *
+     * @param  array<string, int>  $paths
+     */
+    private static function dominantPath(array $paths): string
+    {
+        $systems = array_filter($paths, fn (string $path): bool => $path !== CategoryMapProposer::ALUMINUM_ROOT, ARRAY_FILTER_USE_KEY);
+        $candidates = $systems !== [] ? $systems : $paths;
+
+        uksort($candidates, fn (string $a, string $b): int => [$candidates[$b], $a] <=> [$candidates[$a], $b]);
+
+        return (string) array_key_first($candidates);
     }
 
     /**
@@ -217,7 +289,11 @@ class CatalogImporter
         $directory = $this->reportDirectory ?? storage_path('app/itqan');
 
         CategoryMapFile::writeCsv($directory.DIRECTORY_SEPARATOR.'items-skipped.csv', ['legacy_code', 'name', 'reason'], $skipped);
-        CategoryMapFile::writeCsv($directory.DIRECTORY_SEPARATOR.'exceptions.csv', ['category_path', 'name', 'legacy_codes', 'weights', 'barcodes'], $exceptions);
+        CategoryMapFile::writeCsv(
+            $directory.DIRECTORY_SEPARATOR.'exceptions.csv',
+            ['kind', 'category_path', 'name', 'legacy_codes', 'weights', 'barcodes'],
+            $exceptions,
+        );
     }
 
     /**
@@ -272,7 +348,7 @@ class CatalogImporter
                 $ids[$path] = (int) DB::table($this->table('categories'))->insertGetId([
                     'slug' => 'cat-'.$code,
                     'code' => $code,
-                    'status' => 1,
+                    'status' => CategoryStatus::ACTIVE->value,
                     'sort_order' => 0,
                     'parent_id' => $parentId,
                     'pricing_type' => $pricingType,
@@ -304,13 +380,13 @@ class CatalogImporter
     }
 
     /**
-     * أول رمز جذر بعد اكبر رقم جذر في إتقان (خمس خانات) وبعد اي رمز جذر موجود.
+     * أول رمز جذر بعد اكبر رقم جذر في إتقان (خمس خانات، من ملف الربط كاملاً) وبعد اي رمز جذر موجود.
      *
      * @param  array<string, CategoryMapEntry>  $map
      */
     private function firstFreeRoot(array $map): int
     {
-        $max = 0;
+        $max = $this->codeFloor;
         foreach (array_keys($map) as $code) {
             $code = (string) $code;
             if (strlen($code) === self::ROOT_DIGITS && ctype_digit($code)) {
@@ -356,6 +432,8 @@ class CatalogImporter
     }
 
     /**
+     * الألوان، ولكل لون قيمة في سمة «اللون» النظامية يقرأ منها المتجر (R-6).
+     *
      * @param  array<string, CategoryMapEntry>  $map
      * @param  array<string, int|bool|string>  $report
      * @return array<string, int>  اسم اللون => معرّفه، و'' => «بلا لون»
@@ -400,7 +478,30 @@ class CatalogImporter
         }
         $ids[''] = (int) Finish::system()->getKey();
 
+        $this->mirrorFinishes(array_values(array_unique($ids)));
+
         return $ids;
+    }
+
+    /**
+     * لكل لون بلا قيمة في سمة «اللون» تُنشأ قيمة باسمه وتُربط به.
+     *
+     * @param  array<int, int>  $finishIds
+     */
+    private function mirrorFinishes(array $finishIds): void
+    {
+        $attributeId = Finish::colourAttributeId();
+        $now = now();
+
+        foreach (DB::table($this->table('finishes'))->whereIn('id', $finishIds)->whereNull('attribute_value_id')->get(['id', 'name']) as $finish) {
+            $valueId = DB::table($this->table('attribute_values'))->insertGetId([
+                'attribute_id' => $attributeId, 'sort_order' => 0, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now,
+            ]);
+            DB::table($this->table('attribute_values_translations'))->insert([
+                'attribute_value_id' => $valueId, 'locale' => self::LOCALE, 'name' => $finish->name, 'created_at' => $now, 'updated_at' => $now,
+            ]);
+            DB::table($this->table('finishes'))->where('id', $finish->id)->update(['attribute_value_id' => $valueId]);
+        }
     }
 
     private static function finishKey(string $name): string
@@ -413,8 +514,9 @@ class CatalogImporter
      * @param  array<string, int>  $categoryIds
      * @param  array<string, int>  $finishIds
      * @param  array<string, int|bool|string>  $report
+     * @return array<string, int>  رقم العقدة القديمة => مجموعة السعر
      */
-    private function writeCategoryFinishes(array $map, array $categoryIds, array $finishIds, array &$report): void
+    private function writeCategoryFinishes(array $map, array $categoryIds, array $finishIds, array &$report): array
     {
         $table = $this->table('category_finishes');
         $wanted = [];
@@ -452,21 +554,24 @@ class CatalogImporter
         }
 
         $this->links->remember('items', CategoryFinish::class, $links);
+
+        return $links;
     }
 
     /**
      * @param  array<string, array<string, mixed>>  $groups
      * @param  array<string, int>  $categoryIds
+     * @param  array<string, int>  $nodeGroups
      * @param  array<string, int>  $finishIds
      * @param  array<string, int|bool|string>  $report
-     * @return array<string, array{id: int, sku: string}>  مفتاح المجموعة => الصنف الاب
+     * @return array<string, array<string, mixed>>  مفتاح المجموعة => الصنف الاب (id، slug، sku، الاسم، التصنيف)
      */
-    private function writeParents(array $groups, array $categoryIds, array $finishIds, array &$report): array
+    private function writeParents(array $groups, array $categoryIds, array $nodeGroups, array $finishIds, array &$report): array
     {
         $table = $this->table('products');
         $slugs = [];
         foreach ($groups as $key => $group) {
-            $slugs[$key] = 'itqan-p-'.substr(sha1($key), 0, 24);
+            $slugs[$key] = self::PARENT_SLUG.substr(sha1($key), 0, 24);
         }
 
         $existing = $this->productsBySlug(array_values($slugs));
@@ -485,10 +590,18 @@ class CatalogImporter
                 $report['parents_created']++;
             }
 
-            $rows[] = array_merge($this->productRow($slugs[$key], $sku, $group, null, $group['colourless_weight'] ? $finishIds[''] : null, $now), [
-                'meta_data' => json_encode(['legacy_codes' => array_column($group['leaves'], 'id')], JSON_UNESCAPED_UNICODE),
-            ]);
-            $parents[$key] = ['sku' => $sku, 'category_id' => $categoryId, 'name' => $group['name']];
+            // الموزون بلا لون (المطاط بالوزن) يُباع بنفسه: لونه «بلا لون» ومجموعة سعره مجموعة أوراقه (C-3).
+            $colourless = $group['colourless_weight'];
+            $rows[] = array_merge(
+                $this->productRow(
+                    $slugs[$key], $sku, $group, null,
+                    $colourless ? $finishIds[''] : null,
+                    $colourless ? ($nodeGroups[$group['leaves'][0]['node']] ?? null) : null,
+                    $group['barcode'], $now,
+                ),
+                ['meta_data' => json_encode(['legacy_codes' => array_column($group['leaves'], 'id')], JSON_UNESCAPED_UNICODE)],
+            );
+            $parents[$key] = ['slug' => $slugs[$key], 'sku' => $sku, 'category_id' => $categoryId, 'name' => $group['name']];
         }
 
         $this->upsertProducts($rows, ['meta_data']);
@@ -508,12 +621,13 @@ class CatalogImporter
     /**
      * @param  array<string, array<string, mixed>>  $groups
      * @param  array<string, array<string, mixed>>  $parents
+     * @param  array<string, int>  $nodeGroups
      * @param  array<string, int>  $finishIds
      * @param  array<string, true>  $usedLegacyIds
      * @param  array<string, int|bool|string>  $report
-     * @return array<string, int>  رقم الورقة القديمة => معرّف الصنف (الابن او الاب)
+     * @return array{0: array<string, int>, 1: array<int, string>}  رقم الورقة القديمة => الصنف (الابن او الاب)، وslugs الأبناء
      */
-    private function writeChildren(array $groups, array $parents, array $finishIds, array $usedLegacyIds, bool $allFinishes, array &$report): array
+    private function writeChildren(array $groups, array $parents, array $nodeGroups, array $finishIds, array $usedLegacyIds, bool $allFinishes, array &$report): array
     {
         $now = now();
         $rows = [];
@@ -522,28 +636,31 @@ class CatalogImporter
 
         foreach ($groups as $key => $group) {
             $parent = $parents[$key];
-            $byFinish = [];
+            $byPriceGroup = [];
 
             foreach ($group['leaves'] as $leaf) {
                 $targets[$leaf['id']] = ['parent' => $key];
+                $priceGroup = $nodeGroups[$leaf['node']] ?? null;
 
-                if ($leaf['finish'] === null || (! $allFinishes && ! isset($usedLegacyIds[$leaf['id']]))) {
+                if ($leaf['finish'] === null || $priceGroup === null || (! $allFinishes && ! isset($usedLegacyIds[$leaf['id']]))) {
                     continue;
                 }
 
-                if (isset($byFinish[$leaf['finish']])) {
-                    $targets[$leaf['id']] = ['child' => $byFinish[$leaf['finish']]];
+                // ابن واحد لكل (اب × مجموعة سعر): لونان يختلفان كتابة فقط في المسار نفسه مجموعة واحدة.
+                if (isset($byPriceGroup[$priceGroup])) {
+                    $targets[$leaf['id']] = ['child' => $byPriceGroup[$priceGroup]];
 
                     continue;
                 }
 
-                $slug = 'itqan-'.$leaf['id'];
-                $byFinish[$leaf['finish']] = $slug;
+                $slug = self::CHILD_SLUG.$leaf['id'];
+                $byPriceGroup[$priceGroup] = $slug;
                 $targets[$leaf['id']] = ['child' => $slug];
-                $rows[] = $this->productRow($slug, $leaf['id'], $group, $parent['id'], $finishIds[$leaf['finish']], $now);
+                $rows[] = $this->productRow($slug, $leaf['id'], $group, $parent['id'], $finishIds[$leaf['finish']], $priceGroup, null, $now);
                 $children[$slug] = [
-                    'name' => $parent['name'].' - '.$leaf['finish'],
+                    'name' => $parent['name'].' - '.self::variantLabel($leaf, $group['path']),
                     'category_id' => $parent['category_id'],
+                    'finish_id' => $finishIds[$leaf['finish']],
                 ];
             }
         }
@@ -553,30 +670,120 @@ class CatalogImporter
         $ids = $this->productsBySlug(array_keys($children));
         $report['children_created'] = count($children) - count($before);
 
-        $this->writeNamesAndCategories(array_map(fn (string $slug): array => $children[$slug] + ['id' => $ids[$slug]['id']], array_combine(array_keys($children), array_keys($children))));
+        $named = [];
+        foreach ($children as $slug => $child) {
+            $named[] = ['id' => $ids[$slug]['id'], 'name' => $child['name'], 'category_id' => $child['category_id']];
+        }
+        $this->writeNamesAndCategories($named);
+        $this->mirrorChildren(array_map(fn (string $slug): array => [$ids[$slug]['id'], $children[$slug]['finish_id']], array_keys($children)));
 
-        return array_map(fn (array $target): int => isset($target['child'])
+        $resolved = array_map(fn (array $target): int => isset($target['child'])
             ? $ids[$target['child']]['id']
             : $parents[$target['parent']]['id'], $targets);
+
+        return [$resolved, array_keys($children)];
+    }
+
+    /**
+     * «اللون»، او «التصنيف اللون» اذا كانت مجموعة السعر من نظام غير تصنيف الاب (R-3).
+     *
+     * @param  array{finish: string, path: string}  $leaf
+     */
+    private static function variantLabel(array $leaf, string $parentPath): string
+    {
+        if ($leaf['path'] === $parentPath || $leaf['path'] === CategoryMapProposer::ALUMINUM_ROOT) {
+            return $leaf['finish'];
+        }
+
+        $segments = explode('/', $leaf['path']);
+
+        return end($segments).' '.$leaf['finish'];
+    }
+
+    /**
+     * صف المتغيّر في سمة «اللون» ليقرأه المتجر (R-6). ادراج يتجاهل الموجود.
+     *
+     * @param  array<int, array{0: int, 1: int}>  $children  [معرّف الابن، معرّف اللون]
+     */
+    private function mirrorChildren(array $children): void
+    {
+        if ($children === []) {
+            return;
+        }
+
+        $values = DB::table($this->table('finishes'))
+            ->whereIn('id', array_values(array_unique(array_column($children, 1))))
+            ->pluck('attribute_value_id', 'id')
+            ->all();
+        $now = now();
+        $rows = [];
+
+        foreach ($children as [$productId, $finishId]) {
+            if (! empty($values[$finishId])) {
+                $rows[] = ['product_id' => $productId, 'attribute_id' => (int) $values[$finishId], 'created_at' => $now, 'updated_at' => $now];
+            }
+        }
+
+        foreach (array_chunk($rows, self::BATCH) as $chunk) {
+            DB::table($this->table('product_attribute_value'))->insertOrIgnore($chunk);
+        }
+    }
+
+    /**
+     * ما جاء من نقل سابق ولم يعد في الخطة يُعطَّل ولا يُحذف (R-10).
+     *
+     * @param  array<int, string>  $parentSlugs
+     * @param  array<int, string>  $childSlugs
+     * @param  array<string, int|bool|string>  $report
+     */
+    private function deactivateRemoved(array $parentSlugs, array $childSlugs, array &$report): void
+    {
+        $keepParents = array_flip($parentSlugs);
+        $keepChildren = array_flip($childSlugs);
+        $parentIds = [];
+        $childIds = [];
+
+        $rows = DB::table($this->table('products'))
+            ->where('slug', 'like', self::CHILD_SLUG.'%')
+            ->where('is_active', 1)
+            ->get(['id', 'slug']);
+
+        foreach ($rows as $row) {
+            if (str_starts_with($row->slug, self::PARENT_SLUG)) {
+                if (! isset($keepParents[$row->slug])) {
+                    $parentIds[] = (int) $row->id;
+                }
+            } elseif (! isset($keepChildren[$row->slug])) {
+                $childIds[] = (int) $row->id;
+            }
+        }
+
+        foreach (array_chunk(array_merge($parentIds, $childIds), 1000) as $chunk) {
+            DB::table($this->table('products'))->whereIn('id', $chunk)->update(['is_active' => 0, 'updated_at' => now()]);
+        }
+
+        $report['parents_deactivated'] = count($parentIds);
+        $report['children_deactivated'] = count($childIds);
     }
 
     /**
      * @param  array<string, mixed>  $group
      * @return array<string, mixed>
      */
-    private function productRow(string $slug, string $sku, array $group, ?int $parentId, ?int $finishId, mixed $now): array
+    private function productRow(string $slug, string $sku, array $group, ?int $parentId, ?int $finishId, ?int $categoryFinishId, ?string $barcode, mixed $now): array
     {
         return [
             'slug' => $slug,
             'sku' => $sku,
-            'barcode' => $group['barcode'],
+            'barcode' => $barcode,
             'base_price' => 0,
             'weight_per_meter' => $group['weight_per_meter'],
             'length' => $group['length'],
             'pricing_type' => $group['pricing_type'],
             'parent_id' => $parentId,
             'finish_id' => $finishId,
-            'status' => self::PUBLISHED,
+            'category_finish_id' => $categoryFinishId,
+            'status' => ProductStatus::PUBLISHED->value,
             'is_active' => 1,
             'meta_data' => null,
             'created_at' => $now,
@@ -590,7 +797,10 @@ class CatalogImporter
      */
     private function upsertProducts(array $rows, array $extraUpdates): void
     {
-        $updates = array_merge(['barcode', 'weight_per_meter', 'length', 'pricing_type', 'finish_id', 'is_active', 'updated_at'], $extraUpdates);
+        $updates = array_merge(
+            ['barcode', 'weight_per_meter', 'length', 'pricing_type', 'finish_id', 'category_finish_id', 'is_active', 'updated_at'],
+            $extraUpdates,
+        );
 
         foreach (array_chunk($rows, self::BATCH) as $chunk) {
             DB::table($this->table('products'))->upsert($chunk, ['slug'], $updates);

@@ -90,7 +90,9 @@ class CatalogImporterTest extends TestCase
         $this->assertSame(1, $report['exceptions']);
         $exceptions = $this->csv('exceptions.csv');
         $this->assertCount(3, $exceptions, 'header + one row per conflicting parent');
-        $this->assertSame('يو رفيع', $exceptions[1][1]);
+        $this->assertSame(['kind', 'category_path', 'name', 'legacy_codes', 'weights', 'barcodes'], $exceptions[0]);
+        $this->assertSame('same_name', $exceptions[1][0]);
+        $this->assertSame('يو رفيع', $exceptions[1][2]);
     }
 
     public function test_junk_and_inactive_leaves_are_skipped_with_reason(): void
@@ -151,6 +153,121 @@ class CatalogImporterTest extends TestCase
         $this->assertSame(1, Product::query()->whereNotNull('parent_id')->where('sku', '00168001')->count());
     }
 
+    public function test_profile_in_two_price_groups_of_different_systems_is_one_parent_with_two_children(): void
+    {
+        $this->import([
+            $this->leaf('00024001', 'ثابت مجرين', '00024', weight: '1.100', barcode: '555'),
+            $this->leaf('00033001', 'ثابت مجرين', '00033', weight: '1.100', barcode: '555'),
+        ], allFinishes: true, extraMap: [
+            '00024' => $this->entry('00024', 'المنيوم سبير رال 7016', 'ألمنيوم/سبير', 'رال 7016', 'weight'),
+            '00033' => $this->entry('00033', 'المنيوم رويال سيستم بدون دهان', 'ألمنيوم/رويال سيستم', 'بدون دهان', 'weight'),
+        ], extraNodes: [
+            $this->row('00024', 'المنيوم سبير رال 7016', '0', 'a_al'),
+            $this->row('00033', 'المنيوم رويال سيستم بدون دهان', '0', 'a_al'),
+        ]);
+
+        $parent = Product::query()->whereNull('parent_id')->sole();
+        $groups = Product::query()->where('parent_id', $parent->id)->orderBy('sku')->pluck('category_finish_id', 'sku');
+
+        $this->assertSame(['00024001', '00033001'], $groups->keys()->all());
+        $this->assertSame('00024', CategoryFinish::query()->find($groups['00024001'])->legacy_code);
+        $this->assertSame('00033', CategoryFinish::query()->find($groups['00033001'])->legacy_code);
+    }
+
+    public function test_children_carry_their_price_group_and_no_barcode(): void
+    {
+        $this->import([$this->leaf('00009001', 'ثابت مجرين W45', '00009', weight: '1.267', barcode: '809712')], allFinishes: true);
+
+        $child = Product::query()->whereNotNull('parent_id')->sole();
+
+        $this->assertNull($child->barcode);
+        $this->assertSame('00009', CategoryFinish::query()->find($child->category_finish_id)->legacy_code);
+        $this->assertSame('809712', Product::query()->find($child->parent_id)->barcode);
+    }
+
+    public function test_finish_spelling_variants_in_one_path_make_one_child(): void
+    {
+        $this->import([
+            $this->leaf('00008001', 'ثابت مجرين W45', '00008', weight: '1.267', barcode: '809712'),
+            $this->leaf('00011001', 'ثابت مجرين W45', '00011', weight: '1.267', barcode: '809712'),
+        ], allFinishes: true, extraMap: [
+            '00008' => $this->entry('00008', 'المنيوم الوبين لون FINE IRON', 'ألمنيوم/الوبين', 'FINE IRON', 'weight'),
+            '00011' => $this->entry('00011', 'المنيوم الوبين fine Iron', 'ألمنيوم/الوبين', 'fine Iron', 'weight'),
+        ], extraNodes: [
+            $this->row('00008', 'المنيوم الوبين لون FINE IRON', '0', 'a_al'),
+            $this->row('00011', 'المنيوم الوبين fine Iron', '0', 'a_al'),
+        ]);
+
+        $this->assertSame(1, Product::query()->whereNotNull('parent_id')->count());
+        $links = app(LegacyLinks::class)->map('items', Product::class);
+        $this->assertSame($links['00008001'], $links['00011001']);
+    }
+
+    public function test_same_barcode_and_weight_with_different_names_is_reported(): void
+    {
+        $report = $this->import([
+            $this->leaf('00009021', 'عليون مجرين مفتوح', '00009', weight: '0.500', barcode: '777'),
+            $this->leaf('00009022', 'عليون مجريين مفتوح', '00009', weight: '0.500', barcode: '777'),
+        ], allFinishes: true);
+
+        $kinds = array_column(array_slice($this->csv('exceptions.csv'), 1), 0);
+        $this->assertSame(['same_barcode', 'same_barcode'], $kinds);
+        $this->assertSame(1, $report['exceptions']);
+    }
+
+    public function test_colour_child_is_mirrored_to_the_colour_attribute(): void
+    {
+        $this->import([$this->leaf('00009001', 'ثابت مجرين W45', '00009', weight: '1.267', barcode: '809712')], allFinishes: true);
+
+        $child = Product::query()->whereNotNull('parent_id')->with('finish')->sole();
+        $valueId = $child->finish->attribute_value_id;
+
+        $this->assertNotNull($valueId);
+        $this->assertSame(Finish::colourAttributeId(), (int) DB::table(config('items.table_prefix').'attribute_values')->where('id', $valueId)->value('attribute_id'));
+        $this->assertTrue(DB::table(config('items.table_prefix').'product_attribute_value')
+            ->where('product_id', $child->id)->where('attribute_id', $valueId)->exists());
+    }
+
+    public function test_rerun_after_skipping_a_node_deactivates_its_children(): void
+    {
+        $rows = [
+            $this->leaf('00009001', 'ثابت مجرين W45', '00009', weight: '1.267', barcode: '809712'),
+            $this->leaf('00001001', 'ثابت مجرين W45', '00001', weight: '1.267', barcode: '809712'),
+        ];
+        $this->import($rows, allFinishes: true);
+
+        $report = $this->import($rows, allFinishes: true, extraMap: [
+            '00001' => $this->entry('00001', 'المنيوم الوبين ابيض', 'ألمنيوم/الوبين', 'ابيض', 'weight', CategoryMapEntry::SKIP, 'owner'),
+        ]);
+
+        $this->assertSame(1, $report['children_deactivated']);
+        $this->assertSame(0, (int) Product::query()->where('sku', '00001001')->value('is_active'));
+        $this->assertSame(1, (int) Product::query()->where('sku', '00009001')->value('is_active'));
+    }
+
+    public function test_parent_category_is_the_most_frequent_system(): void
+    {
+        $this->import([
+            $this->leaf('00099001', 'زاوية', '00099', weight: '0.400', barcode: '42'),
+            $this->leaf('00100001', 'زاوية', '00100', weight: '0.400', barcode: '42'),
+            $this->leaf('00009001', 'زاوية', '00009', weight: '0.400', barcode: '42'),
+            $this->leaf('00303001', 'زاوية', '00303', weight: '0.400', barcode: '42'),
+        ], allFinishes: true, extraMap: [
+            '00099' => $this->entry('00099', 'المنيوم نابكو ابيض', 'ألمنيوم/نابكو', 'ابيض', 'weight'),
+            '00100' => $this->entry('00100', 'المنيوم نابكو كريم', 'ألمنيوم/نابكو', 'كريم', 'weight'),
+            '00303' => $this->entry('00303', 'المنيوم دهان جلوسي اكسبرس لون ابيض', 'ألمنيوم', 'جلوسي اكسبرس لون ابيض', 'weight', note: 'painter'),
+        ], extraNodes: [
+            $this->row('00099', 'المنيوم نابكو ابيض', '0', 'a_al'),
+            $this->row('00100', 'المنيوم نابكو كريم', '0', 'a_al'),
+            $this->row('00303', 'المنيوم دهان جلوسي اكسبرس لون ابيض', '0', 'a_al'),
+        ]);
+
+        $parent = Product::query()->whereNull('parent_id')->with('categories.translations')->sole();
+
+        $this->assertSame('نابكو', $parent->categories->sole()->translate('ar')->name);
+        $this->assertSame(4, Product::query()->where('parent_id', $parent->id)->count());
+    }
+
     public function test_running_twice_creates_nothing_new(): void
     {
         $rows = [
@@ -199,14 +316,15 @@ class CatalogImporterTest extends TestCase
             $this->row('00018', 'كوشوك تيرمو بالوزن', '0', 'c_cont'),
         ];
 
-        $map = [
+        // extraMap اولاً: يتقدم على الخريطة الأساسية لمفتاح موجود (اختبار تعديل ملف الربط).
+        $map = $extraMap + [
             '00009' => $this->entry('00009', 'المنيوم الوبين بدون دهان', 'ألمنيوم/الوبين', 'بدون دهان', 'weight'),
             '00001' => $this->entry('00001', 'المنيوم الوبين ابيض', 'ألمنيوم/الوبين', 'ابيض', 'weight'),
             '00035' => $this->entry('00035', 'حذف', 'حذف', null, 'simple', CategoryMapEntry::SKIP, 'junk: حذف'),
             '00020' => $this->entry('00020', 'قطع', 'قطع', null, 'simple'),
             '000200349' => $this->entry('000200349', 'قطع الوبين', 'قطع/قطع الوبين', null, 'simple'),
             '00018' => $this->entry('00018', 'كوشوك تيرمو بالوزن', 'كوشوك تيرمو بالوزن', null, 'weight'),
-        ] + $extraMap;
+        ];
 
         return app(CatalogImporter::class)
             ->withReportDirectory($this->reports)

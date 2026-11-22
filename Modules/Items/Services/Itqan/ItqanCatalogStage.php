@@ -58,8 +58,10 @@ final class ItqanCatalogStage implements ItqanImportStage
         CategoryMapFile::assertMatches($map, $nodes, $leafParents);
 
         $sample = (bool) config('core.itqan.sample', false);
+        $this->importer->withCodeFloor(self::maxRootCode($map));
 
         if ($sample) {
+            $this->importer->asPartial();
             $rows = CatalogSample::select($rows);
             $map = CatalogSample::restrictMap($map, $rows);
             $log('Sample: '.count($rows).' rows, '.count($map).' category nodes.');
@@ -78,6 +80,24 @@ final class ItqanCatalogStage implements ItqanImportStage
         }
 
         return $report + ['sample' => $sample];
+    }
+
+    /**
+     * اكبر رقم جذر (خمس خانات) في ملف الربط كاملاً، قبل تقييده بالعيّنة (R-12).
+     *
+     * @param  array<string, \Modules\Items\Support\Itqan\CategoryMapEntry>  $map
+     */
+    private static function maxRootCode(array $map): int
+    {
+        $max = 0;
+        foreach (array_keys($map) as $code) {
+            $code = (string) $code;
+            if (strlen($code) === 5 && ctype_digit($code)) {
+                $max = max($max, (int) $code);
+            }
+        }
+
+        return $max;
     }
 
     /**
