@@ -23,9 +23,16 @@ final class CategoryMapProposer
         'الرحمن', 'ديلمار', 'مفرومال', 'شرمر', 'باركان', 'تركي', 'اردني', 'مستورد',
     ];
 
+    /**
+     * دهّانون ومورّدون، لا أنظمة: تصنيفاتهم في إتقان تحوي مقاطع أنظمة عدة. العقدة التي تبدأ
+     * بقية اسمها بواحد منها تذهب الى «ألمنيوم» واسمها كاملاً لون (التصميم §10، R-4).
+     */
+    public const PAINTERS = ['دهان', 'بدون دهان شركة الرحمن'];
+
     /** كلمات تصنيفات ملغاة في إتقان. */
     public const JUNK = [
-        'حذف', 'حدف', 'غلط', 'تعديل', 'احتياط', 'سكراب', '؟؟؟', 'RenameIt', 'ليس للاستعمال', 'ليس للاستخدام',
+        'حذف', 'حدف', 'غلط', 'تعديل', 'احتياط', 'سكراب', '؟؟؟', 'RenameIt',
+        'ليس للاستعمال', 'ليس للاستخدام', 'ليست للاستعمال', 'ليست للاستخدام',
     ];
 
     /** كلمات في اول اللون لا تميّزه. */
@@ -81,16 +88,36 @@ final class CategoryMapProposer
             return $this->entry($node, $name, null, str_contains($name, 'بالوزن') ? 'weight' : 'simple');
         }
 
+        if ($this->startsWithAny($remainder, self::PAINTERS)) {
+            return $this->entry($node, self::ALUMINUM_ROOT, $this->finish($remainder), 'weight', 'painter');
+        }
+
         $brand = $this->brand($remainder);
-        $finish = $this->finish($brand === null ? '' : trim(mb_substr($remainder, mb_strlen($brand))));
+
+        if ($brand === null) {
+            return $this->entry($node, self::ALUMINUM_ROOT, $this->finish($remainder), 'weight', 'brand?');
+        }
 
         return $this->entry(
             $node,
-            self::ALUMINUM_ROOT.'/'.($brand ?? $remainder),
-            $finish,
+            self::ALUMINUM_ROOT.'/'.$brand,
+            $this->finish(trim(mb_substr($remainder, mb_strlen($brand)))),
             'weight',
-            $brand === null ? 'brand?' : '',
         );
+    }
+
+    /**
+     * @param  array<int, string>  $prefixes
+     */
+    private function startsWithAny(string $text, array $prefixes): bool
+    {
+        foreach ($prefixes as $prefix) {
+            if ($text === $prefix || str_starts_with($text, $prefix.' ')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -99,7 +126,12 @@ final class CategoryMapProposer
     private function child(array $node, CategoryMapEntry $parent): CategoryMapEntry
     {
         $name = ItqanNames::normalize((string) $node['ItemString']);
-        $entry = $this->entry($node, $parent->categoryPath.'/'.$name, $parent->finish, $parent->pricingType);
+        $underAluminum = $parent->finish !== null && str_starts_with($parent->categoryPath, self::ALUMINUM_ROOT);
+
+        // «المنيوم نابكو ابيض» تحت «المنيوم نابكو» ماركة ولون، لا تصنيف فرعي (R-5).
+        $entry = $underAluminum && ItqanNames::aluminumRemainder($name) !== null
+            ? $this->root($node)
+            : $this->entry($node, $parent->categoryPath.'/'.$name, $parent->finish, $parent->pricingType);
 
         if ($entry->kept() && ! $parent->kept()) {
             return new CategoryMapEntry(

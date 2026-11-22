@@ -58,6 +58,39 @@ class CategoryMapProposerTest extends TestCase
 
         $this->assertSame('keep', $entry->action);
         $this->assertSame('brand?', $entry->note);
+        $this->assertSame('ألمنيوم', $entry->categoryPath);
+        $this->assertSame('سابق 2', $entry->finish);
+    }
+
+    public function test_painter_node_goes_to_aluminum_root_with_full_finish(): void
+    {
+        $entry = $this->propose([$this->node('00303', 'المنيوم دهان جلوسي اكسبرس لون ابيض')])['00303'];
+
+        $this->assertSame('ألمنيوم', $entry->categoryPath);
+        $this->assertSame('جلوسي اكسبرس لون ابيض', $entry->finish);
+        $this->assertSame('painter', $entry->note);
+        $this->assertSame('keep', $entry->action);
+    }
+
+    public function test_aluminum_named_subnode_resolves_like_a_root(): void
+    {
+        $map = $this->propose([
+            $this->node('00023', 'المنيوم نابكو'),
+            $this->node('00023001', 'المنيوم نابكو ابيض', parent: '00023'),
+        ]);
+
+        $this->assertSame('ألمنيوم/نابكو', $map['00023001']->categoryPath);
+        $this->assertSame('ابيض', $map['00023001']->finish);
+    }
+
+    public function test_feminine_not_for_use_is_junk(): void
+    {
+        $map = $this->propose([
+            $this->node('00023', 'المنيوم نابكو'),
+            $this->node('00023013', 'ليست للاستعمال خدمة دهان نابكو ', parent: '00023'),
+        ]);
+
+        $this->assertSame('skip', $map['00023013']->action);
     }
 
     public function test_junk_and_numeric_and_inactive_are_skipped(): void
