@@ -10,8 +10,10 @@ use Modules\Accounting\Entities\GoodsReceipt;
 use Modules\Accounting\Entities\GoodsReceiptItem;
 use Modules\Accounting\Entities\JournalEntry;
 use Modules\Accounting\Entities\PurchaseInvoice;
+use Modules\Accounting\Entities\PurchaseInvoiceItem;
 use Modules\Accounting\Entities\PurchaseOrder;
 use Modules\Accounting\Entities\SalesInvoice;
+use Modules\Accounting\Entities\SalesInvoiceItem;
 use Modules\Accounting\Entities\SalesOrder;
 use Modules\Accounting\Entities\StockMovement;
 use Modules\Accounting\Entities\Warehouse;
@@ -19,6 +21,7 @@ use Modules\Accounting\Enums\InventoryDocumentStatus;
 use Modules\Accounting\Enums\JournalEntryStatus;
 use Modules\Accounting\Enums\StockMovementType;
 use Modules\Accounting\Services\Concerns\PostsInventoryJournal;
+use Modules\Accounting\Support\WeightPieces;
 use Modules\Items\Entities\Product;
 use Modules\Items\Enums\ItemType;
 
@@ -309,7 +312,8 @@ class InvoiceStockService
     {
         $invoice->loadMissing(['items.product', 'items.pieces']);
 
-        return $invoice->items->filter(fn ($item) => filled($item->{$orderItemKey}) && $item->pieces->isNotEmpty())->values();
+        // سطر مجموعة السعر لا صنف رئيسي له يُسوّى: قطعه تحمل كلفتها ووزنها الفعلي.
+        return $invoice->items->filter(fn ($item) => filled($item->{$orderItemKey}) && $item->pieces->isNotEmpty() && ! $item->isPriceGroupLine())->values();
     }
 
     /**
@@ -435,6 +439,12 @@ class InvoiceStockService
         foreach ($invoice->items as $item) {
             $product = $item->product;
 
+            if ($item->isPriceGroupLine()) {
+                array_push($lines, ...$this->priceGroupStockLines($item, round((float) $item->line_total * $factor, 4)));
+
+                continue;
+            }
+
             if (! $product || $product->isService() || ($item->line_type ?? null) === ItemType::SERVICE->value) {
                 continue;
             }
@@ -511,6 +521,28 @@ class InvoiceStockService
         }
 
         return $lines;
+    }
+
+    /**
+     * سطر مجموعة السعر (D2-6): لا صنف رئيسي؛ كل قطعة تحرّك لونها بعددها، وبنصيبها من الوزن
+     * الفعلي ومن قيمة السطر بنسبة وزنها المحسوب.
+     *
+     * @return array<int, array{item_id:int, product_id:int, quantity:float, weight:float, amount:float}>
+     */
+    private function priceGroupStockLines(PurchaseInvoiceItem|SalesInvoiceItem $item, float $amount): array
+    {
+        $pieces = $item->pieces->filter(fn ($piece) => $piece->product_id && (float) $piece->piece_count > 0)->values();
+        $calculated = $pieces->map(fn ($piece) => (float) $piece->total_weight)->all();
+        $weights = WeightPieces::actualShares($calculated, $item->actual_weight);
+        $values = WeightPieces::actualShares($calculated, $amount);
+
+        return $pieces->map(fn ($piece, int $index) => [
+            'item_id' => (int) $item->id,
+            'product_id' => (int) $piece->product_id,
+            'quantity' => round((float) $piece->piece_count, 4),
+            'weight' => $weights[$index],
+            'amount' => $amount > 0 ? $values[$index] : 0.0,
+        ])->all();
     }
 
     /**

@@ -18,6 +18,7 @@ use Modules\Accounting\Enums\SalesOrderStatus;
 use Modules\Accounting\Enums\StockMovementType;
 use Modules\Accounting\Services\Concerns\PostsInventoryJournal;
 use Modules\Accounting\Support\MainItemShare;
+use Modules\Accounting\Support\WeightPieces;
 use Modules\Core\Services\ReferenceNumberService;
 
 /**
@@ -272,11 +273,18 @@ class DeliveryNoteService
         $lines = collect();
 
         foreach ($order->items as $item) {
-            if (! $item->product || $item->product->isService() || ($item->line_type ?? 'goods') === 'service') {
+            $isGroup = $item->isPriceGroupLine();
+
+            if (! $isGroup && (! $item->product || $item->product->isService() || ($item->line_type ?? 'goods') === 'service')) {
                 continue;
             }
 
             if ($item->pieces->isNotEmpty()) {
+                // قطع سطر مجموعة السعر تحمل وزنه الفعلي (لا صنف رئيسي)، وقطع الصنف الرئيسي وزنها المحسوب.
+                $weights = $isGroup
+                    ? WeightPieces::actualShares($item->pieces->mapWithKeys(fn ($piece) => [$piece->id => (float) $piece->total_weight])->all(), $item->actual_weight)
+                    : $item->pieces->mapWithKeys(fn ($piece) => [$piece->id => (float) $piece->total_weight])->all();
+
                 foreach ($item->pieces as $piece) {
                     $count = (float) $piece->piece_count;
 
@@ -293,15 +301,20 @@ class DeliveryNoteService
                         'product_id' => $piece->product_id,
                         'barcode' => $piece->barcode ?: $piece->product?->barcode,
                         'description' => $piece->description ?: $piece->product?->name,
-                        'group' => $item->description ?: $item->product->name,
+                        'group' => $item->description ?: $item->product?->name,
                         'piece_length' => (float) $piece->piece_length,
                         'ordered' => $count,
                         'delivered' => $deliveredQuantity,
                         'outstanding' => max(round($count - $deliveredQuantity, 4), 0),
-                        'weight_per_unit' => round((float) $piece->total_weight / $count, 4),
+                        'weight_per_unit' => round($weights[$piece->id] / $count, 4),
                     ]);
                 }
 
+                continue;
+            }
+
+            // سطر مجموعة السعر بلا قطع لا شيء فيه يُسلَّم.
+            if ($isGroup) {
                 continue;
             }
 
@@ -606,7 +619,8 @@ class DeliveryNoteService
         foreach ($grouped as $itemId => $itemRows) {
             $item = $order->items->firstWhere('id', $itemId);
 
-            if (! $item) {
+            // سطر مجموعة السعر لا صنف رئيسي له: قطعه تحمل الوزن والكلفة.
+            if (! $item || $item->isPriceGroupLine()) {
                 continue;
             }
 

@@ -13,6 +13,7 @@ use Modules\Accounting\Enums\SalesInvoiceStatus;
 use Modules\Accounting\Enums\SalesOrderStatus;
 use Modules\Accounting\Services\SalesInvoiceService;
 use Modules\Accounting\Services\SalesOrderService;
+use Modules\Accounting\tests\Feature\Concerns\PriceGroupFixtures;
 use Modules\Accounting\tests\Feature\Concerns\SalesDocumentFixtures;
 use Tests\TestCase;
 
@@ -23,6 +24,7 @@ use Tests\TestCase;
  */
 class SalesInvoicePagesTest extends TestCase
 {
+    use PriceGroupFixtures;
     use RefreshDatabase;
     use SalesDocumentFixtures;
 
@@ -116,6 +118,40 @@ class SalesInvoicePagesTest extends TestCase
         $this->assertSame($line->pieces->first()->id, $saved->pieces->first()->id);
         $this->assertSame($line->pieces->first()->sales_order_item_piece_id, $saved->pieces->first()->sales_order_item_piece_id);
         $this->assertSame(330.0, (float) $saved->line_total);
+    }
+
+    public function test_a_price_group_line_is_saved_from_the_page_and_carried_from_an_order(): void
+    {
+        ['white' => $white, 'whiteW45' => $whiteW45, 'meshW45' => $meshW45] = $this->alpineGroups();
+
+        // يدوياً: سطر «الوبين — أبيض» يُحفظ ويُفتح كما هو، ولون آخر داخله مرفوض.
+        $this->post(route('accounting.sales-invoices.store'), $this->invoiceData([$this->groupLine($white, [[$meshW45, 1]], 8)]))->assertSessionHas('error');
+        $this->post(route('accounting.sales-invoices.store'), $this->invoiceData([$this->groupLine($white, [[$whiteW45, 2]], 16)]))->assertSessionHas('success');
+
+        $manual = SalesInvoice::query()->latest('id')->firstOrFail();
+        $this->get(route('accounting.sales-invoices.edit', $manual->id))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('invoice.items.0.product_id', null)
+                ->where('invoice.items.0.category_finish_id', $white->id)
+                ->where('invoice.items.0.product_label', 'الوبين — أبيض')
+                ->where('invoice.items.0.pieces.0.product_id', $whiteW45->id));
+        $this->assertSame(320.0, (float) $manual->total_amount);
+
+        // من طلبية: السطر ينتقل بمجموعته وقطعه، والوزن الفعلي في الفاتورة يحدد المبلغ.
+        $order = $this->draftOrder([$this->groupLine($white, [[$whiteW45, 3]], 24)]);
+        $invoice = app(SalesInvoiceService::class)->createFromOrder($order);
+        $form = $this->props($this->get(route('accounting.sales-invoices.edit', $invoice->id)))['invoice'];
+        $this->assertNull($form['items'][0]['product_id']);
+        $this->assertSame($white->id, $form['items'][0]['category_finish_id']);
+
+        $form['items'][0]['actual_weight'] = 25;
+        $this->put(route('accounting.sales-invoices.update', $invoice->id), $form)->assertSessionHas('success');
+
+        $saved = $invoice->items()->with('pieces')->sole();
+        $this->assertNull($saved->product_id);
+        $this->assertSame($white->id, (int) $saved->category_finish_id);
+        $this->assertNotNull($saved->sales_order_item_id);
+        $this->assertSame(500.0, (float) $saved->line_total);
     }
 
     public function test_the_invoice_page_lists_service_lines_in_the_services_section(): void

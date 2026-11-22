@@ -27,6 +27,7 @@ use Modules\Accounting\Enums\PurchaseInvoiceStatus;
 use Modules\Accounting\Enums\PurchaseOrderStatus;
 use Modules\Accounting\Enums\SalesInvoiceStatus;
 use Modules\Accounting\Enums\SalesOrderStatus;
+use Modules\Accounting\Enums\StockMovementType;
 use Modules\Accounting\Services\DeliveryNoteService;
 use Modules\Accounting\Services\GoodsReceiptService;
 use Modules\Accounting\Services\InventoryAccounts;
@@ -35,6 +36,7 @@ use Modules\Accounting\Services\SalesInvoiceService;
 use Modules\Accounting\Services\StockAdjustmentService;
 use Modules\Accounting\Services\StockLedgerService;
 use Modules\Accounting\Services\StockLevelService;
+use Modules\Accounting\tests\Feature\Concerns\PriceGroupFixtures;
 use Modules\Core\Entities\Currency;
 use Modules\Core\Entities\User;
 use Modules\Items\Entities\Product;
@@ -47,6 +49,7 @@ use Tests\TestCase;
  */
 class InvoiceStockFlowTest extends TestCase
 {
+    use PriceGroupFixtures;
     use RefreshDatabase;
 
     private Currency $currency;
@@ -543,6 +546,83 @@ class InvoiceStockFlowTest extends TestCase
         $this->assertSame(70.0, (float) $sale->total_amount);
         $this->assertSame(6.0, app(StockLedgerService::class)->onHand($piece->id));
         $this->assertSame(54.0, (float) $piece->refresh()->stock_weight);
+    }
+
+    /* ---------- سطر مجموعة السعر (المرحلة 2): لا صنف رئيسي، كل لون يتحرك بقطعه وكلفته ---------- */
+
+    public function test_a_price_group_line_of_an_order_issues_each_colour_by_its_pieces_and_cost(): void
+    {
+        ['white' => $white, 'whiteW45' => $whiteW45, 'meshW45' => $meshW45] = $this->alpineGroups();
+        $this->openingBalance($whiteW45, 10, 30);
+        $this->openingBalance($meshW45, 10, 40);
+
+        $order = $this->salesOrder([]);
+        $line = $order->items()->create(['product_id' => null, 'category_finish_id' => $white->id, 'description' => 'الوبين — أبيض', 'quantity' => 16, 'unit_price' => 20, 'total_weight' => 16.25, 'actual_weight' => 16, 'line_total' => 320]);
+        $line->pieces()->create(['product_id' => $whiteW45->id, 'description' => $whiteW45->name, 'piece_count' => 2, 'piece_length' => 6.5, 'weight_per_meter' => 1.25, 'total_weight' => 16.25, 'sort_order' => 0]);
+        $order->update(['total_amount' => 320, 'sub_total' => 320]);
+
+        $invoice = $this->postSalesInvoiceFromOrder($order->refresh());
+
+        $invoiceLine = $invoice->items->sole();
+        $this->assertNull($invoiceLine->product_id);
+        $this->assertSame($white->id, (int) $invoiceLine->category_finish_id);
+        $this->assertSame(16.0, (float) $invoiceLine->quantity);
+        $this->assertSame(320.0, (float) $invoiceLine->line_total);
+
+        // خرجت قطعتان من الأبيض بكلفتهما (2 × 30)، والميش كما هو، ولا حركة بلا صنف ولا تسوية.
+        $this->assertSame(8.0, app(StockLedgerService::class)->onHand($whiteW45->id));
+        $this->assertSame(10.0, app(StockLedgerService::class)->onHand($meshW45->id));
+        $this->assertSame(60.0, $this->balance($this->account('5100')));
+        $this->assertSame(0, StockMovement::query()->where(fn ($query) => $query->whereNull('product_id')->orWhere('product_id', 0))->count());
+        $this->assertSame(0, StockMovement::query()->where('type', StockMovementType::INVOICE_ADJUSTMENT->value)->count());
+        // وزن الحركة هو الوزن الفعلي للسطر (16)، لا المحسوب (16.25).
+        $this->assertSame(-16.0, (float) StockMovement::query()->where('product_id', $whiteW45->id)->where('type', StockMovementType::DELIVERY->value)->sum('weight'));
+    }
+
+    public function test_a_delivery_note_delivers_part_of_a_price_group_line_and_the_invoice_the_rest(): void
+    {
+        ['white' => $white, 'whiteW45' => $whiteW45] = $this->alpineGroups();
+        $this->openingBalance($whiteW45, 10, 30);
+
+        $order = $this->salesOrder([]);
+        $line = $order->items()->create(['product_id' => null, 'category_finish_id' => $white->id, 'description' => 'الوبين — أبيض', 'quantity' => 24, 'unit_price' => 20, 'total_weight' => 24.375, 'actual_weight' => 24, 'line_total' => 480]);
+        $piece = $line->pieces()->create(['product_id' => $whiteW45->id, 'description' => $whiteW45->name, 'piece_count' => 3, 'piece_length' => 6.5, 'weight_per_meter' => 1.25, 'total_weight' => 24.375, 'sort_order' => 0]);
+        $order->update(['total_amount' => 480, 'sub_total' => 480]);
+
+        $note = app(DeliveryNoteService::class)->create([
+            'sales_order_id' => $order->id,
+            'items' => [['sales_order_item_id' => $line->id, 'sales_order_item_piece_id' => $piece->id, 'quantity' => 1]],
+        ]);
+        // القطعة تحمل نصيبها من الوزن الفعلي: 24 ÷ 3.
+        $this->assertSame(8.0, (float) $note->items()->sole()->weight);
+        app(DeliveryNoteService::class)->post($note);
+        $this->assertSame(9.0, app(StockLedgerService::class)->onHand($whiteW45->id));
+
+        $this->postSalesInvoiceFromOrder($order->refresh());
+
+        $this->assertSame(7.0, app(StockLedgerService::class)->onHand($whiteW45->id));
+        $this->assertSame(2, DeliveryNote::query()->where('sales_order_id', $order->id)->count());
+        $this->assertSame(90.0, $this->balance($this->account('5100')));
+        $this->assertSame(-24.0, (float) StockMovement::query()->where('product_id', $whiteW45->id)->where('type', StockMovementType::DELIVERY->value)->sum('weight'));
+        $this->assertSame(0, StockMovement::query()->where('type', StockMovementType::INVOICE_ADJUSTMENT->value)->count());
+    }
+
+    public function test_a_price_group_line_without_order_issues_each_colour_by_its_pieces_and_cost(): void
+    {
+        ['white' => $white, 'whiteW45' => $whiteW45] = $this->alpineGroups();
+        $this->openingBalance($whiteW45, 10, 30);
+
+        $invoice = $this->postSalesInvoice([$this->groupLine($white, [[$whiteW45, 2]], 16)]);
+
+        $line = $invoice->items->sole();
+        $this->assertNull($line->product_id);
+        $this->assertSame($white->id, (int) $line->category_finish_id);
+        $this->assertSame('الوبين — أبيض', $line->description);
+        $this->assertSame(320.0, (float) $invoice->total_amount);
+        $this->assertSame(8.0, app(StockLedgerService::class)->onHand($whiteW45->id));
+        $this->assertSame(60.0, $this->balance($this->account('5100')));
+        $this->assertSame(-16.0, (float) StockMovement::query()->where('product_id', $whiteW45->id)->where('type', StockMovementType::DELIVERY->value)->sum('weight'));
+        $this->assertSame(0, StockMovement::query()->where(fn ($query) => $query->whereNull('product_id')->orWhere('product_id', 0))->count());
     }
 
     public function test_the_actual_weight_sets_the_amount_and_leaves_stock_weight_on_the_pieces(): void

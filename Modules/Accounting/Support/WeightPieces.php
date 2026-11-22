@@ -121,6 +121,34 @@ class WeightPieces
     }
 
     /**
+     * قطع سطر مجموعة السعر تحمل وزنه الفعلي، اذ لا صنف رئيسي يحمله: وزن كل قطعة بنسبة وزنها
+     * المحسوب، وفرق التقريب على آخرها. بلا وزن فعلي تبقى الاوزان المحسوبة.
+     *
+     * @param  array<int|string, float>  $weights  الوزن المحسوب لكل قطعة
+     * @return array<int|string, float>
+     */
+    public static function actualShares(array $weights, mixed $actualWeight): array
+    {
+        $actual = self::decimal($actualWeight);
+        $calculated = array_sum($weights);
+
+        if ($actual <= 0 || $calculated <= 0) {
+            return array_map(fn ($weight) => round((float) $weight, 4), $weights);
+        }
+
+        $shares = [];
+        $left = $actual;
+        $last = array_key_last($weights);
+
+        foreach ($weights as $key => $weight) {
+            $shares[$key] = $key === $last ? round($left, 4) : round((float) $weight * $actual / $calculated, 4);
+            $left -= $shares[$key];
+        }
+
+        return $shares;
+    }
+
+    /**
      * الوزن الذي يُسعَّر به السطر: الفعلي ان وُجد، والا صفر فيكون المبلغ صفراً.
      *
      * @param  array<int, array<string, mixed>>  $pieces  قطع بعد normalize()

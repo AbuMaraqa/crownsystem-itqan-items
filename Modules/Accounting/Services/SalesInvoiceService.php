@@ -16,6 +16,7 @@ use Modules\Accounting\Enums\SalesReturnStatus;
 use Modules\Accounting\Entities\SalesOrderItem;
 use Modules\Accounting\Support\ItemsGrid;
 use Modules\Accounting\Support\SalesServiceLine;
+use Modules\Accounting\Support\GridLine;
 use Modules\Accounting\Support\WeightPieces;
 use Modules\Core\Services\ReferenceNumberService;
 use Modules\Items\Entities\Product;
@@ -375,9 +376,10 @@ class SalesInvoiceService
     private function normalizeItems(array $items): array
     {
         return collect($items)
-            ->filter(fn (array $item) => filled($item['product_id'] ?? null))
+            ->filter(fn (array $item) => GridLine::hasOwner($item))
             ->map(function (array $item): array {
-                $product = Product::query()->with('translations')->find($item['product_id']);
+                // سطر صنف، او سطر مجموعة سعر بلا صنف (التصنيف × اللون) قطعه ألوان مقاطعه.
+                $product = GridLine::product($item);
                 $quantity = $this->decimalValue($item['quantity'] ?? 1, 1);
                 // صنف الوزن باصنافه الفرعية: الكمية المفوترة (كغم) = الوزن الفعلي، وصفر بدونه.
                 $weight = WeightPieces::line($item, $product, ['sales_order_item_piece_id']);
@@ -419,9 +421,10 @@ class SalesInvoiceService
                 return array_merge([
                     'id' => $item['id'] ?? null,
                     'sales_order_item_id' => filled($item['sales_order_item_id'] ?? null) ? (int) $item['sales_order_item_id'] : null,
-                    'product_id' => (int) $item['product_id'],
+                    'product_id' => $product?->id,
+                    'category_finish_id' => GridLine::groupId($item),
                     'barcode' => $item['barcode'] ?? $product?->barcode,
-                    'description' => $item['description'] ?? $product?->name,
+                    'description' => GridLine::description($item, $product),
                     'quantity' => $quantity,
                     'total_weight' => $weight['total_weight'],
                     'actual_weight' => $weight['actual_weight'],
@@ -444,6 +447,7 @@ class SalesInvoiceService
             ->map(fn ($item): array => [
                 'sales_order_item_id' => $item->id,
                 'product_id' => $item->product_id,
+                'category_finish_id' => $item->category_finish_id,
                 'barcode' => $item->barcode,
                 'description' => $item->description,
                 'quantity' => $item->invoiceQuantity(),
