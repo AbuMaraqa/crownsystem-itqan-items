@@ -268,6 +268,44 @@ class CatalogImporterTest extends TestCase
         $this->assertSame(4, Product::query()->where('parent_id', $parent->id)->count());
     }
 
+    public function test_parent_gets_unit_and_english_name(): void
+    {
+        $this->import([
+            $this->row('00009001', 'ثابت مجرين W45', '00009', 'b_al', [
+                'Prop1' => '1.267', 'Prop2' => '6.00', 'Prop3' => 'A-12', 'Prop6' => 'Fixed frame W45', 'Barcode' => '809712', 'itemunit' => 'كغم',
+            ]),
+        ], allFinishes: true);
+
+        $parent = Product::query()->whereNull('parent_id')->sole();
+
+        $this->assertNotNull($parent->unit_id);
+        $this->assertSame('A-12', $parent->shelf);
+        $this->assertSame('Fixed frame W45', DB::table(config('items.table_prefix').'product_translations')
+            ->where('product_id', $parent->id)->where('locale', 'en')->value('name'));
+    }
+
+    public function test_seller_gets_cost_limits_and_secondary_barcodes(): void
+    {
+        $this->import([
+            $this->row('000200349001', 'ماتور ميلانو', '000200349', 'a_storePicture', [
+                'ItemCost' => 21.63, 'ItemMax' => 40, 'ItemMin1' => 3, 'ItemMin2' => 0, 'Barcode' => '111█222',
+            ]),
+            $this->row('00009001', 'ثابت مجرين W45', '00009', 'b_al', [
+                'Prop1' => '1.267', 'Prop2' => '6.00', 'Barcode' => '809712', 'ItemCost' => 18.5,
+            ]),
+        ], allFinishes: true);
+
+        $accessory = Product::query()->whereNull('parent_id')->where('barcode', '111')->sole();
+        $this->assertSame('21.63', number_format((float) $accessory->cost_price, 2, '.', ''));
+        $this->assertSame(40, (int) $accessory->max_limit);
+        $this->assertSame(3, (int) $accessory->min_limit_1);
+        $this->assertNull($accessory->min_limit_2);
+        $this->assertSame(['222'], DB::table(config('items.table_prefix').'product_barcodes')->where('product_id', $accessory->id)->pluck('barcode')->all());
+
+        $child = Product::query()->where('sku', '00009001')->sole();
+        $this->assertSame('18.50', number_format((float) $child->cost_price, 2, '.', ''));
+    }
+
     public function test_running_twice_creates_nothing_new(): void
     {
         $rows = [

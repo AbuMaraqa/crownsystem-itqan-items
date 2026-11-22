@@ -10,6 +10,9 @@ use Modules\Items\Entities\Finish;
 use Modules\Items\Entities\Product;
 use Modules\Items\Enums\CategoryStatus;
 use Modules\Items\Enums\ProductStatus;
+use Modules\Items\Services\LegacyBarcodeWriter;
+use Modules\Items\Services\LegacyEnglishNameWriter;
+use Modules\Items\Services\LegacyUnitResolver;
 use Modules\Items\Support\Itqan\CategoryMapEntry;
 use Modules\Items\Support\Itqan\CategoryMapFile;
 use Modules\Items\Support\Itqan\CategoryMapProposer;
@@ -62,7 +65,13 @@ class CatalogImporter
 
     private bool $partial = false;
 
-    public function __construct(private readonly LegacyLinks $links) {}
+    private ?LegacyUnitResolver $units = null;
+
+    public function __construct(
+        private readonly LegacyLinks $links,
+        private readonly LegacyBarcodeWriter $barcodes,
+        private readonly LegacyEnglishNameWriter $englishNames,
+    ) {}
 
     public function withReportDirectory(string $directory): static
     {
@@ -118,6 +127,8 @@ class CatalogImporter
             'parents_deactivated' => 0,
             'children_deactivated' => 0,
             'linked' => 0,
+            'units_created' => 0,
+            'barcode_rows_created' => 0,
             'dry_run' => $dryRun,
         ];
 
@@ -126,6 +137,7 @@ class CatalogImporter
         }
 
         $this->guardAgainstOldImport();
+        $this->units = app(LegacyUnitResolver::class);
 
         DB::transaction(function () use ($map, $groups, $usedLegacyIds, $allFinishes, $log, &$report): void {
             $categoryIds = $this->writeCategories($map, $report);
@@ -138,6 +150,8 @@ class CatalogImporter
             $log('Children written: '.$report['children_created']);
             $this->links->remember('items', Product::class, $leafTargets);
             $report['linked'] = count($leafTargets);
+            $this->writeLegacyExtras($groups, $parents, $leafTargets, $report);
+            $report['units_created'] = $this->units->createdCount();
 
             if (! $this->partial) {
                 $this->deactivateRemoved(array_column($parents, 'slug'), $childSlugs, $report);
@@ -212,7 +226,8 @@ class CatalogImporter
             $type = (string) $row['ItemType'];
             $fields = LegacyItemFields::columns($type, $row);
             $weight = isset($fields['weight_per_meter']) ? number_format((float) $fields['weight_per_meter'], 3, '.', '') : '';
-            $barcode = (string) (LegacyItemFields::barcodes((string) $row['Barcode'], $type, $row)['primary'] ?? '');
+            $barcodes = LegacyItemFields::barcodes((string) $row['Barcode'], $type, $row);
+            $barcode = (string) ($barcodes['primary'] ?? '');
             $normalized = ItqanNames::normalize($name);
             $scope = $barcode === '' ? $entry->categoryPath : '';
             $key = implode(self::SEP, [$scope, $normalized, $barcode, $weight]);
@@ -225,11 +240,31 @@ class CatalogImporter
                 'length' => $fields['length'] ?? null,
                 'pricing_type' => $entry->pricingType,
                 'colourless_weight' => $entry->finish === null && $entry->pricingType === 'weight',
+                'unit' => null,
+                'english' => null,
+                'shelf' => null,
                 'paths' => [],
                 'leaves' => [],
             ];
+            // حقول الصنف الاب: اول قيمة غير فارغة بين أوراقه.
+            $groups[$key]['unit'] ??= trim((string) $row['itemunit']) !== '' ? trim((string) $row['itemunit']) : null;
+            $groups[$key]['english'] ??= LegacyItemFields::englishName($row);
+            $groups[$key]['shelf'] ??= $fields['shelf'] ?? null;
             $groups[$key]['paths'][$entry->categoryPath] = ($groups[$key]['paths'][$entry->categoryPath] ?? 0) + 1;
-            $groups[$key]['leaves'][] = ['id' => $id, 'finish' => $entry->finish, 'node' => (string) $row['ItemParent'], 'path' => $entry->categoryPath];
+            $groups[$key]['leaves'][] = [
+                'id' => $id,
+                'finish' => $entry->finish,
+                'node' => (string) $row['ItemParent'],
+                'path' => $entry->categoryPath,
+                // حقول البائع (الابن، او الاب اذا لم يكن له ابن): كما يحوّلها المستورد القديم.
+                'seller' => [
+                    'cost_price' => self::decimalOrNull($row['ItemCost'] ?? null),
+                    'max_limit' => self::positiveIntOrNull($row['ItemMax'] ?? null),
+                    'min_limit_1' => self::positiveIntOrNull($row['ItemMin1'] ?? null),
+                    'min_limit_2' => self::positiveIntOrNull($row['ItemMin2'] ?? null),
+                ],
+                'secondary' => $barcodes['secondary'] ?? [],
+            ];
 
             $byName[$scope.self::SEP.$normalized][$key] = true;
             if ($barcode !== '') {
@@ -262,6 +297,23 @@ class CatalogImporter
         }
 
         return [$groups, $skipped, $exceptions, $conflicts];
+    }
+
+    private static function decimalOrNull(mixed $value): ?string
+    {
+        $value = trim((string) $value);
+
+        return $value === '' || ! is_numeric($value) ? null : number_format((float) $value, 2, '.', '');
+    }
+
+    /**
+     * حدود المخزون من إتقان: الصفر او الفارغ يعني «لا حد»، كما في المستورد القديم.
+     */
+    private static function positiveIntOrNull(mixed $value): ?int
+    {
+        $value = trim((string) $value);
+
+        return is_numeric($value) && (int) $value > 0 ? (int) $value : null;
     }
 
     /**
@@ -592,12 +644,15 @@ class CatalogImporter
 
             // الموزون بلا لون (المطاط بالوزن) يُباع بنفسه: لونه «بلا لون» ومجموعة سعره مجموعة أوراقه (C-3).
             $colourless = $group['colourless_weight'];
+            // الاب يبيع بنفسه اذا لم يكن لأوراقه لون، فيأخذ حقول البائع من اول ورقة.
+            $sellsItself = array_filter(array_column($group['leaves'], 'finish'), fn ($finish): bool => $finish !== null) === [];
             $rows[] = array_merge(
                 $this->productRow(
                     $slugs[$key], $sku, $group, null,
                     $colourless ? $finishIds[''] : null,
                     $colourless ? ($nodeGroups[$group['leaves'][0]['node']] ?? null) : null,
                     $group['barcode'], $now,
+                    $sellsItself ? $group['leaves'][0]['seller'] : [],
                 ),
                 ['meta_data' => json_encode(['legacy_codes' => array_column($group['leaves'], 'id')], JSON_UNESCAPED_UNICODE)],
             );
@@ -656,7 +711,7 @@ class CatalogImporter
                 $slug = self::CHILD_SLUG.$leaf['id'];
                 $byPriceGroup[$priceGroup] = $slug;
                 $targets[$leaf['id']] = ['child' => $slug];
-                $rows[] = $this->productRow($slug, $leaf['id'], $group, $parent['id'], $finishIds[$leaf['finish']], $priceGroup, null, $now);
+                $rows[] = $this->productRow($slug, $leaf['id'], $group, $parent['id'], $finishIds[$leaf['finish']], $priceGroup, null, $now, $leaf['seller']);
                 $children[$slug] = [
                     'name' => $parent['name'].' - '.self::variantLabel($leaf, $group['path']),
                     'category_id' => $parent['category_id'],
@@ -682,6 +737,36 @@ class CatalogImporter
             : $parents[$target['parent']]['id'], $targets);
 
         return [$resolved, array_keys($children)];
+    }
+
+    /**
+     * ما كان ينقله المستورد القديم ولا يدخل صف الصنف (R-8): الاسم الانجليزي للاب، والباركودات
+     * الإضافية على الصنف الذي رُبطت به الورقة (الابن، او الاب). الموجود لا يتكرر.
+     *
+     * @param  array<string, array<string, mixed>>  $groups
+     * @param  array<string, array<string, mixed>>  $parents
+     * @param  array<string, int>  $leafTargets
+     * @param  array<string, int|bool|string>  $report
+     */
+    private function writeLegacyExtras(array $groups, array $parents, array $leafTargets, array &$report): void
+    {
+        $english = [];
+        $secondary = [];
+
+        foreach ($groups as $key => $group) {
+            if ($group['english'] !== null) {
+                $english[$parents[$key]['id']] = $group['english'];
+            }
+
+            foreach ($group['leaves'] as $leaf) {
+                foreach ($leaf['secondary'] as $barcode) {
+                    $secondary[$leafTargets[$leaf['id']]][] = $barcode;
+                }
+            }
+        }
+
+        $this->englishNames->insert($this->englishNames->plan($english));
+        $report['barcode_rows_created'] = $this->barcodes->insert($this->barcodes->plan($secondary));
     }
 
     /**
@@ -770,9 +855,17 @@ class CatalogImporter
      * @param  array<string, mixed>  $group
      * @return array<string, mixed>
      */
-    private function productRow(string $slug, string $sku, array $group, ?int $parentId, ?int $finishId, ?int $categoryFinishId, ?string $barcode, mixed $now): array
+    private function productRow(string $slug, string $sku, array $group, ?int $parentId, ?int $finishId, ?int $categoryFinishId, ?string $barcode, mixed $now, array $seller = []): array
     {
+        // الوحدة والرف والتكلفة والحدود تُكتب عند الانشاء فقط (ليست في تحديث upsert)، فلا
+        // تمحو اعادة النقل ما عدّله المستخدم، كما في المستورد القديم.
         return [
+            'unit_id' => $this->units?->findOrCreate($group['unit'] ?? null),
+            'shelf' => $group['shelf'] ?? null,
+            'cost_price' => $seller['cost_price'] ?? null,
+            'max_limit' => $seller['max_limit'] ?? null,
+            'min_limit_1' => $seller['min_limit_1'] ?? null,
+            'min_limit_2' => $seller['min_limit_2'] ?? null,
             'slug' => $slug,
             'sku' => $sku,
             'barcode' => $barcode,
