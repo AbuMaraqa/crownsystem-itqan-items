@@ -115,6 +115,29 @@ class LedgerReportsTest extends TestCase
         app(AccountService::class)->update($this->account('4100'), ['code' => '4100', 'name' => 'Sales', 'type' => AccountType::EXPENSE->value(), 'parent_id' => $this->account('4100')->parent_id, 'is_postable' => true]);
     }
 
+    public function test_companies_we_pay_get_payable_accounts(): void
+    {
+        $accounts = app(AccountService::class);
+        $payables = $this->account('2110');
+
+        // شركة توصيل/شحن/تأمين/تخليص ومزود خدمة: ندفع لها، فحسابها تحت الذمم الدائنة لا المدينة.
+        foreach (['Delivery Company', 'Shipping Company', 'Insurance Company', 'Clearance Company', 'Service Provider'] as $role) {
+            $company = User::factory()->create();
+            $accounts->syncForRoles($company, [$role]);
+            $this->assertSame($payables->id, $company->refresh()->account->parent_id, $role);
+        }
+
+        // حساب انشئ قبل الدور (تحت المدينة) ولا قيود عليه ينتقل تحت الدائنة.
+        $shipper = User::factory()->create();
+        $accounts->createForUser($shipper);
+        $this->assertSame($this->account('1130')->id, $shipper->refresh()->account->parent_id);
+        $accounts->syncForRoles($shipper, ['Shipping Company']);
+        $account = $shipper->refresh()->account;
+        $this->assertSame($payables->id, $account->parent_id);
+        $this->assertSame($payables->type, $account->type);
+        $this->assertSame($payables->normal_balance, $account->normal_balance);
+    }
+
     public function test_balance_sheet_balances_with_the_unclosed_profit(): void
     {
         $this->postEntry('2026-02-01', '1110', '3100', 1000);   // رأس مال

@@ -12,6 +12,13 @@ use Modules\Core\Support\SafeDelete;
 
 class AccountService
 {
+    /**
+     * الادوار التي ندفع لها: حسابها تحت الذمم الدائنة (Core.supplier_account_parent).
+     *
+     * @var array<int, string>
+     */
+    public const PAYABLE_ROLES = ['Supplier', 'Delivery Company', 'Shipping Company', 'Insurance Company', 'Clearance Company', 'Service Provider'];
+
     public function create(array $data): Account
     {
         return DB::transaction(function () use ($data) {
@@ -31,7 +38,9 @@ class AccountService
      */
     public function syncForRoles(User $user, array $roleNames): void
     {
-        if (in_array('Supplier', $roleNames, true)) {
+        // كل جهة ندفع لها (المورد، وشركات التوصيل والشحن والتأمين والتخليص، ومزود الخدمة) حسابها
+        // تحت الذمم الدائنة.
+        if (array_intersect(self::PAYABLE_ROLES, $roleNames) !== []) {
             $this->createForUser($user, 'supplier_account_parent');
         } elseif (in_array('Customer', $roleNames, true)) {
             $this->createForUser($user, 'customer_account_parent');
@@ -49,20 +58,30 @@ class AccountService
     {
         // الحساب المحذوف يبقى حاجزاً user_id في الفهرس الفريد، فيُسترجع بدل انشاء حساب ثانٍ.
         $existing = $user->account ?? Account::withTrashed()->where('user_id', $user->id)->first();
+        $parent = AccountMapping::query()
+            ->where('source_module', 'Core')
+            ->where('source_key', $parentKey)
+            ->first()
+            ?->account;
 
         if ($existing) {
             if ($existing->trashed()) {
                 $existing->restore();
             }
 
+            // صار للمستخدم دور يغيّر جهة حسابه (مثلاً اصبح شركة شحن) ولا قيود عليه بعد: ينتقل تحت
+            // الحساب الاب الصحيح بنوعه وطبيعة رصيده. حساب عليه قيود يبقى كما هو.
+            if ($parent && $existing->parent_id !== $parent->id && $parentKey !== 'user_account_parent' && ! $existing->hasJournalLines()) {
+                $existing->update([
+                    'code' => $this->nextChildCode($parent->id, $parent->type),
+                    'parent_id' => $parent->id,
+                    'type' => $parent->type->value(),
+                    'normal_balance' => $parent->normal_balance->value(),
+                ]);
+            }
+
             return $existing;
         }
-
-        $parent = AccountMapping::query()
-            ->where('source_module', 'Core')
-            ->where('source_key', $parentKey)
-            ->first()
-            ?->account;
 
         if (! $parent) {
             return null;
