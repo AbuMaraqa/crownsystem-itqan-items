@@ -47,6 +47,16 @@ final class ItqanCatalogStage implements ItqanImportStage
         }
 
         $map = $this->map($rows, $log);
+        $nodes = ItqanCategoryNodes::fromRows($rows);
+        $leafParents = [];
+        foreach ($rows as $row) {
+            $id = trim((string) $row['ItemId']);
+            if ($id !== CategoryMapProposer::TREE_ROOT && ! isset($nodes[$id])) {
+                $leafParents[] = trim((string) $row['ItemParent']);
+            }
+        }
+        CategoryMapFile::assertMatches($map, $nodes, $leafParents);
+
         $sample = (bool) config('core.itqan.sample', false);
 
         if ($sample) {

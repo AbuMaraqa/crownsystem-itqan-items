@@ -68,6 +68,48 @@ class CategoryMapFileTest extends TestCase
         CategoryMapFile::read($this->path);
     }
 
+    public function test_read_rejects_code_without_leading_zeros(): void
+    {
+        file_put_contents($this->path, "legacy_code,legacy_name,items,action,category_path,finish,pricing_type,note\n9,x,1,keep,a,,weight,\n");
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Excel');
+        CategoryMapFile::read($this->path);
+    }
+
+    public function test_read_rejects_invalid_utf8(): void
+    {
+        file_put_contents($this->path, "legacy_code,legacy_name,items,action,category_path,finish,pricing_type,note\n00009,\xC7\xE1\xE6\xC8\xED\xE4,1,keep,a,,weight,\n");
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('UTF-8');
+        CategoryMapFile::read($this->path);
+    }
+
+    public function test_assert_matches_rejects_mostly_unmapped_leaves(): void
+    {
+        $map = ['00009' => new CategoryMapEntry('00009', 'x', 1, 'keep', 'ألمنيوم/الوبين', 'بدون دهان', 'weight')];
+
+        $this->expectException(RuntimeException::class);
+        CategoryMapFile::assertMatches($map, ['00009' => [], '00001' => []], ['00009', '00001', '00001', '00001']);
+    }
+
+    public function test_assert_matches_rejects_codes_that_match_no_node(): void
+    {
+        $map = ['00099' => new CategoryMapEntry('00099', 'x', 1, 'keep', 'ألمنيوم/الوبين', 'بدون دهان', 'weight')];
+
+        $this->expectException(RuntimeException::class);
+        CategoryMapFile::assertMatches($map, ['00009' => []], ['00009']);
+    }
+
+    public function test_assert_matches_accepts_a_matching_map(): void
+    {
+        $map = ['00009' => new CategoryMapEntry('00009', 'x', 1, 'keep', 'ألمنيوم/الوبين', 'بدون دهان', 'weight')];
+
+        CategoryMapFile::assertMatches($map, ['00009' => [], '00001' => []], ['00009', '00009', '00009', '00009', '00001']);
+        $this->addToAssertionCount(1);
+    }
+
     public function test_nodes_count_direct_leaves(): void
     {
         $nodes = ItqanCategoryNodes::fromRows([
