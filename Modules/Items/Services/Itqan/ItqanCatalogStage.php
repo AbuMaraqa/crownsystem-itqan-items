@@ -1,0 +1,91 @@
+<?php
+
+namespace Modules\Items\Services\Itqan;
+
+use Modules\Core\Support\Itqan\ItqanImportStage;
+use Modules\Core\Support\Itqan\ItqanSource;
+use Modules\Items\Services\LegacyItemsImporter;
+use Modules\Items\Support\Itqan\CatalogSample;
+use Modules\Items\Support\Itqan\CategoryMapFile;
+use Modules\Items\Support\Itqan\CategoryMapProposer;
+use Modules\Items\Support\Itqan\ItqanCategoryNodes;
+use Modules\Items\Support\Search\ItemsSearchIndex;
+
+/**
+ * مرحلة الاصناف بالشكل الجديد: التصنيف هو الماركة، والمقطع صنف مرة واحدة، والألوان
+ * أبناء، وسعر الكيلو على (التصنيف × اللون). تأخذ مكان المرحلة القديمة items.
+ *
+ * - الربط من storage/app/itqan/category-map.csv بعد مراجعة صاحب النظام، والا يُقترح في الذاكرة.
+ * - الأبناء للأوراق المستخدمة في فواتير إتقان (invoicesdet) فقط؛ --sample و--all-finishes تنشئ كل الألوان.
+ * التصميم: docs/superpowers/specs/2026-11-21-items-catalog-redesign-design.md §6.
+ */
+final class ItqanCatalogStage implements ItqanImportStage
+{
+    public function __construct(
+        private readonly CatalogImporter $importer,
+        private readonly CategoryMapProposer $proposer,
+    ) {}
+
+    public function key(): string
+    {
+        return 'items';
+    }
+
+    public function dependsOn(): array
+    {
+        return [];
+    }
+
+    public function run(ItqanSource $source, bool $dryRun, callable $log): array
+    {
+        ini_set('memory_limit', (string) env('ITEMS_SEED_MEMORY_LIMIT', '2048M'));
+
+        $log('Reading Itqan items ('.$source->count('items').' rows)...');
+        $rows = [];
+        foreach ($source->rows('items', LegacyItemsImporter::LEGACY_COLUMNS) as $row) {
+            $rows[] = $row;
+        }
+
+        $map = $this->map($rows, $log);
+        $sample = (bool) config('core.itqan.sample', false);
+
+        if ($sample) {
+            $rows = CatalogSample::select($rows);
+            $map = CatalogSample::restrictMap($map, $rows);
+            $log('Sample: '.count($rows).' rows, '.count($map).' category nodes.');
+        }
+
+        $used = [];
+        foreach ($source->rows('invoicesdet', ['theItemId']) as $row) {
+            $used[trim((string) $row['theItemId'])] = true;
+        }
+
+        $report = $this->importer->import($rows, $map, $used, $sample || (bool) config('core.itqan.all_finishes', false), $dryRun, $log);
+
+        if (! $dryRun) {
+            $log('Rebuilding the items search index...');
+            $report['search_indexed'] = app(ItemsSearchIndex::class)->rebuild();
+        }
+
+        return $report + ['sample' => $sample];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $rows
+     * @return array<string, \Modules\Items\Support\Itqan\CategoryMapEntry>
+     */
+    private function map(array $rows, callable $log): array
+    {
+        $path = CategoryMapFile::defaultPath();
+
+        if (is_file($path)) {
+            $log('Category map: '.$path);
+
+            return CategoryMapFile::read($path);
+        }
+
+        $log('Category map file not found; using the proposed map. Run itqan:category-map to review it first.');
+
+        return $this->proposer->propose(array_values(ItqanCategoryNodes::fromRows($rows)));
+    }
+}

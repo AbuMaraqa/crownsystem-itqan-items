@@ -9,7 +9,7 @@ use Illuminate\Support\ServiceProvider;
 use Modules\Core\Support\Itqan\ItqanStages;
 use Modules\Items\Console\Commands\BackfillLegacyFields;
 use Modules\Items\Console\Commands\ItqanCategoryMap;
-use Modules\Items\Services\Itqan\ItqanItemsStage;
+use Modules\Items\Services\Itqan\ItqanCatalogStage;
 use Modules\Items\Services\Itqan\ItqanPricesStage;
 use Modules\Items\Console\Commands\LinkMainProducts;
 use Modules\Items\Console\Commands\RebuildSearchIndex;
@@ -55,7 +55,8 @@ class ItemsServiceProvider extends ServiceProvider
 
         // مراحل نقل إتقان الخاصة بالاصناف.
         $stages = $this->app->make(ItqanStages::class);
-        $stages->register('items', ItqanItemsStage::class);
+        // الكتالوج الجديد (التصميم 2026-11-21) يأخذ مكان ItqanItemsStage، الذي يبقى ملفاً حتى المرحلة 4.
+        $stages->register('items', ItqanCatalogStage::class);
         $stages->register('prices', ItqanPricesStage::class);
     }
 

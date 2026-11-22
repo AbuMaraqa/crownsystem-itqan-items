@@ -133,6 +133,24 @@ class CatalogImporterTest extends TestCase
         $this->assertTrue(CategoryFinish::query()->where('finish_id', $system->id)->where('legacy_code', '00018')->exists());
     }
 
+    public function test_finish_names_differing_only_in_letter_case_are_one_finish(): void
+    {
+        $this->import([
+            $this->leaf('00008001', 'ثابت مجرين W45', '00008', weight: '1.267', barcode: '809712'),
+            $this->leaf('00168001', 'ثابت مجرين W45', '00168', weight: '1.267', barcode: '809712'),
+        ], allFinishes: true, extraMap: [
+            '00008' => $this->entry('00008', 'المنيوم الوبين لون FINE IRON', 'ألمنيوم/الوبين', 'FINE IRON', 'weight'),
+            '00168' => $this->entry('00168', 'المنيوم كليل سيستم لون fine Iron', 'ألمنيوم/كليل سيستم', 'fine Iron', 'weight'),
+        ], extraNodes: [
+            $this->row('00008', 'المنيوم الوبين لون FINE IRON', '0', 'a_al'),
+            $this->row('00168', 'المنيوم كليل سيستم لون fine Iron', '0', 'a_al'),
+        ]);
+
+        $this->assertSame(1, Finish::query()->whereRaw('LOWER(name) = ?', ['fine iron'])->count());
+        $this->assertSame(1, Product::query()->whereNotNull('parent_id')->where('sku', '00008001')->count());
+        $this->assertSame(1, Product::query()->whereNotNull('parent_id')->where('sku', '00168001')->count());
+    }
+
     public function test_running_twice_creates_nothing_new(): void
     {
         $rows = [
@@ -170,9 +188,9 @@ class CatalogImporterTest extends TestCase
      * @param  array<string, CategoryMapEntry>  $extraMap
      * @return array<string, int|bool|string>
      */
-    private function import(array $leaves, array $used = [], bool $allFinishes = false, array $extraMap = []): array
+    private function import(array $leaves, array $used = [], bool $allFinishes = false, array $extraMap = [], array $extraNodes = []): array
     {
-        $nodes = [
+        $nodes = [...$extraNodes,
             $this->row('00009', 'المنيوم الوبين بدون دهان', '0', 'c_cont'),
             $this->row('00001', 'المنيوم الوبين ابيض', '0', 'c_cont'),
             $this->row('00035', 'حذف', '0', 'c_cont'),

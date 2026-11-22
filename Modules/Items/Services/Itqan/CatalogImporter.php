@@ -369,23 +369,43 @@ class CatalogImporter
             }
         }
 
+        // «FINE IRON» و«fine Iron» لون واحد: المقارنة بلا حالة أحرف في PHP، فيتصرف
+        // PostgreSQL (حساس للحالة) وMySQL (غير حساس في الفهرس الفريد) بالطريقة نفسها.
         $table = $this->table('finishes');
-        $existing = DB::table($table)->whereIn('name', array_keys($names) ?: [''])->pluck('id', 'name')->all();
-        $now = now();
-        $new = array_values(array_diff(array_keys($names), array_keys($existing)));
+        $existing = [];
+        foreach (DB::table($table)->get(['id', 'name']) as $row) {
+            $existing[self::finishKey((string) $row->name)] = (int) $row->id;
+        }
 
-        foreach (array_chunk($new, self::BATCH) as $chunk) {
-            DB::table($table)->insert(array_map(fn (string $name): array => [
+        $new = [];
+        foreach (array_keys($names) as $name) {
+            $key = self::finishKey((string) $name);
+            if (! isset($existing[$key]) && ! isset($new[$key])) {
+                $new[$key] = (string) $name;
+            }
+        }
+
+        $now = now();
+        foreach ($new as $key => $name) {
+            $existing[$key] = (int) DB::table($table)->insertGetId([
                 'name' => $name, 'is_system' => false, 'is_active' => true, 'sort_order' => 0,
                 'created_at' => $now, 'updated_at' => $now,
-            ], $chunk));
+            ]);
         }
         $report['finishes_created'] = count($new);
 
-        $ids = DB::table($table)->whereIn('name', array_keys($names) ?: [''])->pluck('id', 'name')->map(fn ($id): int => (int) $id)->all();
+        $ids = [];
+        foreach (array_keys($names) as $name) {
+            $ids[(string) $name] = $existing[self::finishKey((string) $name)];
+        }
         $ids[''] = (int) Finish::system()->getKey();
 
         return $ids;
+    }
+
+    private static function finishKey(string $name): string
+    {
+        return mb_strtolower(ItqanNames::normalize($name));
     }
 
     /**

@@ -18,12 +18,20 @@ class ItqanImport extends Command
         {stages?* : Stages to run (default: all registered stages)}
         {--path= : Itqan data folder (almamoun2015). Defaults to ITQAN_DATA_PATH}
         {--dry-run : Read and report without writing}
-        {--as-user= : Id of the admin user the imported records are attributed to}';
+        {--as-user= : Id of the admin user the imported records are attributed to}
+        {--sample : Items stage: import only the small test sample (Alubin in 4 colours, 20 accessories, 1 rubber)}
+        {--all-finishes : Items stage: create a colour child for every legacy colour, not only the used ones}';
 
     protected $description = 'Import data from the old Itqan system (MyISAM files) into CrownSystem.';
 
     public function handle(ItqanImportRunner $runner): int
     {
+        // واجهة المرحلة ثابتة (run(source, dryRun, log))، فخيارات مرحلة الاصناف تُمرَّر بالإعداد.
+        config([
+            'core.itqan.sample' => (bool) $this->option('sample'),
+            'core.itqan.all_finishes' => (bool) $this->option('all-finishes'),
+        ]);
+
         try {
             $runner->run(
                 ItqanSource::fromConfig($this->option('path')),
