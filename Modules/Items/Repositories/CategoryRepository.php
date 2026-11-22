@@ -31,7 +31,7 @@ class CategoryRepository extends BaseEloquentRepository implements CategoryRepos
             ->translated()
             ->where(fn (Builder $query) => $query
                 ->where('status', CategoryStatus::ACTIVE)
-                ->when($except?->parent_id, fn (Builder $query, $parentId) => $query->orWhereKey($parentId)))
+                ->when($except?->parent_id, fn (Builder $query, $parentId) => $query->orWhere($query->qualifyColumn('id'), $parentId)))
             ->when($excluded !== [], fn (Builder $query) => $query->whereKeyNot($excluded))
             ->orderBy('code')
             ->orderBy('id')

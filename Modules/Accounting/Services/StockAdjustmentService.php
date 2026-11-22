@@ -230,7 +230,7 @@ class StockAdjustmentService
         $products = Product::query()
             ->with('translations')
             ->whereIn('id', $ids)
-            ->when($mainProductId, fn ($query) => $query->where(fn ($q) => $q->where('main_product_id', $mainProductId)->orWhereKey($mainProductId)))
+            ->when($mainProductId, fn ($query) => $query->where(fn ($q) => $q->where('main_product_id', $mainProductId)->orWhere($q->qualifyColumn('id'), $mainProductId)))
             ->orderBy('barcode')
             ->get();
         $onHand = $levels->levels($products->pluck('id')->all(), $warehouse->id);

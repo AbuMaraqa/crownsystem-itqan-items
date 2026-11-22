@@ -96,6 +96,24 @@ class CategoryColoursTest extends TestCase
                 ->has('finishes', 3));
     }
 
+    public function test_the_edit_page_of_a_sub_category_opens_and_keeps_its_inactive_parent_in_the_tree(): void
+    {
+        $this->signIn();
+        $parent = $this->category();
+        $parent->update(['status' => 0]);
+        $child = $this->category();
+        $child->update(['parent_id' => $parent->id]);
+
+        $this->get(route('categories.edit', $child->id))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Items/Category/Edit')
+                // الأب غير النشط يبقى في الشجرة ليظهر اختيار التصنيف الحالي، والتصنيف نفسه لا يظهر.
+                ->has('parents', 1)
+                ->where('parents.0.id', $parent->id)
+                ->where('parents.0.children', []));
+    }
+
     public function test_colours_and_prices_are_saved(): void
     {
         $this->signIn();
