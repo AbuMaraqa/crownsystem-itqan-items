@@ -17,7 +17,7 @@ defineProps<{ options: ProductFormOptions }>();
 
 const form = useForm<ProductForm>(emptyProduct());
 
-const context: ProductContext = { productId: null, lookupRoute: 'products.lookup', labels: {}, subProducts: [], madeFrom: [], stock: null, stockLinks: [] };
+const context: ProductContext = { productId: null, lookupRoute: 'products.lookup', labels: {}, madeFrom: [], stock: null, stockLinks: [], variantStock: {} };
 
 function submit(): void {
     if (form.processing) return;

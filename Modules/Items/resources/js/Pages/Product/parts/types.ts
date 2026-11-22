@@ -19,10 +19,6 @@ export interface ProductRowFields {
     min_limit_1: Num;
     min_limit_2: Num;
     category_id: (number | string)[];
-    /** Shown as before; they have no column, so they are not stored. */
-    meta_title: string | null;
-    meta_description: string | null;
-    meta_keywords: string | null;
     /** New files. */
     image: File | File[] | null;
     gallery: File | File[] | null;
@@ -36,6 +32,9 @@ export interface ProductRowFields {
 export interface VariationRow extends ProductRowFields {
     id: number | null;
     attribute_values: number[];
+    /** A weight item's colour: its price group (category × colour). The server names the row from it. */
+    category_finish_id: number | null;
+    is_active: boolean;
 }
 
 export interface AllowedOptionRow {
@@ -79,9 +78,7 @@ export interface ProductForm extends ProductRowFields {
     service_cost_source: string | null;
     revenue_account_id: number | string | null;
     cost_account_id: number | string | null;
-    main_product_id: number | string | null;
     site_area: Num;
-    color: string | null;
     brand_id: number | string | null;
     unit_id: number | string | null;
     tags: string[];
@@ -128,7 +125,6 @@ export interface ProductFormOptions {
     serviceCostSources: Option[];
     revenueAccounts: Option[];
     costAccounts: Option[];
-    colors: string[];
     attributes: AttributeChoice[];
     addons: AddonChoice[];
     canEditLimits: boolean;
@@ -139,13 +135,29 @@ export interface LookupOption extends Option {
     length?: string | number | null;
 }
 
-export interface SubProductRow {
+/** A weight item's colour to choose: a price group of its categories, from `products.colours` (CategoryColours). */
+export interface ColourChoice {
     id: number;
+    finish_id: number;
     name: string;
-    sku: string;
-    barcode: string;
-    length: string;
-    weight_per_meter: string;
+    category: string;
+    swatch: string | null;
+    is_active: boolean;
+    /** price list id => kg sell price */
+    prices: Record<string, string | null> | never[];
+}
+
+export interface ColourCatalogue {
+    lists: { id: number; name: string }[];
+    colours: ColourChoice[];
+}
+
+/** One colour's stock, by variation id (ProductStockSummary::variants). */
+export interface VariantStock {
+    on_hand: string;
+    available: string;
+    available_negative: boolean;
+    weight: string | null;
 }
 
 export interface MadeFromRow {
@@ -170,8 +182,8 @@ export interface ProductContext {
     /** The picker route: `products.lookup` on add, `products.edit-lookup` on edit. */
     lookupRoute: string;
     labels: Record<string, string>;
-    subProducts: SubProductRow[];
     madeFrom: MadeFromRow[];
     stock: StockSummary | null;
     stockLinks: { label: string; href: string }[];
+    variantStock: Record<string, VariantStock>;
 }

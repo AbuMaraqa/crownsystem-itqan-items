@@ -49,6 +49,15 @@ class Attribute extends Model implements TranslatableContract
 
     public $useTranslationFallback = true;
 
+    /**
+     * سمة «اللون» النظامية: قيمها صورة من قائمة الألوان (Finish) يقرؤها المتجر، فلا تُعدَّل ولا
+     * تُحذف من صفحة السمات؛ الألوان تُدار من قائمتها.
+     */
+    public function isSystem(): bool
+    {
+        return $this->slug === Finish::COLOUR_ATTRIBUTE;
+    }
+
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()

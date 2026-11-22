@@ -3,6 +3,7 @@ import { useForm } from '@inertiajs/vue3';
 
 import FormActions from '@/Components/form/FormActions.vue';
 import type { ExistingImage } from '@/Components/form/ImageUpload.vue';
+import type { Option } from '@/Components/form/SelectInput.vue';
 import type { TreeNode } from '@/Components/form/TreeSelectNode.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
@@ -10,6 +11,7 @@ import { t } from '@/lib/i18n';
 import { route } from '@/lib/route';
 
 import CategoryFields, { type CategoryForm } from './CategoryFields.vue';
+import ColoursCard, { type ColourRow, type PriceListColumn } from './parts/ColoursCard.vue';
 
 defineOptions({ layout: AdminLayout });
 
@@ -17,6 +19,9 @@ const props = defineProps<{
     category: Omit<CategoryForm, 'image' | 'removed_image'> & { id: number; code: string | null };
     images: ExistingImage[];
     parents: TreeNode[];
+    colours: ColourRow[];
+    priceLists: PriceListColumn[];
+    finishes: Option[];
 }>();
 
 const { id: _id, code: _code, ...values } = props.category;
@@ -34,4 +39,6 @@ function submit(): void {
         <CategoryFields :form="form" :parents="parents" :images="images" :code="category.code" />
         <FormActions :processing="form.processing" :cancel-href="route('categories.index')" />
     </form>
+    <!-- Its own form: the colours and kg prices are saved apart from the category's fields. -->
+    <ColoursCard v-if="category.pricing_type === 'weight'" class="mt-6" :category-id="category.id" :colours="colours" :price-lists="priceLists" :finishes="finishes" />
 </template>

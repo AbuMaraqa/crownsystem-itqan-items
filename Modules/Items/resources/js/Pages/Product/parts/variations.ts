@@ -6,7 +6,7 @@ const INHERITED = [
     'short_description', 'description', 'barcode',
     'base_price',
     'max_limit', 'min_limit_1', 'min_limit_2',
-    'category_id', 'meta_title', 'meta_description', 'meta_keywords',
+    'category_id',
 ] as const satisfies readonly (keyof ProductRowFields)[];
 
 /** A copy, so a row and its parent never share one array. */
@@ -67,7 +67,7 @@ export function generateVariations(form: ProductForm, attributes: AttributeChoic
             return { ...existing, name, slug: existing.name === name ? existing.slug : '', attribute_values: valueIds };
         }
 
-        return { ...emptyRow(), ...inherited(form), id: null, attribute_values: valueIds, name, slug: '' };
+        return { ...emptyRow(), ...inherited(form), id: null, attribute_values: valueIds, category_finish_id: null, is_active: true, name, slug: '' };
     });
 }
 

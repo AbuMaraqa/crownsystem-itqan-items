@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * The items list: main items only, each sub-item listed inside its main item. The search goes through
- * ProductSearch (every field, closest first) and also finds a main item by its sub-item.
+ * The items list: one row per item (its variations are not rows), each with its colours. An item
+ * belongs to its categories only. The search goes through ProductSearch (every field, closest first).
  */
 import { Link, router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
@@ -25,12 +25,10 @@ import BarcodeModal from './parts/BarcodeModal.vue';
 
 defineOptions({ layout: AdminLayout });
 
-interface SubItem {
-    id: number;
-    /** Escaped by the server; the search match is wrapped in <mark>. */
-    name_html: string;
-    barcode: string | null;
-    matched: boolean;
+interface ColourChip {
+    name: string;
+    swatch: string | null;
+    active: boolean;
 }
 
 interface Row {
@@ -46,17 +44,17 @@ interface Row {
     pricing_type: string;
     base_price: string | number;
     locales: string[];
-    sub_items: { count: number; rows: SubItem[]; more: number } | null;
+    colours: { count: number; rows: ColourChip[]; more: number } | null;
 }
 
-const props = defineProps<{ table: TablePayload<Row>; categories: Option[] }>();
+const props = defineProps<{ table: TablePayload<Row>; categories: Option[]; finishes: Option[] }>();
 
 const columns = computed<TableColumn[]>(() => [
     { key: 'image', label: t('Image'), toggleable: true, hidden: true },
     { key: 'sku', label: t('Item Number'), sort: 'sku', toggleable: true },
     { key: 'barcode', label: t('Barcode'), toggleable: true, hidden: true },
     { key: 'name', label: t('Name'), sort: 'name' },
-    { key: 'sub_items', label: t('Sub Items') },
+    { key: 'colours', label: t('Colours'), class: 'min-w-44', toggleable: true },
     { key: 'slug', label: t('Slug'), sort: 'slug', toggleable: true },
     { key: 'categories', label: t('Category'), toggleable: true },
     { key: 'is_active', label: t('Active'), sort: 'is_active' },
@@ -68,6 +66,7 @@ const columns = computed<TableColumn[]>(() => [
 const filters = computed<TableFilter[]>(() => [
     { type: 'text', key: 'name', label: t('Name'), placeholder: t('Search by name') },
     { key: 'category_id', label: t('Category'), options: props.categories },
+    { key: 'finish_id', label: t('Colour'), options: props.finishes },
     {
         key: 'pricing_type',
         label: t('Pricing Type'),
@@ -132,29 +131,19 @@ const { remove, removeMany } = useRecordDelete('products');
             <Link v-if="can('Product Update')" :href="route('products.edit', row.id)" class="font-medium text-brand-600 hover:underline dark:text-brand-400">{{ row.name }}</Link>
             <template v-else>{{ row.name }}</template>
         </template>
-        <template #cell-sub_items="{ row }">
-            <div v-if="row.sub_items" class="min-w-56 text-sm">
-                <span class="inline-flex rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
-                    {{ t(':count sub-items', { count: row.sub_items.count }) }}
+        <template #cell-colours="{ row }">
+            <div v-if="row.colours" class="flex flex-wrap items-center gap-1">
+                <span
+                    v-for="colour in row.colours.rows"
+                    :key="colour.name"
+                    class="inline-flex items-center gap-1 rounded-full border border-line px-2 py-0.5 text-xs"
+                    :class="{ 'opacity-50 line-through': !colour.active }"
+                    :title="colour.active ? colour.name : `${colour.name} (${t('Inactive')})`"
+                >
+                    <span v-if="colour.swatch" class="inline-block size-2.5 rounded-full border border-line" :style="{ backgroundColor: colour.swatch }" />
+                    {{ colour.name }}
                 </span>
-                <div class="mt-1 border-s-2 border-brand-200 ps-2 dark:border-brand-500/30">
-                    <component
-                        :is="can('Product Update') ? Link : 'span'"
-                        v-for="sub in row.sub_items.rows"
-                        :key="sub.id"
-                        :href="can('Product Update') ? route('products.edit', sub.id) : undefined"
-                        class="flex items-center gap-1.5 py-0.5 hover:underline"
-                        :class="sub.matched ? 'font-semibold text-brand-600 dark:text-brand-400' : 'text-muted'"
-                    >
-                        <span class="text-gray-300 dark:text-gray-600">└</span>
-                        <!-- eslint-disable-next-line vue/no-v-html -->
-                        <span v-html="sub.name_html" />
-                        <span v-if="sub.barcode" class="font-mono text-xs text-gray-400" dir="ltr">{{ sub.barcode }}</span>
-                    </component>
-                    <Link v-if="row.sub_items.more > 0 && can('Product Update')" :href="route('products.edit', row.id)" class="block py-0.5 ps-4 text-xs text-brand-600 hover:underline dark:text-brand-400">
-                        {{ t('+ :count more sub-items', { count: row.sub_items.more }) }}
-                    </Link>
-                </div>
+                <span v-if="row.colours.more > 0" class="text-xs text-muted">{{ t('+ :count more', { count: row.colours.more }) }}</span>
             </div>
             <span v-else class="text-muted">—</span>
         </template>

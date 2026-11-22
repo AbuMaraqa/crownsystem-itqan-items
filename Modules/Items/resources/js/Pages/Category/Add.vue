@@ -18,6 +18,7 @@ const form = useForm<CategoryForm>({
     slug: '',
     parent_id: null,
     description: '',
+    pricing_type: 'simple',
     image: null,
     removed_image: [],
 });

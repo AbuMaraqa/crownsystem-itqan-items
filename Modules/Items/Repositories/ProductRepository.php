@@ -38,6 +38,10 @@ class ProductRepository extends BaseEloquentRepository implements ProductReposit
         parent::__construct($model);
     }
 
+    /**
+     * قائمة الاصناف: الاصناف بلا متغيراتها، ولكل صنف ألوانه (متغيراته ذات اللون). الصنف ينتمي الى
+     * تصنيفه فقط، فالصنف الذي كان تحت صنف رئيسي صف عادي.
+     */
     public function tableQuery(): Builder
     {
         return $this->query()
@@ -45,36 +49,33 @@ class ProductRepository extends BaseEloquentRepository implements ProductReposit
                 'translations',
                 'media',
                 'categories.translations',
-                'subProducts' => fn ($query) => $query
-                    ->select(['id', 'sku', 'barcode', 'main_product_id', 'length', 'weight_per_meter'])
-                    ->with('translations:id,product_id,locale,name')
+                'variations' => fn ($query) => $query
+                    ->select(['id', 'parent_id', 'finish_id', 'is_active'])
+                    ->whereNotNull('finish_id')
+                    ->with('finish.attributeValue')
                     ->orderBy('id'),
             ])
-            ->whereNull('parent_id')
-            // الصنف الفرعي يظهر داخل صنفه الرئيسي لا صفاً مستقلاً.
-            ->whereNull('main_product_id');
+            ->whereNull('parent_id');
     }
 
-    public function searchWithSubProducts(Builder $query, string $search): Builder
+    public function search(Builder $query, string $search): Builder
     {
-        return $query->where(fn (Builder $query) => ProductSearch::apply($query, $search)
-            ->orWhereIn($query->qualifyColumn('id'), Product::query()
-                ->select('main_product_id')
-                ->whereNotNull('main_product_id')
-                ->where(fn (Builder $query) => ProductSearch::apply($query, $search))));
+        return $query->where(fn (Builder $query) => ProductSearch::apply($query, $search));
     }
 
     public function inCategory(Builder $query, int $categoryId): Builder
     {
-        $inCategory = fn (Builder $query) => $query->whereHas('categories', fn (Builder $categories) => $categories
-            ->where((new Category)->getTable().'.id', $categoryId));
+        return $query->whereHas('categories', fn (Builder $categories) => $categories->where((new Category)->getTable().'.id', $categoryId));
+    }
 
-        // الصنف الرئيسي يظهر ايضاً اذا كان احد اصنافه الفرعية في التصنيف.
-        return $query->where(fn (Builder $query) => $inCategory($query)
-            ->orWhereIn($query->qualifyColumn('id'), Product::query()
-                ->select('main_product_id')
-                ->whereNotNull('main_product_id')
-                ->where(fn (Builder $query) => $inCategory($query))));
+    /**
+     * الاصناف التي لها هذا اللون: احد متغيراتها، او الصنف نفسه.
+     */
+    public function withFinish(Builder $query, int $finishId): Builder
+    {
+        return $query->where(fn (Builder $query) => $query
+            ->where($query->qualifyColumn('finish_id'), $finishId)
+            ->orWhereIn($query->qualifyColumn('id'), Product::query()->select('parent_id')->whereNotNull('parent_id')->where('finish_id', $finishId)));
     }
 
     public function findForEdit(int $id): Product
@@ -116,7 +117,6 @@ class ProductRepository extends BaseEloquentRepository implements ProductReposit
             'serviceCostSources' => $pairs(ServiceCostSource::options()),
             'revenueAccounts' => $pairs(ItemCardRules::ledgerAccountOptions(AccountType::REVENUE)),
             'costAccounts' => $pairs(ItemCardRules::ledgerAccountOptions(AccountType::EXPENSE)),
-            'colors' => Product::colorOptions(),
             'attributes' => Attribute::query()->with(['translations', 'attributeValues.translations'])->orderBy('id')->get()
                 ->map(fn (Attribute $attribute) => [
                     'id' => (int) $attribute->id,
@@ -164,24 +164,6 @@ class ProductRepository extends BaseEloquentRepository implements ProductReposit
             ->all();
     }
 
-    public function subProductRows(Product $product): array
-    {
-        return $product->subProducts()
-            ->with('translations')
-            ->orderBy('id')
-            ->get(['id', 'sku', 'barcode', 'length', 'weight_per_meter'])
-            ->map(fn (Product $sub) => [
-                'id' => (int) $sub->id,
-                'name' => (string) $sub->name,
-                'sku' => (string) $sub->sku,
-                'barcode' => (string) $sub->barcode,
-                'length' => self::decimalLabel($sub->length),
-                'weight_per_meter' => self::decimalLabel($sub->weight_per_meter),
-            ])
-            ->values()
-            ->all();
-    }
-
     public function madeFrom(Product $product): array
     {
         return $product->cuttingRecipesAsOutput()
@@ -201,10 +183,5 @@ class ProductRepository extends BaseEloquentRepository implements ProductReposit
             ->whereIn('product_id', collect($productIds)->all())
             ->get()
             ->keyBy(fn (BranchPrice $price): string => "{$price->product_id}:{$price->branch_id}");
-    }
-
-    private static function decimalLabel(mixed $value): string
-    {
-        return filled($value) ? rtrim(rtrim(number_format((float) $value, 4, '.', ''), '0'), '.') : '—';
     }
 }

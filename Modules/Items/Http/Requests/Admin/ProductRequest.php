@@ -15,6 +15,7 @@ use Modules\Items\Entities\AddonOption;
 use Modules\Items\Entities\AttributeValue;
 use Modules\Items\Entities\Brand;
 use Modules\Items\Entities\Category;
+use Modules\Items\Entities\CategoryFinish;
 use Modules\Items\Entities\ItemTypeProfile;
 use Modules\Items\Entities\Manufacturer;
 use Modules\Items\Entities\Product;
@@ -108,18 +109,11 @@ class ProductRequest extends FormRequest
             'service_cost_source' => ['nullable', Rule::in(array_column(ServiceCostSource::cases(), 'value'))],
             'revenue_account_id' => ['nullable', 'integer', Rule::exists((new Account)->getTable(), 'id')],
             'cost_account_id' => ['nullable', 'integer', Rule::exists((new Account)->getTable(), 'id')],
-            'main_product_id' => ['nullable', 'integer', $this->closure(fn ($value) => ($data['item_type'] ?? null) === ItemType::SERVICE->value
-                ? null
-                : ItemCardRules::mainProductError($value, $data['pricing_type'] ?? null, $id ?: null))],
             // صنف الوزن بلا سعر في بطاقته.
             'base_price' => [$isWeight ? 'nullable' : 'required', ...array_slice(self::MONEY, 1)],
-            'color' => ['nullable', 'string', 'max:50'],
             'max_limit' => self::LIMIT,
             'min_limit_1' => self::LIMIT,
             'min_limit_2' => self::LIMIT,
-            'meta_title' => ['nullable', 'string', 'max:60'],
-            'meta_description' => ['nullable', 'string', 'max:160'],
-            'meta_keywords' => ['nullable', 'string', 'max:255'],
             'image' => ['nullable', ...self::IMAGE],
             'gallery' => ['nullable', 'array'],
             'gallery.*' => self::IMAGE,
@@ -147,11 +141,18 @@ class ProductRequest extends FormRequest
             'addons.*.allowed_options.*.price' => ['nullable', 'numeric', 'min:0', 'max:99999999.99'],
             'addons.*.allowed_options.*.is_default' => ['boolean'],
             'variations' => ['array'],
-            'variations.*.name' => ['required', 'string', 'max:255'],
+            // اسم لون صنف الوزن يُصنع في الخادم من اسم الاب واللون.
+            'variations.*.name' => [$isWeight ? 'nullable' : 'required', 'string', 'max:255'],
+            'variations.*.is_active' => ['boolean'],
+            // لون صنف الوزن هو مجموعة سعره (التصنيف × اللون)، مرة واحدة في الصنف.
+            'variations.*.category_finish_id' => $isWeight
+                ? ['required', 'integer', 'distinct', Rule::exists((new CategoryFinish)->getTable(), 'id')]
+                : ['nullable'],
             'variations.*.short_description' => ['nullable', 'string'],
             'variations.*.description' => ['nullable', 'string'],
             'variations.*.barcode' => ['nullable', 'string', 'max:255'],
-            'variations.*.base_price' => ['required', ...array_slice(self::MONEY, 1)],
+            // سعر لون صنف الوزن هو سعر الكيلو لمجموعة سعره.
+            'variations.*.base_price' => [$isWeight ? 'nullable' : 'required', ...array_slice(self::MONEY, 1)],
             'variations.*.max_limit' => self::LIMIT,
             'variations.*.min_limit_1' => self::LIMIT,
             'variations.*.min_limit_2' => self::LIMIT,
@@ -159,9 +160,6 @@ class ProductRequest extends FormRequest
             'variations.*.category_id.*' => ['integer', Rule::exists((new Category)->getTable(), 'id')],
             'variations.*.attribute_values' => ['array'],
             'variations.*.attribute_values.*' => ['integer', Rule::exists((new AttributeValue)->getTable(), 'id')],
-            'variations.*.meta_title' => ['nullable', 'string', 'max:60'],
-            'variations.*.meta_description' => ['nullable', 'string', 'max:160'],
-            'variations.*.meta_keywords' => ['nullable', 'string', 'max:255'],
             'variations.*.image' => ['nullable', ...self::IMAGE],
             'variations.*.gallery' => ['nullable', 'array'],
             'variations.*.gallery.*' => self::IMAGE,
@@ -193,7 +191,6 @@ class ProductRequest extends FormRequest
             'name' => 'Name', 'slug' => 'Slug', 'sku' => 'Sku', 'barcode' => 'Barcode', 'category_id' => 'Category',
             'base_price' => 'Base Price',
             'max_limit' => 'Max Limit', 'min_limit_1' => 'Min Limit 1', 'min_limit_2' => 'Min Limit 2',
-            'meta_title' => 'Meta Title', 'meta_description' => 'Meta Description', 'meta_keywords' => 'Meta Keywords',
             'short_description' => 'Short Description', 'description' => 'Description', 'image' => 'Image',
         ];
 
@@ -204,7 +201,8 @@ class ProductRequest extends FormRequest
             'bundle_count' => __('Bundle Count'), 'profile_thickness' => __('Profile Thickness'), 'is_open_profile' => __('Profile Shape'),
             'area' => __('Area'), 'item_type' => __('Item Nature'), 'service_kind' => __('Service Kind'),
             'service_cost_source' => __('Default Cost Source'), 'revenue_account_id' => __('Revenue Account'),
-            'cost_account_id' => __('Cost Account'), 'main_product_id' => __('Main Item'), 'color' => __('Color'), 'gallery.*' => __('Gallery'),
+            'cost_account_id' => __('Cost Account'), 'gallery.*' => __('Gallery'),
+            'variations.*.category_finish_id' => __('Colour'),
             'accessories.*.accessory_product_id' => __('Item'), 'accessories.*.quantity' => __('Suggested Quantity'),
             'cutting_recipes.*.output_product_id' => __('Item'), 'cutting_recipes.*.pieces_per_unit' => __('Pieces per Unit'),
             'addons.*.addon_id' => __('Addon Group'), 'addons.*.min_selection' => __('Min Selection'),
@@ -236,10 +234,8 @@ class ProductRequest extends FormRequest
             $data = $this->validationData();
             $rows = ['' => $data];
 
-            if (($data['pricing_type'] ?? null) !== 'weight') {
-                foreach ((array) ($data['variations'] ?? []) as $index => $row) {
-                    $rows["variations.{$index}."] = (array) $row;
-                }
+            foreach ((array) ($data['variations'] ?? []) as $index => $row) {
+                $rows["variations.{$index}."] = (array) $row;
             }
 
             foreach ($rows as $prefix => $row) {
@@ -312,6 +308,12 @@ class ProductRequest extends FormRequest
         foreach (['tags', 'labels', 'category_id', 'manufacturers', 'branches', 'accessories', 'cutting_recipes'] as $list) {
             if (array_key_exists($list, $data)) {
                 $data[$list] = (array) ($data[$list] ?? []);
+            }
+        }
+
+        foreach ((array) ($data['variations'] ?? []) as $index => $row) {
+            if (is_array($row)) {
+                $data['variations'][$index]['is_active'] = (bool) ($row['is_active'] ?? true);
             }
         }
 

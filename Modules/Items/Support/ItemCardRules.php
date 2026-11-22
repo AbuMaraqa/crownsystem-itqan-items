@@ -32,16 +32,24 @@ final class ItemCardRules
     {
         $isService = ($state['item_type'] ?? null) === ItemType::SERVICE->value;
 
-        return [
+        $attributes = [
             'item_type' => $isService ? ItemType::SERVICE->value : ItemType::GOODS->value,
             'service_kind' => $isService ? (ServiceKind::tryFrom((string) ($state['service_kind'] ?? ''))?->value ?? ServiceKind::GENERAL->value) : null,
             'service_cost_source' => $isService ? (ServiceCostSource::tryFrom((string) ($state['service_cost_source'] ?? ''))?->value ?? ServiceCostSource::INTERNAL->value) : null,
             'revenue_account_id' => $isService ? ($state['revenue_account_id'] ?? null) : null,
             'cost_account_id' => $isService ? ($state['cost_account_id'] ?? null) : null,
-            'main_product_id' => $isService ? null : ($state['main_product_id'] ?? null),
             // متابعة المخزون تتبع طبيعة الصنف: السلعة تُتابَع دائماً والخدمة لا.
             'manage_stock' => $isService ? 0 : 1,
         ];
+
+        // بطاقة الصنف لم تعد ترسل الصنف الرئيسي فيبقى المحفوظ كما هو؛ شجرة الاصناف ما زالت ترسله.
+        if ($isService) {
+            $attributes['main_product_id'] = null;
+        } elseif (array_key_exists('main_product_id', $state)) {
+            $attributes['main_product_id'] = $state['main_product_id'];
+        }
+
+        return $attributes;
     }
 
     /**

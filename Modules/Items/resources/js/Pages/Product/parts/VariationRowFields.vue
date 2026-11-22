@@ -7,13 +7,13 @@ import RichEditor from '@/Components/form/RichEditor.vue';
 import type { Option } from '@/Components/form/SelectInput.vue';
 import TextareaInput from '@/Components/form/TextareaInput.vue';
 import TextInput from '@/Components/form/TextInput.vue';
+import Toggle from '@/Components/form/Toggle.vue';
 import Tabs from '@/Components/ui/Tabs.vue';
 import { t } from '@/lib/i18n';
 
 import { rowTabsWithError } from './fieldTabs';
 import MediaFields from './MediaFields.vue';
 import PriceTab from './PriceTab.vue';
-import SeoFields from './SeoFields.vue';
 import StockLimitFields from './StockLimitFields.vue';
 import type { VariationRow } from './types';
 
@@ -30,7 +30,6 @@ const tabs = computed(() =>
         { value: 'inventory', label: t('Inventory') },
         { value: 'images', label: t('Images') },
         { value: 'categories', label: t('Categories') },
-        { value: 'seo', label: t('Meta Information') },
     ].map((tab) => ({ ...tab, hasError: withErrors.value.has(tab.value) })),
 );
 
@@ -61,6 +60,7 @@ watch(
                 <div class="grid gap-4 md:grid-cols-2">
                     <TextInput v-model="row.sku" :label="t('Sku')" dir="ltr" :placeholder="t('Keep empty for auto generated')" :error="error('sku')" />
                     <TextInput v-model="row.barcode" :label="t('Barcode')" dir="ltr" :error="error('barcode')" />
+                    <Toggle v-model="row.is_active" :label="t('Active')" />
                 </div>
             </template>
             <template #price><PriceTab :row="row" :error="error" /></template>
@@ -73,7 +73,6 @@ watch(
             <template #categories>
                 <MultiSelect v-model="row.category_id" :label="t('Category')" :options="categories" :error="error('category_id')" />
             </template>
-            <template #seo><SeoFields :row="row" :error="error" /></template>
         </Tabs>
     </div>
 </template>

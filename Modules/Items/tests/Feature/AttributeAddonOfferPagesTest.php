@@ -17,7 +17,9 @@ use Modules\GeoLocation\Entities\Governorate;
 use Modules\Items\Entities\Addon;
 use Modules\Items\Entities\AddonOption;
 use Modules\Items\Entities\Attribute;
+use Modules\Items\Entities\AttributeValue;
 use Modules\Items\Entities\Category;
+use Modules\Items\Entities\Finish;
 use Modules\Items\Entities\Offer;
 use Modules\Items\Enums\AddonType;
 use Modules\Items\Enums\AttributeType;
@@ -96,8 +98,9 @@ class AttributeAddonOfferPagesTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Items/Attribute/Index')
-                ->has('table.data', 2)
-                ->where('table.meta.total', 2)
+                // والسمة النظامية «اللون» التي تعكس قائمة الألوان للمتجر.
+                ->has('table.data', 3)
+                ->where('table.meta.total', 3)
                 ->has('types', count(AttributeType::cases())));
 
         $this->get(route('attributes.index', ['filter' => ['type' => AttributeType::SELECT->value]]))
@@ -119,7 +122,7 @@ class AttributeAddonOfferPagesTest extends TestCase
             ],
         ])->assertSessionHasNoErrors()->assertRedirect(route('attributes.index'));
 
-        $attribute = Attribute::query()->with('attributeValues')->firstOrFail();
+        $attribute = Attribute::query()->with('attributeValues')->where('slug', '!=', Finish::COLOUR_ATTRIBUTE)->firstOrFail();
         $this->assertSame('اللون', $attribute->translate('ar')->name);
         $this->assertNotSame('', $attribute->slug); // made from the name
         $this->assertSame($user->id, (int) $attribute->created_by);
@@ -151,7 +154,7 @@ class AttributeAddonOfferPagesTest extends TestCase
 
         $this->put(route('attributes.update', $attribute->id), [
             'name' => 'اللون',
-            'slug' => 'colour',
+            'slug' => 'shade',
             'type' => AttributeType::COLOR->value,
             'values' => [
                 ['name' => 'أخضر', 'color_code' => '#00ff00'],
@@ -159,8 +162,8 @@ class AttributeAddonOfferPagesTest extends TestCase
             ],
         ])->assertSessionHasNoErrors()->assertRedirect(route('attributes.index'));
 
-        $this->assertSame(1, Attribute::query()->count());
-        $this->assertSame('colour', $attribute->refresh()->slug);
+        $this->assertSame(1, Attribute::query()->where('slug', '!=', Finish::COLOUR_ATTRIBUTE)->count());
+        $this->assertSame('shade', $attribute->refresh()->slug);
         $this->assertNull($dropped->fresh());
         $this->assertSame('أسود فاحم', $kept->fresh()->translate('ar')->name);
         $this->assertSame(2, $attribute->attributeValues()->count());
@@ -199,7 +202,28 @@ class AttributeAddonOfferPagesTest extends TestCase
         $this->assertNull($one->fresh());
 
         $this->delete(route('attributes.destroy-many'), ['ids' => [$two->id, $three->id]])->assertSessionHas('success');
-        $this->assertSame(0, Attribute::query()->count());
+        $this->assertSame(0, Attribute::query()->where('slug', '!=', Finish::COLOUR_ATTRIBUTE)->count());
+    }
+
+    public function test_the_system_colour_attribute_is_neither_edited_nor_deleted(): void
+    {
+        $this->signIn();
+        $colour = Attribute::query()->where('slug', Finish::COLOUR_ATTRIBUTE)->firstOrFail();
+        $valueId = Finish::system()->attribute_value_id;
+
+        // قيمه صورة من قائمة الألوان، فتعديلها من هنا يقطع ألوان المتجر عن ألوانها.
+        $this->get(route('attributes.index'))->assertInertia(fn (Assert $page) => $page
+            ->where('table.data.0.id', $colour->id)
+            ->where('table.data.0.editable', false)
+            ->where('table.data.0.deletable', false));
+
+        $this->put(route('attributes.update', $colour->id), ['name' => 'لون', 'slug' => 'x', 'type' => AttributeType::COLOR->value, 'values' => []])
+            ->assertSessionHas('error');
+        $this->delete(route('attributes.destroy', $colour->id))->assertSessionHas('error');
+        $this->delete(route('attributes.destroy-many'), ['ids' => [$colour->id]])->assertSessionHas('error');
+
+        $this->assertSame(Finish::COLOUR_ATTRIBUTE, $colour->refresh()->slug);
+        $this->assertNotNull(AttributeValue::query()->find($valueId));
     }
 
     // ----- Addons -------------------------------------------------------------------------------

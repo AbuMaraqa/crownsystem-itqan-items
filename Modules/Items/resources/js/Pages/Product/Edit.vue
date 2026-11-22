@@ -8,7 +8,7 @@ import { t } from '@/lib/i18n';
 import { route } from '@/lib/route';
 
 import { toRequestBody, withUploadState } from './parts/productForm';
-import type { MadeFromRow, ProductContext, ProductForm, ProductFormOptions, StockSummary, SubProductRow, VariationRow } from './parts/types';
+import type { MadeFromRow, ProductContext, ProductForm, ProductFormOptions, StockSummary, VariantStock, VariationRow } from './parts/types';
 import ProductFields from './ProductFields.vue';
 
 defineOptions({ layout: AdminLayout });
@@ -24,10 +24,11 @@ const props = defineProps<{
         attributes: Record<string, number[]> | never[];
     };
     labels: Record<string, string> | never[];
-    subProducts: SubProductRow[];
     madeFrom: MadeFromRow[];
     stock: StockSummary | null;
     stockLinks: { label: string; href: string }[];
+    /** An empty PHP array arrives as a list. */
+    variantStock: Record<string, VariantStock> | never[];
 }>();
 
 const { id: productId, variations, attributes, ...values } = props.product;
@@ -42,10 +43,10 @@ const context: ProductContext = {
     productId,
     lookupRoute: 'products.edit-lookup',
     labels: Array.isArray(props.labels) ? {} : props.labels,
-    subProducts: props.subProducts,
     madeFrom: props.madeFrom,
     stock: props.stock,
     stockLinks: props.stockLinks,
+    variantStock: Array.isArray(props.variantStock) ? {} : props.variantStock,
 };
 
 function submit(): void {

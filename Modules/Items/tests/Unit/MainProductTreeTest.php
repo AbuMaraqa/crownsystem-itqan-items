@@ -135,43 +135,22 @@ class MainProductTreeTest extends TestCase
         $this->actingAs($user);
     }
 
-    public function test_choosing_a_main_item_makes_the_sub_item_a_weight_item(): void
+    public function test_the_main_item_search_lists_weight_items_only(): void
     {
         $this->signInForProductPages();
 
         $main = $this->product('المنيوم سبير F40 SAPIR', '00088');
-        $sub = $this->product('كباس زجاج ثابت', 'BLT5227', 'simple');
 
-        // نموذج الصنف يتطلب تصنيفاً.
-        $category = Category::create(['slug' => 'sapir-'.uniqid(), 'status' => 1]);
-        $category->translateOrNew('ar')->name = 'المنيوم سبير';
-        $category->save();
-        $sub->categories()->attach($category->id);
-
-        // البحث عن الصنف الرئيسي لا يعرض اصناف الكمية.
+        // البحث عن الصنف الرئيسي (شجرة الاصناف) لا يعرض اصناف الكمية. بطاقة الصنف لم تعد تختاره.
         $this->product('المنيوم اكسسوارات', '00099', 'simple');
         $this->assertSame([$main->id], array_keys(ProductSearch::options('المنيوم', 25, 'weight')));
         $this->getJson(route('products.edit-lookup', ['type' => 'main', 'q' => 'المنيوم']))
             ->assertOk()
             ->assertJsonCount(1)
             ->assertJsonPath('0.value', $main->id);
-
-        // ما ترسله الصفحة: حالتها كما فُتحت، والصنف الرئيسي مختار فصار صنف وزن.
-        $state = $this->get(route('products.edit', $sub->id))->assertOk()->viewData('page')['props']['product'];
-        unset($state['id'], $state['images'], $state['gallery_images'], $state['attributes']);
-        $state = [...$state, 'main_product_id' => $main->id, 'pricing_type' => 'weight', 'removed_image' => [], 'removed_gallery' => []];
-
-        $this->put(route('products.update', $sub->id), ['payload' => json_encode($state)])->assertSessionHasNoErrors();
-
-        $this->assertSame($main->id, $sub->fresh()->main_product_id);
-        $this->assertSame('weight', $sub->fresh()->pricing_type);
-
-        // اعادة التسعير الى الكمية مع بقاء الصنف الرئيسي مرفوضة.
-        $this->put(route('products.update', $sub->id), ['payload' => json_encode([...$state, 'pricing_type' => 'simple'])])
-            ->assertSessionHasErrors(['main_product_id']);
     }
 
-    public function test_items_list_shows_sub_items_inside_their_main_item(): void
+    public function test_items_list_shows_old_sub_items_as_ordinary_rows(): void
     {
         $this->signInForProductPages();
 
@@ -181,12 +160,8 @@ class MainProductTreeTest extends TestCase
 
         $ids = fn ($response): array => collect($response->viewData('page')['props']['table']['data'])->pluck('id')->sort()->values()->all();
 
-        $list = $this->get(route('products.index'))->assertOk();
-        $this->assertSame(collect([$main->id, $door->id])->sort()->values()->all(), $ids($list));
-        $this->assertSame('كباس زجاج ثابت', collect($list->viewData('page')['props']['table']['data'])->firstWhere('id', $main->id)['sub_items']['rows'][0]['name_html']);
-
-        // البحث باسم الصنف الفرعي او باركوده يُظهر صنفه الرئيسي.
-        $this->assertSame([$main->id], $ids($this->get(route('products.index', ['filter' => ['search' => 'BLT5227']]))));
-        $this->assertNotContains($sub->id, $ids($this->get(route('products.index', ['filter' => ['search' => 'BLT5227']]))));
+        // الصنف ينتمي الى تصنيفه فقط: لا صنف رئيسي يجمع غيره في القائمة.
+        $this->assertSame(collect([$main->id, $sub->id, $door->id])->sort()->values()->all(), $ids($this->get(route('products.index'))->assertOk()));
+        $this->assertSame([$sub->id], $ids($this->get(route('products.index', ['filter' => ['search' => 'BLT5227']]))));
     }
 }

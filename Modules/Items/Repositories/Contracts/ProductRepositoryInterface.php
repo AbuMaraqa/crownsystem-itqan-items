@@ -10,21 +10,25 @@ use Modules\Items\Entities\Product;
 interface ProductRepositoryInterface extends RepositoryInterface
 {
     /**
-     * The items list: main rows only (no variations, no sub-items), with what a row shows:
-     * names, categories, image and the sub-items listed inside their main item.
+     * The items list: items without their variations, with what a row shows: names, categories,
+     * image and the item's colours (its variations that have a colour).
      */
     public function tableQuery(): Builder;
 
     /**
-     * Narrow a query to the items matching a search (ProductSearch), or whose sub-item matches,
-     * so a main item shows when its sub-item's name, code or barcode is searched.
+     * Narrow a query to the items matching a search (ProductSearch).
      */
-    public function searchWithSubProducts(Builder $query, string $search): Builder;
+    public function search(Builder $query, string $search): Builder;
 
     /**
-     * Narrow a query to the items of a category, and the main items one of whose sub-items is in it.
+     * Narrow a query to the items of a category.
      */
     public function inCategory(Builder $query, int $categoryId): Builder;
+
+    /**
+     * Narrow a query to the items in a colour: one of their variations has it, or the item itself.
+     */
+    public function withFinish(Builder $query, int $finishId): Builder;
 
     /**
      * An item with what its edit form shows.
@@ -50,13 +54,6 @@ interface ProductRepositoryInterface extends RepositoryInterface
      * @return list<array{value: int, label: string, length: string|null}>
      */
     public function lookup(string $type, string $search, ?int $exclude = null): array;
-
-    /**
-     * The sub-items of a main item: name, code, barcode, length and weight per metre.
-     *
-     * @return list<array<string, mixed>>
-     */
-    public function subProductRows(Product $product): array;
 
     /**
      * The items this item is cut from, with the pieces each one yields.

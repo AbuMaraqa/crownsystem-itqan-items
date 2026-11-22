@@ -14,10 +14,14 @@ use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
 use Modules\Core\Support\Translations;
 use Modules\Items\Entities\Category;
+use Modules\Items\Entities\Finish;
 use Modules\Items\Enums\CategoryStatus;
+use Modules\Items\Http\Requests\Admin\CategoryColoursRequest;
 use Modules\Items\Http\Requests\Admin\CategoryRequest;
 use Modules\Items\Repositories\Contracts\CategoryRepositoryInterface;
+use Modules\Items\Services\CategoryColourService;
 use Modules\Items\Services\CategoryService;
+use Modules\Items\Support\CategoryColours;
 use Modules\Core\Support\RecordInfo;
 use Modules\Items\Support\TranslatedSort;
 use Spatie\QueryBuilder\AllowedSort;
@@ -122,10 +126,28 @@ class CategoryController extends Controller
                 'description' => $model->translate(app()->getLocale(), false)?->description ?? '',
                 'slug' => $model->slug,
                 'parent_id' => $model->parent_id,
+                'pricing_type' => $model->pricing_type ?: 'simple',
             ],
             'images' => $media ? [['id' => $media->id, 'url' => $media->getUrl()]] : [],
             'parents' => $this->categories->parentTree($model),
+            // تبويب «الألوان وأسعار الكيلو».
+            'colours' => CategoryColours::forCategory($model),
+            'priceLists' => CategoryColours::priceLists(),
+            'finishes' => collect(Finish::options())->map(fn (string $name, int $id) => ['value' => $id, 'label' => $name])->values()->all(),
         ]);
+    }
+
+    /**
+     * ألوان التصنيف واسعار الكيلو (CategoryColourService).
+     */
+    public function updateColours(CategoryColoursRequest $request, CategoryColourService $colours, int $category): RedirectResponse
+    {
+        /** @var Category $model */
+        $model = $this->categories->findOrFail($category);
+
+        $colours->sync($model, $request->validated()['rows'], $request->user()->id);
+
+        return back()->with('success', __('Colours and kg prices saved successfully'));
     }
 
     public function update(CategoryRequest $request, int $category): RedirectResponse
@@ -192,6 +214,8 @@ class CategoryController extends Controller
         return [
             'slug' => $data['slug'],
             'parent_id' => $data['parent_id'] ?? null,
+            // الاضافة السريعة من بطاقة الصنف لا ترسله: الافتراضي «بالكمية».
+            'pricing_type' => $data['pricing_type'] ?? 'simple',
         ];
     }
 }

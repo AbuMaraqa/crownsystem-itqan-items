@@ -59,4 +59,21 @@ class CategoryFinish extends Model
     {
         return $this->hasMany(CategoryFinishPrice::class, 'category_finish_id');
     }
+
+    /**
+     * اسم اللون كما يظهر في متغيّر صنف من التصنيفات المعطاة: «أبيض»، او «نابكو أبيض» اذا كانت
+     * مجموعة السعر من تصنيف آخر (كما في النقل R-3). يحتاج category و finish محمّلين.
+     *
+     * @param  array<int, int|string>  $categoryIds  تصنيفات الصنف الاب
+     */
+    public function labelFor(array $categoryIds): string
+    {
+        $finish = (string) $this->finish?->name;
+
+        if (in_array((int) $this->category_id, array_map('intval', $categoryIds), true)) {
+            return $finish;
+        }
+
+        return trim($this->category?->name.' '.$finish);
+    }
 }

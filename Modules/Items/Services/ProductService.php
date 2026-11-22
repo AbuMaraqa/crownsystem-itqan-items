@@ -7,10 +7,14 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Modules\Accounting\Support\StockLimits;
 use Modules\Branch\Entities\Branch;
 use Modules\Items\Entities\AttributeValue;
 use Modules\Items\Entities\BranchPrice;
+use Modules\Items\Entities\Category;
+use Modules\Items\Entities\CategoryFinish;
+use Modules\Items\Entities\Finish;
 use Modules\Items\Entities\Label;
 use Modules\Items\Entities\Product;
 use Modules\Items\Entities\Tag;
@@ -25,11 +29,11 @@ use Modules\Items\Support\ItemCardRules;
  * واحدة، والاسم والوصف يُكتبان بلغة الواجهة الحالية فقط.
  *
  * ما تخفيه البطاقة لا يُكتب، كما في صفحة Livewire السابقة:
- * - صنف الوزن: لا وسوم ولا شارات ولا علامة ولا مصنّعين ولا اضافات ولا متغيرات ولا معلومات وصفية،
- *   ولا سعر اساسي (سعر الكيلو من قوائم الاسعار). في الاضافة يُصفَّر سعره، وفي التعديل تبقى القيمة المحفوظة.
+ * - صنف الوزن: لا وسوم ولا شارات ولا علامة ولا مصنّعين ولا اضافات، ولا سعر اساسي (سعر الكيلو
+ *   على مجموعة سعر كل لون). في الاضافة يُصفَّر سعره، وفي التعديل تبقى القيمة المحفوظة. ألوانه متغيّرات.
  * - السعر الوحيد في البطاقة هو السعر الاساسي؛ لا سعر بيع ولا جملة ولا خصم، ولا سعر تكلفة يُكتب
  *   يدوياً لان التكلفة تُحسب من المشتريات الفعلية (المتوسط المرجّح في ProductCost).
- * - الخدمة: لا لون ولا حدود مخزون.
+ * - الخدمة: لا حدود مخزون.
  * - حدود المخزون لا يكتبها الا صاحب صلاحية «تعديل الحدود».
  */
 class ProductService
@@ -38,22 +42,24 @@ class ProductService
     private const COLUMNS = [
         'slug', 'sku', 'barcode', 'base_price',
         'weight_per_meter', 'length', 'pricing_type', 'brand_id', 'unit_id', 'site_area',
-        'color', 'max_limit', 'min_limit_1', 'min_limit_2',
+        'max_limit', 'min_limit_1', 'min_limit_2',
     ];
 
     private const TRANSLATED = ['name', 'short_description', 'description'];
 
-    /** حقول التجارة الالكترونية التي تختفي عن صنف الوزن. */
+    /** حقول التجارة الالكترونية التي تختفي عن صنف الوزن (ألوانه متغيّرات تبقى). */
     private const COMMERCE = [
-        'tags', 'labels', 'brand_id', 'manufacturers', 'addons', 'variations',
+        'tags', 'labels', 'brand_id', 'manufacturers', 'addons',
         'base_price',
-        'meta_title', 'meta_description', 'meta_keywords',
     ];
 
     private const VARIATION_COLUMNS = [
-        'sku', 'barcode', 'base_price',
+        'sku', 'barcode', 'base_price', 'is_active',
         'max_limit', 'min_limit_1', 'min_limit_2',
     ];
+
+    /** ما يأخذه المتغيّر من ابيه في كل حفظ: لون صنف الوزن هو المقطع نفسه. */
+    private const INHERITED_COLUMNS = ['pricing_type', 'unit_id', 'weight_per_meter', 'length', 'item_type_profile_id', 'profile_thickness', 'is_open_profile', 'area', 'bundle_count', 'site_area'];
 
     public function __construct(
         private readonly ProductRepositoryInterface $products,
@@ -121,9 +127,9 @@ class ProductService
             $this->saveRelations($product, $data, $locale);
             $this->saveMedia($product, $data);
 
-            // قائمة متغيرات فارغة لا تحذف المحفوظ، كما في الصفحة السابقة.
-            if (! empty($data['variations'])) {
-                $this->syncVariations($product, $data['variations'], $locale, $userId);
+            // الصفحة ترسل القائمة دائماً، فالقائمة الفارغة تحذف المتغيرات؛ وطلب بلا القائمة لا يلمسها.
+            if (array_key_exists('variations', $data)) {
+                $this->syncVariations($product, (array) $data['variations'], $locale, $userId);
             }
 
             return $product;
@@ -218,7 +224,7 @@ class ProductService
         }
 
         if ($isService) {
-            $data = Arr::except($data, ['color', ...StockLimits::FIELDS]);
+            $data = Arr::except($data, StockLimits::FIELDS);
         }
 
         if (! StockLimits::canEdit()) {
@@ -419,23 +425,53 @@ class ProductService
 
     /**
      * متغيرات الصنف كما في النموذج: الموجود يُحدَّث، والجديد يُنشأ (او يُستعاد المحذوف بنفس
-     * الرابط)، وما لم يعد في القائمة يُحذف.
+     * الرابط)، وما لم يعد في القائمة يُحذف، الا المستخدم في مستند فيُرفض الحفظ (يُعطَّل بدل الحذف).
+     *
+     * - لون صنف الوزن: صفه يحمل مجموعة سعره (التصنيف × اللون)، ومنها لونه واسمه «الاب - اللون»
+     *   وقيمته في سمة «اللون» للمتجر. سعره سعر الكيلو لمجموعته، فلا سعر في صفه.
+     * - متغيّر الصنف العادي: قيم سماته من النموذج، ولونه قيمة سمة «اللون» ان اختيرت.
+     * - كل متغيّر يأخذ من ابيه نوع التسعير والوحدة والمقاسات في كل حفظ.
      *
      * @param  array<int, array<string, mixed>>  $rows
+     *
+     * @throws ValidationException لون مستخدم في مستند حُذف من القائمة
      */
     private function syncVariations(Product $product, array $rows, string $locale, int $userId): void
     {
         $existing = $product->variations()->get()->keyBy('id');
+        $isWeight = $product->pricing_type === 'weight';
+        $categoryIds = $product->categories()->pluck((new Category)->getTable().'.id')->map(fn ($id) => (int) $id)->all();
+        $groups = $isWeight
+            ? CategoryFinish::query()->with(['category.translations', 'finish.attributeValue'])->whereIn('id', array_filter(array_column($rows, 'category_finish_id')))->get()->keyBy('id')
+            : collect();
         $kept = [];
 
         foreach ($rows as $row) {
             $id = filled($row['id'] ?? null) ? (int) $row['id'] : null;
-            $valueIds = collect((array) ($row['attribute_values'] ?? []))->filter(fn ($value) => filled($value))->map(fn ($value) => (int) $value)->unique()->values()->all();
-            $name = filled($row['name'] ?? null) ? (string) $row['name'] : $this->variationName((string) $product->name, $valueIds);
+            $group = $isWeight ? $groups->get((int) ($row['category_finish_id'] ?? 0)) : null;
 
-            $fields = Arr::only($row, self::VARIATION_COLUMNS);
+            if ($isWeight && ! $group) {
+                continue;
+            }
+
+            $valueIds = $group
+                ? array_filter([(int) $group->finish->attribute_value_id])
+                : collect((array) ($row['attribute_values'] ?? []))->filter(fn ($value) => filled($value))->map(fn ($value) => (int) $value)->unique()->values()->all();
+            $name = match (true) {
+                $group !== null => $product->name.' - '.$group->labelFor($categoryIds),
+                filled($row['name'] ?? null) => (string) $row['name'],
+                default => $this->variationName((string) $product->name, $valueIds),
+            };
+
+            $fields = [
+                ...Arr::only($row, self::VARIATION_COLUMNS),
+                ...$product->only(self::INHERITED_COLUMNS),
+                'finish_id' => $group ? $group->finish_id : $this->finishOf($valueIds),
+                'category_finish_id' => $group?->id,
+            ];
             $fields['parent_id'] = $product->id;
-            $fields['base_price'] = $fields['base_price'] ?? 0;
+            $fields['base_price'] = $isWeight ? 0 : ($fields['base_price'] ?? 0);
+            $fields['is_active'] = (int) ($row['is_active'] ?? true);
 
             if (blank($fields['sku'] ?? null)) {
                 unset($fields['sku']);
@@ -476,18 +512,45 @@ class ProductService
                 $variation->attributeValues()->sync($valueIds);
             }
 
-            if (! empty($row['category_id'])) {
+            // لون صنف الوزن في تصنيف ابيه دائماً؛ متغيّر الصنف العادي له تصنيفه في صفه.
+            if ($isWeight) {
+                $variation->categories()->sync($categoryIds);
+            } elseif (! empty($row['category_id'])) {
                 $variation->categories()->sync(array_map('intval', (array) $row['category_id']));
             }
 
             $this->saveMedia($variation, $row);
         }
 
-        $removed = $existing->keys()->diff($kept);
+        // Eloquent Collection::except تستبعد بمعرّف الصنف ثم تعيد الترقيم، فالمعرّفات من modelKeys.
+        $removed = $existing->except($kept);
+        $used = $removed->filter(fn (Product $variation) => $variation->hasDocumentLines());
+
+        if ($used->isNotEmpty()) {
+            throw ValidationException::withMessages(['variations' => __('These variations are used in documents and cannot be removed; deactivate them instead: :names', [
+                'names' => $used->map(fn (Product $variation) => (string) $variation->name)->join('، '),
+            ])]);
+        }
 
         if ($removed->isNotEmpty()) {
-            Product::query()->whereIn('id', $removed)->delete();
+            Product::query()->whereIn('id', $removed->modelKeys())->delete();
         }
+    }
+
+    /**
+     * لون المتغيّر من قيم سماته: اللون الذي قيمته في سمة «اللون» بينها، او null.
+     *
+     * @param  list<int>  $valueIds
+     */
+    private function finishOf(array $valueIds): ?int
+    {
+        if ($valueIds === []) {
+            return null;
+        }
+
+        $id = Finish::query()->whereIn('attribute_value_id', $valueIds)->value('id');
+
+        return $id === null ? null : (int) $id;
     }
 
     /**

@@ -14,6 +14,7 @@ use Inertia\Response;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
 use Modules\Items\Entities\Addon;
+use Modules\Items\Entities\Finish;
 use Modules\Items\Entities\Product;
 use Modules\Items\Enums\ItemType;
 use Modules\Items\Enums\ProductActive;
@@ -22,13 +23,11 @@ use Modules\Items\Repositories\Contracts\ProductRepositoryInterface;
 use Modules\Items\Services\ItemsPdfService;
 use Modules\Items\Services\ProductAccessoryService;
 use Modules\Items\Services\ProductService;
+use Modules\Items\Support\CategoryColours;
 use Modules\Items\Support\ItemCardRules;
 use Modules\Items\Support\ProductSearch;
 use Modules\Items\Support\ProductStockSummary;
 use Modules\Core\Support\RecordInfo;
-use Modules\Items\Support\Search\SearchHighlighter;
-use Modules\Items\Support\Search\SearchQuery;
-use Modules\Items\Support\Search\TextNormalizer;
 use Modules\Items\Support\TranslatedSort;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -40,8 +39,8 @@ use Spatie\QueryBuilder\AllowedSort;
  */
 class ProductController extends Controller
 {
-    /** الاصناف الفرعية الظاهرة في صف صنفها الرئيسي، والباقي يُختصر بعدد. */
-    private const VISIBLE_SUB_ITEMS = 5;
+    /** الألوان الظاهرة في صف الصنف، والباقي يُختصر بعدد. */
+    private const VISIBLE_COLOURS = 6;
 
     /** ملصقات ملف PDF واحد. */
     private const MAX_LABELS = 1000;
@@ -53,8 +52,6 @@ class ProductController extends Controller
 
     public function index(Request $request): Response
     {
-        $filter = (array) $request->input('filter', []);
-        $search = SearchQuery::from((string) ($filter['search'] ?? $filter['name'] ?? ''));
         // مع البحث وبلا ترتيب يختاره المستخدم: الاقرب الى نص البحث اولاً.
         $byRelevance = ! $request->filled('sort');
 
@@ -62,14 +59,15 @@ class ProductController extends Controller
             'table' => AdminTable::for($this->products->tableQuery())
                 ->filters(
                     AllowedFilter::callback('search', function (Builder $query, mixed $value) use ($byRelevance): void {
-                        $this->products->searchWithSubProducts($query, (string) $value);
+                        $this->products->search($query, (string) $value);
 
                         if ($byRelevance) {
                             ProductSearch::orderByRelevance($query, (string) $value);
                         }
                     }),
-                    AllowedFilter::callback('name', fn (Builder $query, mixed $value) => $this->products->searchWithSubProducts($query, (string) $value)),
+                    AllowedFilter::callback('name', fn (Builder $query, mixed $value) => $this->products->search($query, (string) $value)),
                     AllowedFilter::callback('category_id', fn (Builder $query, mixed $value) => $this->products->inCategory($query, (int) $value)),
+                    AllowedFilter::callback('finish_id', fn (Builder $query, mixed $value) => $this->products->withFinish($query, (int) $value)),
                     AllowedFilter::callback('pricing_type', function (Builder $query, mixed $value): void {
                         if (in_array($value, ['simple', 'weight'], true)) {
                             $query->where('pricing_type', $value);
@@ -94,9 +92,10 @@ class ProductController extends Controller
                     'pricing_type' => $product->pricing_type,
                     'base_price' => $product->base_price,
                     'locales' => $product->translations->pluck('locale')->values(),
-                    'sub_items' => $this->subItems($product, $search),
+                    'colours' => $this->colourChips($product),
                 ]),
             'categories' => fn () => $this->products->formOptions()['categories'],
+            'finishes' => fn () => collect(Finish::options())->map(fn (string $name, int $id) => ['value' => $id, 'label' => $name])->values()->all(),
         ]);
     }
 
@@ -123,15 +122,29 @@ class ProductController extends Controller
             'product' => $this->formState($model, $accessories),
             // تسميات ما اختير في الحقول التي تبحث في الخادم.
             'labels' => ProductSearch::labels([
-                $model->main_product_id,
                 ...$model->accessories()->pluck('accessory_product_id')->all(),
                 ...$model->cuttingRecipesAsSource()->pluck('output_product_id')->all(),
             ]),
-            'subProducts' => $this->products->subProductRows($model),
             'madeFrom' => $this->products->madeFrom($model),
             'stock' => ProductStockSummary::of($model),
             'stockLinks' => ProductStockSummary::links($model),
+            'variantStock' => ProductStockSummary::variants($model),
         ]);
+    }
+
+    /**
+     * ألوان صنف الوزن واسعار الكيلو: `?categories[]=..&include[]=..` (مجموعات سعر محفوظة على متغيراته).
+     */
+    public function colours(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'categories' => ['nullable', 'array', 'max:50'],
+            'categories.*' => ['integer'],
+            'include' => ['nullable', 'array', 'max:500'],
+            'include.*' => ['integer'],
+        ]);
+
+        return response()->json(CategoryColours::for($data['categories'] ?? [], $data['include'] ?? []));
     }
 
     public function update(ProductRequest $request, int $product): RedirectResponse
@@ -233,37 +246,26 @@ class ProductController extends Controller
     }
 
     /**
-     * The sub-items under their main item's name. When searching, the matching ones come first and
-     * are highlighted; the rest are cut to a count so the row stays short.
+     * The item's colours in its row: the first few as chips, the rest as a count.
      *
-     * @return array{count: int, rows: list<array<string, mixed>>, more: int}|null
+     * @return array{count: int, rows: list<array{name: string, swatch: ?string, active: bool}>, more: int}|null
      */
-    private function subItems(Product $product, SearchQuery $search): ?array
+    private function colourChips(Product $product): ?array
     {
-        if ($product->subProducts->isEmpty()) {
+        if ($product->variations->isEmpty()) {
             return null;
         }
 
-        // المطابقة كالبحث نفسه: كل الكلمات بأي ترتيب، وبلا فرق في الهمزات والتاء المربوطة.
-        $matches = function (Product $sub) use ($search): bool {
-            $text = TextNormalizer::normalize($sub->name.' '.$sub->sku.' '.$sub->barcode);
-
-            return ! $search->isEmpty() && collect($search->terms)->every(fn (string $term): bool => str_contains($text, $term));
-        };
-
-        [$matched, $others] = $product->subProducts->partition($matches);
-        $visible = $matched->concat($others)->take(max($matched->count(), self::VISIBLE_SUB_ITEMS));
+        $visible = $product->variations->take(self::VISIBLE_COLOURS);
 
         return [
-            'count' => $product->subProducts->count(),
-            'rows' => $visible->map(fn (Product $sub) => [
-                'id' => $sub->id,
-                // نص مهرَّب، والتمييز وسم <mark> فقط (SearchHighlighter).
-                'name_html' => (string) SearchHighlighter::highlight($sub->name, $search),
-                'barcode' => $sub->barcode,
-                'matched' => $matches($sub),
+            'count' => $product->variations->count(),
+            'rows' => $visible->map(fn (Product $variation) => [
+                'name' => (string) $variation->finish?->name,
+                'swatch' => $variation->finish?->attributeValue?->color_code ?: null,
+                'active' => (int) $variation->is_active === ProductActive::IS_ACTIVE->value,
             ])->values()->all(),
-            'more' => $product->subProducts->count() - $visible->count(),
+            'more' => $product->variations->count() - $visible->count(),
         ];
     }
 
@@ -291,9 +293,7 @@ class ProductController extends Controller
             'service_cost_source' => $product->service_cost_source,
             'revenue_account_id' => $product->revenue_account_id,
             'cost_account_id' => $product->cost_account_id,
-            'main_product_id' => $product->main_product_id,
             'site_area' => $product->site_area,
-            'color' => $product->color,
             'brand_id' => $product->brand_id,
             'unit_id' => $product->unit_id,
             'tags' => $product->tags->pluck('name')->filter()->values()->all(),
@@ -323,6 +323,8 @@ class ProductController extends Controller
             'variations' => $product->variations->map(fn (Product $variation) => [
                 'id' => $variation->id,
                 ...$this->rowState($variation),
+                'is_active' => (int) $variation->is_active === ProductActive::IS_ACTIVE->value,
+                'category_finish_id' => $variation->category_finish_id === null ? null : (int) $variation->category_finish_id,
                 'attribute_values' => $variation->attributeValues->modelKeys(),
                 'images' => $images($variation, 'product'),
                 'gallery_images' => $images($variation, 'product_gallery'),
@@ -354,9 +356,6 @@ class ProductController extends Controller
             'min_limit_1' => $product->min_limit_1,
             'min_limit_2' => $product->min_limit_2,
             'category_id' => $product->categories->modelKeys(),
-            'meta_title' => null,
-            'meta_description' => null,
-            'meta_keywords' => null,
         ];
     }
 }

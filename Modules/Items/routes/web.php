@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Modules\Accounting\Http\Middleware\AuthorizeAnyPermission;
 use Modules\Items\Http\Controllers\Admin\AddonController;
 use Modules\Items\Http\Controllers\Admin\AttributeController;
 use Modules\Items\Http\Controllers\Admin\BrandController;
@@ -40,6 +41,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::post('/reorder', 'reorder')->name('reorder')->can('Category Update');
                     Route::get('/{category}/edit', 'edit')->whereNumber('category')->name('edit')->can('Category Update');
                     Route::put('/{category}', 'update')->whereNumber('category')->name('update')->can('Category Update');
+                    Route::put('/{category}/colours', 'updateColours')->whereNumber('category')->name('colours.update')->can('Category Update');
                     Route::delete('/{category}', 'destroy')->whereNumber('category')->name('destroy')->can('Category Delete');
                     Route::get('/{category}/info', 'info')->whereNumber('category')->name('info')->can('Category View List');
                 });
@@ -197,6 +199,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     // منتقي الاصناف في النموذج (?type=main|goods|any&exclude=..&q=)، مسار لكل نموذج.
                     Route::get('/lookup', 'lookup')->name('lookup')->can('Product Create');
                     Route::get('/edit-lookup', 'lookup')->name('edit-lookup')->can('Product Update');
+                    // ألوان صنف الوزن واسعار الكيلو لتبويب «الألوان والمتغيرات».
+                    Route::get('/colours', 'colours')->name('colours')->middleware(AuthorizeAnyPermission::class.':Product Create,Product Update');
                     Route::get('/{product}/edit', 'edit')->whereNumber('product')->name('edit')->can('Product Update');
                     Route::put('/{product}', 'update')->whereNumber('product')->name('update')->can('Product Update');
                     Route::put('/{product}/active', 'active')->whereNumber('product')->name('active')->can('Product Update');

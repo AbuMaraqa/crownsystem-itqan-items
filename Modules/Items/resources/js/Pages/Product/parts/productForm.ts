@@ -14,9 +14,6 @@ export function emptyRow(): ProductRowFields {
         min_limit_1: '',
         min_limit_2: '',
         category_id: [],
-        meta_title: '',
-        meta_description: '',
-        meta_keywords: '',
         image: null,
         gallery: [],
         images: [],
@@ -43,9 +40,7 @@ export function emptyProduct(): ProductForm {
         service_cost_source: 'internal',
         revenue_account_id: null,
         cost_account_id: null,
-        main_product_id: null,
         site_area: '',
-        color: '',
         brand_id: null,
         unit_id: null,
         tags: [],
@@ -69,10 +64,6 @@ export const isWeight = (form: Pick<ProductForm, 'pricing_type'>): boolean => fo
 
 export const isService = (form: Pick<ProductForm, 'item_type'>): boolean => form.item_type === 'service';
 
-/** A piece: a weight item under a main item. It has no price. */
-export const isPiece = (form: Pick<ProductForm, 'pricing_type' | 'item_type' | 'main_product_id'>): boolean =>
-    isWeight(form) && !isService(form) && form.main_product_id !== null && form.main_product_id !== '';
-
 function isFile(value: unknown): value is File {
     return typeof File !== 'undefined' && value instanceof File;
 }
@@ -81,8 +72,8 @@ function files(value: File | File[] | null): File[] {
     return (Array.isArray(value) ? value : [value]).filter(isFile);
 }
 
-/** What a weight item does not show, so the form does not send it (the server drops it too). */
-const COMMERCE = ['tags', 'labels', 'brand_id', 'manufacturers', 'addons', 'variations', 'meta_title', 'meta_description', 'meta_keywords'] as const;
+/** What a weight item does not show, so the form does not send it (the server drops it too). Its colours are variations. */
+const COMMERCE = ['tags', 'labels', 'brand_id', 'manufacturers', 'addons'] as const;
 
 /**
  * The request body: everything but the files as one JSON field (see ProductRequest), the files under

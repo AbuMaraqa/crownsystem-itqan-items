@@ -291,7 +291,7 @@ class ProductSearchTest extends TestCase
             ->viewData('page')['props']['table']['data'])->pluck('id')->all();
 
         $this->assertSame([$this->door->id], $ids('ابواب'));
-        // الصنف الرئيسي يظهر عند البحث باسم صنفه الفرعي.
-        $this->assertSame([$this->white->id], $ids('مجاري'));
+        // الصنف ينتمي الى تصنيفه فقط: المقطع القديم يظهر بنفسه، لا صنفه الرئيسي.
+        $this->assertSame([$this->profile->id], $ids('مجاري'));
     }
 }

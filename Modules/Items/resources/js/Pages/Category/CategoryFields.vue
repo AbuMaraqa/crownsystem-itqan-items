@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { InertiaForm } from '@inertiajs/vue3';
 
+import Field from '@/Components/form/Field.vue';
 import ImageUpload, { type ExistingImage } from '@/Components/form/ImageUpload.vue';
 import TextareaInput from '@/Components/form/TextareaInput.vue';
 import TextInput from '@/Components/form/TextInput.vue';
@@ -14,6 +15,8 @@ export interface CategoryForm {
     slug: string;
     parent_id: number | string | null;
     description: string;
+    /** How the category's items are priced: by quantity, or by weight (a kg price per colour). */
+    pricing_type: 'simple' | 'weight';
     image: File | File[] | null;
     removed_image: (number | string)[];
 }
@@ -25,6 +28,11 @@ defineProps<{
     /** The category number from the item tree, made by the server from the parent's number. */
     code?: string | null;
 }>();
+
+const pricingTypes = [
+    { value: 'simple', label: t('Simple') },
+    { value: 'weight', label: t('By Weight') },
+];
 </script>
 
 <template>
@@ -42,6 +50,14 @@ defineProps<{
                     :placeholder="t('Select Parent Category')"
                     :error="form.errors.parent_id"
                 />
+                <Field class="md:col-span-2" :label="t('Pricing Type')" :error="form.errors.pricing_type" :hint="t('By weight: the items are priced per kg, by the kg price of each colour below.')">
+                    <div class="flex h-control items-center gap-5" role="radiogroup">
+                        <label v-for="type in pricingTypes" :key="type.value" class="inline-flex items-center gap-2 text-sm">
+                            <input v-model="form.pricing_type" type="radio" name="pricing_type" :value="type.value" class="size-4 accent-brand-500" />
+                            {{ type.label }}
+                        </label>
+                    </div>
+                </Field>
                 <TextareaInput v-model="form.description" class="md:col-span-2" :label="t('Description')" :error="form.errors.description" />
             </div>
         </Card>

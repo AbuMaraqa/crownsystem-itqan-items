@@ -3,6 +3,7 @@
 namespace Modules\Items\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -47,6 +48,8 @@ class AttributeController extends Controller
                     'description' => $attribute->description,
                     'type' => AttributeType::tryFrom((int) $attribute->type)?->label(),
                     'locales' => $attribute->translations->pluck('locale'),
+                    'editable' => ! $attribute->isSystem(),
+                    'deletable' => ! $attribute->isSystem(),
                 ]),
             'types' => $this->types(),
         ]);
@@ -101,7 +104,11 @@ class AttributeController extends Controller
         /** @var Attribute $model */
         $model = $this->attributes->findOrFail($attribute);
 
-        $this->attributeService->update($model, $request->validated(), app()->getLocale(), $request->user()->id);
+        try {
+            $this->attributeService->update($model, $request->validated(), app()->getLocale(), $request->user()->id);
+        } catch (DomainException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
 
         return to_route('attributes.index')->with('success', __('Attribute updated successfully'));
     }
@@ -111,8 +118,12 @@ class AttributeController extends Controller
         /** @var Attribute $model */
         $model = $this->attributes->findOrFail($attribute);
 
-        if (! $this->attributeService->delete($model)) {
-            return back()->with('error', SafeDelete::message());
+        try {
+            if (! $this->attributeService->delete($model)) {
+                return back()->with('error', SafeDelete::message());
+            }
+        } catch (DomainException $exception) {
+            return back()->with('error', $exception->getMessage());
         }
 
         return back()->with('success', __('Attribute deleted successfully'));
@@ -122,8 +133,12 @@ class AttributeController extends Controller
     {
         $ids = $request->validate(['ids' => ['required', 'array'], 'ids.*' => ['integer']])['ids'];
 
-        if (! $this->attributeService->deleteMany($ids)) {
-            return back()->with('error', SafeDelete::message());
+        try {
+            if (! $this->attributeService->deleteMany($ids)) {
+                return back()->with('error', SafeDelete::message());
+            }
+        } catch (DomainException $exception) {
+            return back()->with('error', $exception->getMessage());
         }
 
         return back()->with('success', __('Attributes deleted successfully'));

@@ -45,6 +45,8 @@ class CategoryRequest extends FormRequest
                 $this->notInsideItself(...),
             ],
             'description' => ['nullable', 'string'],
+            // طريقة تسعير اصناف التصنيف: بالكمية، او بالوزن (سعر الكيلو لكل لون).
+            'pricing_type' => ['nullable', Rule::in(['simple', 'weight'])],
             // الصورة اختيارية للتصنيف.
             'image' => ['nullable', 'image', 'mimes:jpeg,jpg,png,gif,webp', 'max:2048'],
             'removed_image' => ['nullable', 'array'],
@@ -75,6 +77,7 @@ class CategoryRequest extends FormRequest
             'slug' => __('Slug'),
             'parent_id' => __('Parent Category'),
             'description' => __('Description'),
+            'pricing_type' => __('Pricing Type'),
             'image' => __('Image'),
         ];
     }

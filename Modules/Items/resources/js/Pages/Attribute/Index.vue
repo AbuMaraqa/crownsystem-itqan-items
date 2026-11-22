@@ -24,6 +24,9 @@ interface Row {
     description: string | null;
     type: string | null;
     locales: string[];
+    /** False for the system colour attribute: it follows the colours list. */
+    editable: boolean;
+    deletable: boolean;
 }
 
 const props = defineProps<{ table: TablePayload<Row>; types: Option[] }>();
@@ -77,6 +80,8 @@ const { remove, removeMany } = useRecordDelete('attributes');
                 :id="row.id"
                 :title="row.name"
                 :edit-href="route('attributes.edit', row.id)"
+                :editable="row.editable"
+                :deletable="row.deletable"
                 :fields="[
                     { label: t('Name'), value: row.name },
                     { label: t('Slug'), value: row.slug },

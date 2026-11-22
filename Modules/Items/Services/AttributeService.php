@@ -2,6 +2,7 @@
 
 namespace Modules\Items\Services;
 
+use DomainException;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Support\SafeDelete;
 use Modules\Core\Support\Translations;
@@ -47,6 +48,8 @@ class AttributeService
      */
     public function update(Attribute $attribute, array $data, string $locale, ?int $userId): Attribute
     {
+        $this->ensureNotSystem($attribute);
+
         return DB::transaction(function () use ($attribute, $data, $locale, $userId): Attribute {
             $attribute->fill(['slug' => $data['slug'], 'type' => $data['type']]);
             Translations::fill($attribute, Translations::fromForm($data, $locale, self::TRANSLATED));
@@ -65,6 +68,8 @@ class AttributeService
      */
     public function delete(Attribute $attribute): bool
     {
+        $this->ensureNotSystem($attribute);
+
         return SafeDelete::attempt(fn () => $this->attributes->delete($attribute));
     }
 
@@ -75,9 +80,21 @@ class AttributeService
      */
     public function deleteMany(array $ids): bool
     {
+        $this->attributes->query()->whereKey($ids)->get()->each(fn (Attribute $attribute) => $this->ensureNotSystem($attribute));
+
         return SafeDelete::attempt(fn () => DB::transaction(fn () => $this->attributes->query()->whereKey($ids)->get()->each(
             fn (Attribute $attribute) => $this->attributes->delete($attribute)
         )));
+    }
+
+    /**
+     * @throws DomainException سمة «اللون» النظامية (Attribute::isSystem)
+     */
+    private function ensureNotSystem(Attribute $attribute): void
+    {
+        if ($attribute->isSystem()) {
+            throw new DomainException(__('The colour attribute follows the colours list and cannot be changed here.'));
+        }
     }
 
     /**

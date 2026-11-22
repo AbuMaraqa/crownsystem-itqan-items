@@ -70,6 +70,28 @@ final class ProductStockSummary
     }
 
     /**
+     * رصيد كل لون (متغيّر) للصنف في تبويب «المخزون»، باستعلام واحد. فارغ بلا صلاحية «Stock View List».
+     *
+     * @return array<int, array{on_hand: string, available: string, available_negative: bool, weight: ?string}> بمفتاح معرّف المتغيّر
+     */
+    public static function variants(Product $product): array
+    {
+        if (! auth()->user()?->can('Stock View List') || ! $product->exists) {
+            return [];
+        }
+
+        $ids = $product->relationLoaded('variations') ? $product->variations->modelKeys() : $product->variations()->pluck('id')->all();
+        $fmt = fn ($value): string => Quantity::format($value, 2);
+
+        return array_map(fn (array $levels) => [
+            'on_hand' => $fmt($levels['on_hand']),
+            'available' => $fmt($levels['available']),
+            'available_negative' => $levels['available'] < 0,
+            'weight' => $levels['weight'] > 0 ? $fmt($levels['weight']) : null,
+        ], app(StockLevelService::class)->levels($ids));
+    }
+
+    /**
      * روابط المخزون في التبويب: بطاقة الصنف المخزنية والرصيد الافتتاحي (لغير الصنف الرئيسي).
      *
      * @return list<array{label: string, href: string}>

@@ -18,6 +18,7 @@ use Modules\Items\Entities\AttributeValue;
 use Modules\Items\Entities\BranchPrice;
 use Modules\Items\Entities\Brand;
 use Modules\Items\Entities\Category;
+use Modules\Items\Entities\Finish;
 use Modules\Items\Entities\Label;
 use Modules\Items\Entities\Product;
 use Modules\Items\Entities\ProductAccessory;
@@ -72,6 +73,16 @@ class ProductPagesTest extends TestCase
         return $product;
     }
 
+    /** لون ومرآته في سمة «اللون». */
+    private function finish(string $name, ?string $hex = null): Finish
+    {
+        $value = new AttributeValue(['attribute_id' => Finish::colourAttributeId(), 'color_code' => $hex]);
+        $value->translateOrNew('ar')->name = $name;
+        $value->save();
+
+        return Finish::create(['name' => $name, 'is_active' => true, 'attribute_value_id' => $value->id]);
+    }
+
     private function category(string $name = 'فئة'): Category
     {
         $category = Category::create(['slug' => 'cat-'.Str::lower(Str::random(8)), 'status' => 1]);
@@ -93,12 +104,11 @@ class ProductPagesTest extends TestCase
             'base_price' => '10', 'sale_price' => '', 'cost_price' => '', 'wholesale_price' => '',
             'discount_type' => null, 'discount_value' => '', 'discount_start_date' => '', 'discount_end_date' => '',
             'max_limit' => '', 'min_limit_1' => '', 'min_limit_2' => '', 'category_id' => [],
-            'meta_title' => '', 'meta_description' => '', 'meta_keywords' => '',
             'removed_image' => [], 'removed_gallery' => [],
             'weight_per_meter' => '', 'length' => '', 'pricing_type' => 'simple', 'item_type_profile_id' => null,
             'bundle_count' => '', 'profile_thickness' => null, 'is_open_profile' => null, 'area' => '',
             'item_type' => 'goods', 'service_kind' => 'general', 'service_cost_source' => 'internal',
-            'revenue_account_id' => null, 'cost_account_id' => null, 'main_product_id' => null, 'site_area' => '', 'color' => '',
+            'revenue_account_id' => null, 'cost_account_id' => null, 'site_area' => '',
             'brand_id' => null, 'unit_id' => null, 'tags' => [], 'labels' => [], 'manufacturers' => [], 'branches' => [],
             'addons' => [], 'accessories' => [], 'cutting_recipes' => [], 'variations' => [],
         ], $overrides);
@@ -130,34 +140,43 @@ class ProductPagesTest extends TestCase
 
     /* ---------- القائمة ---------- */
 
-    public function test_the_list_needs_its_permission_and_shows_main_items_with_their_sub_items(): void
+    public function test_the_list_needs_its_permission_and_shows_items_with_their_colours(): void
     {
         $this->signIn([]);
         $this->get(route('products.index'))->assertForbidden();
 
         $this->signIn(['Product View List']);
-        $main = $this->product('المنيوم سبير', ['sku' => '00088', 'pricing_type' => 'weight']);
-        $this->product('كباس زجاج ثابت', ['sku' => 'BLT5227', 'barcode' => 'BC-BLT5227', 'pricing_type' => 'weight', 'main_product_id' => $main->id]);
-        $door = $this->product('باب 2000 دفتين', ['sku' => 'D-2000']);
+        $white = $this->finish('أبيض', '#ffffff');
+        $mesh = $this->finish('ميش');
+        $profile = $this->product('ثابت مجرين W45', ['sku' => '00090001', 'pricing_type' => 'weight']);
+        $this->product('ثابت مجرين W45 - أبيض', ['parent_id' => $profile->id, 'finish_id' => $white->id, 'pricing_type' => 'weight']);
+        $this->product('ثابت مجرين W45 - ميش', ['parent_id' => $profile->id, 'finish_id' => $mesh->id, 'pricing_type' => 'weight', 'is_active' => 0]);
+        // صنف قديم كان تحت صنف رئيسي: صف عادي في تصنيفه.
+        $old = $this->product('كباس زجاج ثابت', ['sku' => 'BLT5227', 'pricing_type' => 'weight', 'main_product_id' => $profile->id]);
 
         $this->get(route('products.index'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Items/Product/Index')
                 ->has('table.data', 2)
-                ->where('table.data.0.id', $door->id)
-                ->where('table.data.1.id', $main->id)
-                ->where('table.data.1.sub_items.count', 1)
-                ->where('table.data.1.sub_items.rows.0.name_html', 'كباس زجاج ثابت')
-                ->where('table.data.1.sub_items.rows.0.matched', false)
-                ->has('categories'));
+                ->where('table.data.0.id', $old->id)
+                ->where('table.data.1.id', $profile->id)
+                ->where('table.data.1.colours.count', 2)
+                ->where('table.data.1.colours.rows.0.name', 'أبيض')
+                ->where('table.data.1.colours.rows.0.swatch', '#ffffff')
+                ->where('table.data.1.colours.rows.1.active', false)
+                ->where('table.data.0.colours', null)
+                ->missing('table.data.0.sub_items')
+                ->has('categories')
+                ->has('finishes'));
 
-        // البحث برقم الصنف الفرعي يُظهر صنفه الرئيسي، والمطابق مميَّز.
+        // البحث يجد الصنف بنفسه فقط.
         $this->get(route('products.index', ['filter' => ['search' => 'BLT5227']]))
-            ->assertInertia(fn (Assert $page) => $page
-                ->has('table.data', 1)
-                ->where('table.data.0.id', $main->id)
-                ->where('table.data.0.sub_items.rows.0.matched', true));
+            ->assertInertia(fn (Assert $page) => $page->has('table.data', 1)->where('table.data.0.id', $old->id));
+
+        // تصفية اللون: الاصناف التي لها هذا اللون.
+        $this->get(route('products.index', ['filter' => ['finish_id' => $mesh->id]]))
+            ->assertInertia(fn (Assert $page) => $page->has('table.data', 1)->where('table.data.0.id', $profile->id));
     }
 
     public function test_the_list_filters_by_category_pricing_type_and_activity(): void
@@ -165,17 +184,18 @@ class ProductPagesTest extends TestCase
         $this->signIn(['Product View List']);
         $category = $this->category();
         $main = $this->product('المنيوم', ['pricing_type' => 'weight']);
-        $piece = $this->product('مقطع', ['pricing_type' => 'weight', 'main_product_id' => $main->id]);
-        $piece->categories()->attach($category->id);
+        $main->categories()->attach($category->id);
+        $this->product('مقطع', ['pricing_type' => 'weight']);
         $door = $this->product('باب');
         $door->forceFill(['is_active' => 0])->save();
 
-        // الصنف الرئيسي يظهر في التصنيف اذا كان احد فروعه فيه.
         $this->get(route('products.index', ['filter' => ['category_id' => $category->id]]))
             ->assertInertia(fn (Assert $page) => $page->has('table.data', 1)->where('table.data.0.id', $main->id));
 
         $this->get(route('products.index', ['filter' => ['pricing_type' => 'simple']]))
             ->assertInertia(fn (Assert $page) => $page->has('table.data', 1)->where('table.data.0.id', $door->id));
+        $this->get(route('products.index', ['filter' => ['pricing_type' => 'weight']]))
+            ->assertInertia(fn (Assert $page) => $page->has('table.data', 2));
 
         $this->get(route('products.index', ['filter' => ['is_active' => 0]]))
             ->assertInertia(fn (Assert $page) => $page->has('table.data', 1)->where('table.data.0.id', $door->id)->where('table.data.0.is_active', false));
@@ -263,7 +283,6 @@ class ProductPagesTest extends TestCase
             'labels' => ['شارة'],
             'length' => '6',
             'max_limit' => '30', 'min_limit_1' => '20', 'min_limit_2' => '10',
-            'color' => 'ابيض',
             'accessories' => [['accessory_product_id' => $lock->id, 'quantity' => '2']],
             'cutting_recipes' => [['output_product_id' => $glass->id, 'pieces_per_unit' => '6']],
             'addons' => [['addon_id' => $addon->id, 'is_required' => true, 'min_selection' => 1, 'max_selection' => null, 'max_quantity_per_option' => 1, 'allowed_options' => []]],
@@ -283,7 +302,6 @@ class ProductPagesTest extends TestCase
         $this->assertSame(1, $product->tags()->count());
         $this->assertSame(1, $product->labels()->count());
         $this->assertSame('30.00', $product->max_limit);
-        $this->assertSame('ابيض', $product->color);
         $this->assertSame([$lock->id], $product->accessories()->pluck('accessory_product_id')->all());
         $this->assertSame(1, $product->cuttingRecipesAsSource()->count());
         $this->assertSame(1, $product->addons()->count());
@@ -311,38 +329,35 @@ class ProductPagesTest extends TestCase
         $this->assertNull(Product::query()->whereTranslation('name', 'بلا حدود')->firstOrFail()->max_limit);
     }
 
-    public function test_a_repeated_piece_name_gets_a_unique_slug(): void
+    public function test_a_repeated_name_gets_a_unique_slug(): void
     {
         $this->signIn();
-        $main = $this->product('رئيسي', ['pricing_type' => 'weight']);
 
         foreach ([1, 2] as $ignored) {
-            $this->store($this->newItem(['name' => 'Kabbas', 'pricing_type' => 'weight', 'main_product_id' => $main->id, 'cost_price' => '5']))
+            $this->store($this->newItem(['name' => 'Kabbas', 'pricing_type' => 'weight', 'cost_price' => '5']))
                 ->assertSessionHasNoErrors();
         }
 
-        $pieces = Product::query()->where('main_product_id', $main->id)->get();
-        $this->assertCount(2, $pieces);
-        $this->assertCount(2, $pieces->pluck('slug')->unique());
-        // المقطع بلا سعر ولا تكلفة.
-        $this->assertNull($pieces->first()->cost_price);
+        $items = Product::query()->whereTranslation('name', 'Kabbas')->get();
+        $this->assertCount(2, $items);
+        $this->assertCount(2, $items->pluck('slug')->unique());
+        // صنف الوزن بلا سعر ولا تكلفة في بطاقته.
+        $this->assertNull($items->first()->cost_price);
     }
 
-    public function test_a_service_drops_stock_fields_and_its_main_item(): void
+    public function test_a_service_drops_stock_fields(): void
     {
         $this->signIn();
-        $main = $this->product('رئيسي', ['pricing_type' => 'weight']);
 
         $this->store($this->newItem([
-            'name' => 'نقل', 'item_type' => 'service', 'service_kind' => 'transport', 'main_product_id' => $main->id,
-            'color' => 'احمر', 'max_limit' => '3', 'min_limit_1' => '2', 'min_limit_2' => '1',
+            'name' => 'نقل', 'item_type' => 'service', 'service_kind' => 'transport',
+            'max_limit' => '3', 'min_limit_1' => '2', 'min_limit_2' => '1',
         ]))->assertSessionHasNoErrors();
 
         $service = Product::query()->whereTranslation('name', 'نقل')->firstOrFail();
         $this->assertSame('service', $service->item_type);
         $this->assertSame('transport', $service->service_kind);
-        $this->assertNull($service->main_product_id);
-        $this->assertNull($service->color);
+        $this->assertNull($service->max_limit);
         $this->assertSame(0, (int) $service->manage_stock);
     }
 
@@ -390,8 +405,7 @@ class ProductPagesTest extends TestCase
     public function test_the_edit_page_opens_saved_values(): void
     {
         $this->signIn(['Product Update']);
-        $main = $this->product('رئيسي', ['pricing_type' => 'weight']);
-        $product = $this->product('مقطع', ['pricing_type' => 'weight', 'profile_thickness' => 'thick', 'is_open_profile' => true, 'bundle_count' => 4, 'main_product_id' => $main->id]);
+        $product = $this->product('مقطع', ['pricing_type' => 'weight', 'profile_thickness' => 'thick', 'is_open_profile' => true, 'bundle_count' => 4]);
 
         $this->get(route('products.edit', $product->id))
             ->assertOk()
@@ -400,13 +414,8 @@ class ProductPagesTest extends TestCase
                 ->where('product.profile_thickness', 'thick')
                 ->where('product.is_open_profile', 1)
                 ->where('product.bundle_count', 4)
-                ->where('product.main_product_id', $main->id)
-                ->where('labels.'.$main->id, fn ($label) => str_contains($label, 'رئيسي'))
-                ->where('subProducts', [])
-                ->where('stock', null));
-
-        $this->get(route('products.edit', $main->id))
-            ->assertInertia(fn (Assert $page) => $page->has('subProducts', 1)->where('subProducts.0.id', $product->id));
+                ->where('stock', null)
+                ->where('variantStock', []));
     }
 
     public function test_the_edit_page_saves_and_keeps_the_category_required(): void
@@ -427,27 +436,14 @@ class ProductPagesTest extends TestCase
         $this->assertNotEmpty($product->sku);
     }
 
-    public function test_choosing_a_main_item_and_its_rules(): void
+    public function test_an_old_main_item_with_sub_items_stays_priced_by_weight(): void
     {
         $this->signIn();
         $main = $this->product('المنيوم سبير', ['pricing_type' => 'weight']);
-        $simple = $this->product('اكسسوار');
-        $sub = $this->product('كباس', ['pricing_type' => 'simple']);
-        $sub->categories()->attach($this->category()->id);
-
-        // البحث عن الصنف الرئيسي لا يعرض اصناف الكمية ولا الصنف نفسه.
-        $this->getJson(route('products.edit-lookup', ['type' => 'main', 'exclude' => $main->id, 'q' => 'المنيوم']))->assertOk()->assertJsonCount(0);
-        $this->getJson(route('products.edit-lookup', ['type' => 'main', 'q' => 'المنيوم']))->assertJsonPath('0.value', $main->id);
-
-        $this->update($sub, $this->editState($sub, ['main_product_id' => $main->id, 'pricing_type' => 'weight']))->assertSessionHasNoErrors();
-        $this->assertSame($main->id, (int) $sub->refresh()->main_product_id);
-
-        // الصنف الفرعي يجب ان يكون صنف وزن، والرئيسي صنف وزن.
-        $this->update($sub, $this->editState($sub, ['pricing_type' => 'simple']))->assertSessionHasErrors('main_product_id');
-        $this->update($sub, $this->editState($sub, ['main_product_id' => $simple->id]))->assertSessionHasErrors('main_product_id');
-
-        // الصنف الرئيسي الذي تحته فروع يبقى صنف وزن.
+        $this->product('كباس', ['pricing_type' => 'weight', 'main_product_id' => $main->id]);
         $main->categories()->attach($this->category()->id);
+
+        // ربط الصنف الرئيسي القديم يبقى حتى تُزيله المرحلة 4، فلا يُحوَّل اصله الى «بالكمية».
         $this->update($main, $this->editState($main, ['pricing_type' => 'simple', 'base_price' => '1']))->assertSessionHasErrors('pricing_type');
     }
 

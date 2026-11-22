@@ -210,17 +210,15 @@ class ProductFormItemModelFieldsTest extends TestCase
         $product->tags()->sync([$tag->id]);
         $product->labels()->sync([$label->id]);
         $product->addons()->attach($addon->id, ['created_by' => auth()->id()]);
-        $variation = $this->product(['parent_id' => $product->id]);
 
-        // الصفحة لا ترسل هذه الحقول لصنف الوزن؛ ولو وصلت فارغة لا تُكتب.
-        $this->save($product, ['tags' => [], 'labels' => [], 'brand_id' => null, 'addons' => [], 'variations' => []])->assertSessionHasNoErrors();
+        // الصفحة لا ترسل هذه الحقول لصنف الوزن؛ ولو وصلت فارغة لا تُكتب. (ألوانه متغيّرات تُحفظ: ProductColoursTest.)
+        $this->save($product, ['tags' => [], 'labels' => [], 'brand_id' => null, 'addons' => []])->assertSessionHasNoErrors();
 
         $product->refresh();
         $this->assertSame($brand->id, (int) $product->brand_id);
         $this->assertSame([$tag->id], $product->tags()->pluck($tag->getTable().'.id')->all());
         $this->assertSame([$label->id], $product->labels()->pluck($label->getTable().'.id')->all());
         $this->assertSame([$addon->id], $product->addons()->pluck($addon->getTable().'.id')->all());
-        $this->assertNotNull(Product::query()->find($variation->id));
     }
 
     public function test_a_simple_item_still_saves_its_commerce_fields_from_the_edit_page(): void
