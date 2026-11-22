@@ -10,6 +10,8 @@ use Modules\Accounting\Entities\SalesQuotation;
 use Modules\Accounting\Enums\SalesOrderStatus;
 use Modules\Accounting\Enums\SalesQuotationStatus;
 use Modules\Accounting\Services\SalesQuotationService;
+use Modules\Accounting\Services\StockLevelService;
+use Modules\Accounting\tests\Feature\Concerns\PriceGroupFixtures;
 use Modules\Accounting\tests\Feature\Concerns\SalesDocumentFixtures;
 use Modules\Core\Entities\User;
 use Spatie\Permission\Models\Role;
@@ -22,6 +24,7 @@ use Tests\TestCase;
  */
 class SalesOrderPagesTest extends TestCase
 {
+    use PriceGroupFixtures;
     use RefreshDatabase;
     use SalesDocumentFixtures;
 
@@ -282,6 +285,66 @@ class SalesOrderPagesTest extends TestCase
         $this->assertSame(SalesOrderStatus::DRAFT, $order->refresh()->status);
     }
 
+    /* ---------- سطر مجموعة السعر (المرحلة 2): «الوبين — أبيض» وقطعه ألوان مقاطعه ---------- */
+
+    public function test_a_price_group_line_saves_reopens_confirms_and_reserves_its_colour_pieces(): void
+    {
+        ['white' => $white, 'whiteW45' => $whiteW45, 'meshW45' => $meshW45] = $this->alpineGroups();
+
+        $this->post(route('accounting.sales-orders.store'), $this->orderData([$this->groupLine($white, [[$whiteW45, 3]], 24)]))
+            ->assertSessionHas('success');
+
+        $order = SalesOrder::query()->latest('id')->firstOrFail();
+        $line = $order->items()->with('pieces')->sole();
+        $this->assertNull($line->product_id);
+        $this->assertSame($white->id, (int) $line->category_finish_id);
+        $this->assertSame('الوبين — أبيض', $line->description);
+        // الوزن الكلي من القطع (3 × 6.5 × 1.25)، والمبلغ بالوزن الفعلي 24 × سعر الكيلو 20.
+        $this->assertEquals(24.375, (float) $line->total_weight);
+        $this->assertEquals(480, (float) $line->line_total);
+
+        $form = $this->props($this->get(route('accounting.sales-orders.edit', $order->id)))['order'];
+        $this->assertNull($form['items'][0]['product_id']);
+        $this->assertSame($white->id, $form['items'][0]['category_finish_id']);
+        $this->assertSame('الوبين — أبيض', $form['items'][0]['product_label']);
+        $this->assertSame($whiteW45->id, $form['items'][0]['pieces'][0]['product_id']);
+
+        $this->post(route('accounting.sales-orders.confirm', $order->id), $form)->assertSessionHas('success');
+        $this->assertSame(SalesOrderStatus::CONFIRMED, $order->refresh()->status);
+        $this->assertSame($white->id, (int) $order->items()->sole()->category_finish_id);
+
+        // الطلبية المؤكدة تحجز كل لون بعدد قطعه، ولا تحجز لوناً آخر.
+        $reserved = app(StockLevelService::class)->reserved([$whiteW45->id, $meshW45->id], $this->warehouse->id);
+        $this->assertEquals(3, $reserved[$whiteW45->id] ?? 0);
+        $this->assertEquals(0, $reserved[$meshW45->id] ?? 0);
+    }
+
+    public function test_an_order_from_a_quotation_keeps_its_price_group_lines(): void
+    {
+        ['white' => $white, 'whiteW45' => $whiteW45] = $this->alpineGroups();
+        $quotationService = app(SalesQuotationService::class);
+        $quotation = $quotationService->approve($quotationService->create([
+            'client_id' => $this->customer->id,
+            'quotation_date' => now()->toDateString(),
+            'currency_id' => $this->currency->id,
+            'items' => [$this->groupLine($white, [[$whiteW45, 2]], 16)],
+        ]));
+
+        $form = $this->props($this->get(route('accounting.sales-orders.add', ['sales_quotation_id' => $quotation->id])))['order'];
+        $this->assertNull($form['items'][0]['product_id']);
+        $this->assertSame($white->id, $form['items'][0]['category_finish_id']);
+        $this->assertSame($whiteW45->id, $form['items'][0]['pieces'][0]['product_id']);
+
+        $this->post(route('accounting.sales-orders.store'), $form)->assertSessionHas('success');
+
+        $line = SalesOrder::query()->where('sales_quotation_id', $quotation->id)->sole()->items()->with('pieces')->sole();
+        $this->assertNull($line->product_id);
+        $this->assertSame($white->id, (int) $line->category_finish_id);
+        $this->assertNotNull($line->sales_quotation_item_id);
+        $this->assertSame([$whiteW45->id], $line->pieces->pluck('product_id')->map(fn ($id) => (int) $id)->all());
+        $this->assertSame(SalesQuotationStatus::CONVERTED, $quotation->refresh()->status);
+    }
+
     /**
      * يولّد PDF (واجهة PDF العامة): آخر اختبار في الصنف، انظر تقرير مسار pdf في web.php.
      */
@@ -291,5 +354,10 @@ class SalesOrderPagesTest extends TestCase
 
         $this->getJson(route('accounting.sales-orders.info', $order->id))->assertOk();
         $this->get(route('accounting.sales-orders.pdf', $order->id))->assertOk();
+
+        // سطر مجموعة السعر بلا صنف يُطبع باسم مجموعته.
+        ['white' => $white, 'whiteW45' => $whiteW45] = $this->alpineGroups();
+        $groupOrder = $this->draftOrder([$this->groupLine($white, [[$whiteW45, 1]])]);
+        $this->get(route('accounting.sales-orders.pdf', $groupOrder->id))->assertOk();
     }
 }
