@@ -33,8 +33,10 @@ use Modules\Accounting\Services\StockAdjustmentService;
 use Modules\Accounting\Services\StockLedgerService;
 use Modules\Accounting\Services\StockLevelService;
 use Modules\Accounting\Services\StockTransferService;
+use Modules\Accounting\tests\Feature\Concerns\PriceGroupFixtures;
 use Modules\Core\Entities\Currency;
 use Modules\Core\Entities\User;
+use Modules\Items\Entities\CategoryFinish;
 use Modules\Items\Entities\Product;
 use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
@@ -47,6 +49,7 @@ use Tests\TestCase;
  */
 class WeightMainItemBalanceTest extends TestCase
 {
+    use PriceGroupFixtures;
     use RefreshDatabase;
 
     private Currency $currency;
@@ -402,6 +405,132 @@ class WeightMainItemBalanceTest extends TestCase
         $this->assertMain(kg: 8, value: 88);
         $this->assertSame(88.0, $this->balance($this->warehouseAccount()));
         $this->assertSame(0.0, $this->balance($this->varianceAccount()));
+        $this->assertSame(0.0, $this->totalBalance());
+    }
+
+    /* ---------- سطر مجموعة السعر (المرحلة 2): كل لون يدخل بقطعه ونصيبه من الوزن والقيمة ---------- */
+
+    public function test_a_price_group_purchase_is_received_by_colour_at_its_value_share(): void
+    {
+        ['white' => $white, 'whiteW45' => $w45, 'whiteW60' => $w60] = $this->alpineGroups();
+        // 2 × W45 (16.25 كغم) + 1 × W60 (13 كغم) = 29.25 محسوب، 40 فعلي × 5 = 200.
+        $order = $this->groupPurchaseOrder($white, [[$w45, 2], [$w60, 1]], actual: 40, price: 5);
+        $this->postGroupReceipt($order);
+
+        $this->assertSame(2.0, $this->onHand($w45));
+        $this->assertSame(1.0, $this->onHand($w60));
+        $this->assertSame(111.1111, $this->valueOf($w45));
+        $this->assertSame(88.8889, $this->valueOf($w60));
+        $this->assertSame(22.2222, $this->weightOf($w45));
+        $this->assertSame(17.7778, $this->weightOf($w60));
+        $this->assertSame(200.0, $this->balance($this->warehouseAccount()));
+        $this->assertSame(0, StockMovement::query()->where(fn ($query) => $query->whereNull('product_id')->orWhere('product_id', 0))->count());
+
+        $this->invoiceGroupOrder($order, actual: 40, price: 5);
+
+        $this->assertSame(111.1111, $this->valueOf($w45));
+        $this->assertSame(200.0, $this->balance($this->warehouseAccount()));
+        $this->assertSame(0.0, $this->balance($this->varianceAccount()));
+        $this->assertSame(0.0, $this->totalBalance());
+    }
+
+    public function test_a_price_group_invoice_at_another_price_revalues_each_colour_by_its_share(): void
+    {
+        ['white' => $white, 'whiteW45' => $w45, 'whiteW60' => $w60] = $this->alpineGroups();
+        $order = $this->groupPurchaseOrder($white, [[$w45, 2], [$w60, 1]], actual: 40, price: 5);
+        $this->postGroupReceipt($order);
+
+        $this->invoiceGroupOrder($order, actual: 40, price: 6);
+
+        // 240 بنسبة الوزن المحسوب: 133.3333 و 106.6667.
+        $this->assertSame(133.3333, $this->valueOf($w45));
+        $this->assertSame(106.6667, $this->valueOf($w60));
+        $this->assertSame(240.0, $this->balance($this->warehouseAccount()));
+        $this->assertSame(0.0, $this->balance($this->varianceAccount()));
+        $this->assertSame(0.0, $this->totalBalance());
+    }
+
+    public function test_a_price_group_purchase_invoice_without_order_stocks_each_colour_at_its_share(): void
+    {
+        ['white' => $white, 'whiteW45' => $w45, 'whiteW60' => $w60] = $this->alpineGroups();
+        $service = app(PurchaseInvoiceService::class);
+
+        $invoice = $service->post($service->create($this->invoiceData($this->supplier, [
+            $this->groupLine($white, [[$w45, 2], [$w60, 1]], 40, 5),
+        ])));
+
+        $this->assertNull($invoice->items->sole()->product_id);
+        $this->assertSame(111.1111, $this->valueOf($w45));
+        $this->assertSame(88.8889, $this->valueOf($w60));
+        $this->assertSame(22.2222, $this->weightOf($w45));
+        $this->assertSame(200.0, $this->balance($this->warehouseAccount()));
+        $this->assertSame(0.0, $this->totalBalance());
+    }
+
+    public function test_a_price_group_sales_return_brings_each_colour_back_at_its_issue_cost(): void
+    {
+        ['white' => $white, 'whiteW45' => $w45, 'whiteW60' => $w60] = $this->alpineGroups();
+        $this->buyGroup($white, [[$w45, 2], [$w60, 1]], actual: 40, price: 5);
+        $sales = app(SalesInvoiceService::class);
+        $invoice = $sales->post($sales->create($this->invoiceData($this->customer, [$this->groupLine($white, [[$w45, 2], [$w60, 1]], 40, 8)])));
+        $this->assertSame(200.0, $this->balance($this->cogsAccount()));
+
+        $line = $invoice->items()->with('pieces')->sole();
+        $service = app(SalesReturnService::class);
+        $return = $service->post($service->create([
+            'sales_invoice_id' => $invoice->id,
+            'return_date' => now()->toDateString(),
+            'items' => [[
+                'sales_invoice_item_id' => $line->id,
+                'pieces' => [['sales_invoice_item_piece_id' => $line->pieces->firstWhere('product_id', $w45->id)->id, 'piece_count' => 1]],
+            ]],
+        ]));
+
+        $returned = $return->items()->sole();
+        $this->assertNull($returned->product_id);
+        $this->assertSame($white->id, (int) $returned->category_finish_id);
+        // قطعة W45 تعود بكلفة خروجها (111.1111 ÷ 2) وبنصيبها من الوزن المفوتر (8.125 × 40 ÷ 29.25).
+        $this->assertSame(1.0, $this->onHand($w45));
+        $this->assertSame(0.0, $this->onHand($w60));
+        $this->assertEqualsWithDelta(11.1111, $this->weightOf($w45), 0.0001);
+        $this->assertEqualsWithDelta(144.4444, $this->balance($this->cogsAccount()), 0.0002);
+        $this->assertSame(0.0, $this->totalBalance());
+
+        $service->cancel($return, 'test');
+
+        $this->assertSame(0.0, $this->onHand($w45));
+        $this->assertSame(200.0, $this->balance($this->cogsAccount()));
+        $this->assertSame(0.0, $this->totalBalance());
+    }
+
+    public function test_a_price_group_purchase_return_takes_each_colour_out_at_its_cost(): void
+    {
+        ['white' => $white, 'whiteW45' => $w45, 'whiteW60' => $w60] = $this->alpineGroups();
+        $invoice = $this->buyGroup($white, [[$w45, 2], [$w60, 1]], actual: 40, price: 5);
+
+        $line = $invoice->items()->with('pieces')->sole();
+        $service = app(PurchaseReturnService::class);
+        $return = $service->post($service->create([
+            'purchase_invoice_id' => $invoice->id,
+            'return_date' => now()->toDateString(),
+            'items' => [[
+                'purchase_invoice_item_id' => $line->id,
+                'pieces' => [['purchase_invoice_item_piece_id' => $line->pieces->firstWhere('product_id', $w60->id)->id, 'piece_count' => 1]],
+            ]],
+        ]));
+
+        $this->assertSame($white->id, (int) $return->items()->sole()->category_finish_id);
+        $this->assertSame(2.0, $this->onHand($w45));
+        $this->assertSame(0.0, $this->onHand($w60));
+        $this->assertSame(0.0, $this->valueOf($w60));
+        $this->assertEqualsWithDelta(111.1111, $this->balance($this->warehouseAccount()), 0.0002);
+        $this->assertSame(0.0, $this->totalBalance());
+
+        $service->cancel($return, 'test');
+
+        $this->assertSame(1.0, $this->onHand($w60));
+        $this->assertSame(88.8889, $this->valueOf($w60));
+        $this->assertSame(200.0, $this->balance($this->warehouseAccount()));
         $this->assertSame(0.0, $this->totalBalance());
     }
 
@@ -778,6 +907,65 @@ class WeightMainItemBalanceTest extends TestCase
             'purchase_order_item_id' => $item->id,
             'product_id' => $item->product_id,
             'quantity' => $actual ?? 0,
+            'actual_weight' => $actual,
+            'unit_price' => $price,
+            'pieces' => PurchaseInvoiceService::orderPieces($item),
+        ]], ['purchase_order_id' => $order->id])));
+    }
+
+    /**
+     * @param  array<int, array{0: Product, 1: int}>  $pieces
+     */
+    private function groupPurchaseOrder(CategoryFinish $group, array $pieces, float $actual, float $price): PurchaseOrder
+    {
+        $service = app(PurchaseOrderService::class);
+        $line = $this->groupLine($group, $pieces, $actual, $price);
+
+        return $service->confirm($service->create([
+            'client_id' => $this->supplier->id,
+            'warehouse_id' => $this->warehouse->id,
+            'order_date' => now()->toDateString(),
+            'items' => [$line],
+        ]));
+    }
+
+    /**
+     * فاتورة شراء بلا طلبية بسطر مجموعة سعر، مرحّلة.
+     *
+     * @param  array<int, array{0: Product, 1: int}>  $pieces
+     */
+    private function buyGroup(CategoryFinish $group, array $pieces, float $actual, float $price): PurchaseInvoice
+    {
+        $service = app(PurchaseInvoiceService::class);
+
+        return $service->post($service->create($this->invoiceData($this->supplier, [$this->groupLine($group, $pieces, $actual, $price)])));
+    }
+
+    private function postGroupReceipt(PurchaseOrder $order)
+    {
+        $item = $order->items()->with('pieces')->sole();
+        $service = app(GoodsReceiptService::class);
+
+        return $service->post($service->create([
+            'purchase_order_id' => $order->id,
+            'items' => $item->pieces->map(fn ($piece) => [
+                'purchase_order_item_id' => $item->id,
+                'purchase_order_item_piece_id' => $piece->id,
+                'quantity' => (float) $piece->piece_count,
+            ])->all(),
+        ]));
+    }
+
+    private function invoiceGroupOrder(PurchaseOrder $order, float $actual, float $price): PurchaseInvoice
+    {
+        $service = app(PurchaseInvoiceService::class);
+        $item = PurchaseOrder::query()->with('items.pieces')->findOrFail($order->id)->items->sole();
+
+        return $service->post($service->create($this->invoiceData($this->supplier, [[
+            'purchase_order_item_id' => $item->id,
+            'product_id' => null,
+            'category_finish_id' => $item->category_finish_id,
+            'quantity' => $actual,
             'actual_weight' => $actual,
             'unit_price' => $price,
             'pieces' => PurchaseInvoiceService::orderPieces($item),

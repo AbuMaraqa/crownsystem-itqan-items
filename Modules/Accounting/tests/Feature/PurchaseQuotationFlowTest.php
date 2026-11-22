@@ -25,6 +25,8 @@ use Modules\Accounting\Services\InventoryAccounts;
 use Modules\Accounting\Services\PurchaseInvoiceService;
 use Modules\Accounting\Services\PurchaseOrderService;
 use Modules\Accounting\Services\PurchaseQuotationService;
+use Modules\Accounting\Services\StockLedgerService;
+use Modules\Accounting\tests\Feature\Concerns\PriceGroupFixtures;
 use Modules\Accounting\tests\Unit\ConsolidatedTestFactory;
 use Modules\Core\Entities\Currency;
 use Modules\Core\Entities\User;
@@ -37,6 +39,7 @@ use Tests\TestCase;
  */
 class PurchaseQuotationFlowTest extends TestCase
 {
+    use PriceGroupFixtures;
     use RefreshDatabase;
 
     private Currency $currency;
@@ -185,6 +188,39 @@ class PurchaseQuotationFlowTest extends TestCase
         $this->assertSame(0.0, $this->balance($this->account('5115')));
         $this->assertSame(225.0, $this->balance($this->warehouseAccount()));
         $this->assertSame(-225.0, $this->balance($this->supplierAccount()));
+    }
+
+    public function test_a_price_group_line_is_quoted_invoiced_and_received_by_colour(): void
+    {
+        ['white' => $white, 'whiteW45' => $w45, 'whiteW60' => $w60] = $this->alpineGroups();
+        $order = app(PurchaseOrderService::class)->confirm(app(PurchaseOrderService::class)->create($this->orderData([
+            $this->groupLine($white, [[$w45, 2], [$w60, 1]], 40, 0),
+        ])));
+
+        // سطر المجموعة يظهر في عرض السعر باسمه ووزنه الفعلي، ويُسعَّر بالكيلو.
+        $lines = app(PurchaseQuotationService::class)->orderGridLines($order);
+        $this->assertCount(1, $lines);
+        $this->assertNull($lines[0]['product_id']);
+        $this->assertSame($white->id, $lines[0]['category_finish_id']);
+        $this->assertSame(40.0, $lines[0]['quantity']);
+
+        $quotation = app(PurchaseQuotationService::class)->approve($this->quote($order, 5));
+        $service = app(PurchaseInvoiceService::class);
+        $invoice = $service->createFromQuotation($quotation);
+
+        $line = $invoice->items->sole();
+        $this->assertNull($line->product_id);
+        $this->assertSame($white->id, (int) $line->category_finish_id);
+        $this->assertSame(200.0, (float) $invoice->total_amount);
+
+        $service->post($invoice);
+
+        $ledger = app(StockLedgerService::class);
+        $this->assertSame(2.0, $ledger->onHand($w45->id));
+        $this->assertSame(1.0, $ledger->onHand($w60->id));
+        $this->assertSame(200.0, $this->balance($this->warehouseAccount()));
+        $this->assertSame(0.0, $this->balance($this->account('2125')));
+        $this->assertSame(0.0, $this->balance($this->account('5115')));
     }
 
     public function test_invoicing_without_a_quotation_starts_unpriced_and_cannot_post_until_priced(): void

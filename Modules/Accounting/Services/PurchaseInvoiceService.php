@@ -16,6 +16,7 @@ use Modules\Accounting\Enums\PurchaseInvoiceStatus;
 use Modules\Accounting\Enums\PurchaseOrderStatus;
 use Modules\Accounting\Enums\PurchaseReturnStatus;
 use Modules\Accounting\Support\ItemsGrid;
+use Modules\Accounting\Support\GridLine;
 use Modules\Accounting\Support\WeightPieces;
 use Modules\Core\Services\ReferenceNumberService;
 use Modules\Items\Entities\Product;
@@ -444,9 +445,10 @@ class PurchaseInvoiceService
     private function normalizeItems(array $items): array
     {
         return collect($items)
-            ->filter(fn(array $item) => filled($item['product_id'] ?? null))
+            ->filter(fn (array $item) => GridLine::hasOwner($item))
             ->map(function (array $item): array {
-                $product = Product::query()->with('translations')->find($item['product_id']);
+                // سطر صنف، او سطر مجموعة سعر بلا صنف (التصنيف × اللون) قطعه ألوان مقاطعه.
+                $product = GridLine::product($item);
                 $quantity = $this->decimalValue($item['quantity'] ?? 1, 1);
                 $unitPrice = $this->decimalValue($item['unit_price'] ?? ($product ? app(StockLedgerService::class)->averageCost((int) $product->id) : 0));
 
@@ -489,9 +491,10 @@ class PurchaseInvoiceService
                 return [
                     'id' => $item['id'] ?? null,
                     'purchase_order_item_id' => filled($item['purchase_order_item_id'] ?? null) ? (int) $item['purchase_order_item_id'] : null,
-                    'product_id' => (int) $item['product_id'],
+                    'product_id' => $product?->id,
+                    'category_finish_id' => GridLine::groupId($item),
                     'barcode' => $item['barcode'] ?? $product?->barcode,
-                    'description' => $item['description'] ?? $product?->name,
+                    'description' => GridLine::description($item, $product),
                     'quantity' => $quantity,
                     'total_weight' => $weight['total_weight'],
                     'actual_weight' => $weight['actual_weight'],
@@ -522,6 +525,7 @@ class PurchaseInvoiceService
             ->map(fn ($item): array => [
                 'purchase_order_item_id' => $item->id,
                 'product_id' => $item->product_id,
+                'category_finish_id' => $item->category_finish_id,
                 'barcode' => $item->barcode,
                 'description' => $item->description,
                 'quantity' => $item->invoiceQuantity(),

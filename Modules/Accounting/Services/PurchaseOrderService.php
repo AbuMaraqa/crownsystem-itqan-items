@@ -13,6 +13,7 @@ use Modules\Accounting\Enums\PurchaseOrderDeliveryType;
 use Modules\Accounting\Enums\PurchaseOrderStatus;
 use Modules\Accounting\Support\ItemsGrid;
 use Modules\Accounting\Support\ItemsGridState;
+use Modules\Accounting\Support\GridLine;
 use Modules\Accounting\Support\WeightPieces;
 use Modules\Core\Services\ReferenceNumberService;
 use Modules\Items\Entities\Product;
@@ -326,16 +327,17 @@ class PurchaseOrderService
     private function normalizeItems(array $items): array
     {
         return collect($items)
-            ->filter(fn (array $item) => filled($item['product_id'] ?? null))
+            ->filter(fn (array $item) => GridLine::hasOwner($item))
             ->map(function (array $item): array {
-                $product = Product::query()->with('translations')->find($item['product_id']);
+                // سطر صنف، او سطر مجموعة سعر بلا صنف (التصنيف × اللون) قطعه ألوان مقاطعه.
+                $product = GridLine::product($item);
                 $quantity = $this->decimalValue($item['quantity'] ?? 1, 1);
 
                 if ($quantity <= 0) {
                     throw new DomainException(__('Purchase order item quantity must be greater than zero.'));
                 }
 
-                $isWeightPriced = $product?->pricing_type === 'weight';
+                $isWeightPriced = GridLine::isWeight($item, $product);
                 $pieces = $isWeightPriced ? WeightPieces::normalize($item['pieces'] ?? []) : [];
                 $totalWeight = round(collect($pieces)->sum('total_weight'), 4);
                 $actualWeight = max($this->decimalValue($item['actual_weight'] ?? 0), 0);
@@ -351,11 +353,12 @@ class PurchaseOrderService
                 return [
                     'id' => $item['id'] ?? null,
                     'source_purchase_order_item_id' => $item['source_purchase_order_item_id'] ?? null,
-                    'product_id' => (int) $item['product_id'],
+                    'product_id' => $product?->id,
+                    'category_finish_id' => GridLine::groupId($item),
                     // المجموعة التي يندرج تحتها الصنف في جدول الادخال، ان وُجدت.
                     'category_id' => filled($item['category_id'] ?? null) ? (int) $item['category_id'] : null,
                     'barcode' => $item['barcode'] ?? $product?->barcode,
-                    'description' => $item['description'] ?? $product?->name,
+                    'description' => GridLine::description($item, $product),
                     'quantity' => $quantity,
                     'length' => filled($item['length'] ?? null) ? $this->decimalValue($item['length']) : null,
                     'unit_price' => $unitPrice,

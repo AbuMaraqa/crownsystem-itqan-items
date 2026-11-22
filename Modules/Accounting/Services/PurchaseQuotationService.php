@@ -212,6 +212,7 @@ class PurchaseQuotationService
                 $orderItem = $orderItems->get($line['purchase_order_item_id']);
 
                 return array_merge($line, [
+                    'category_finish_id' => $orderItem?->category_finish_id,
                     'actual_weight' => $orderItem?->actual_weight,
                     'pieces' => $orderItem ? PurchaseInvoiceService::orderPieces($orderItem) : [],
                     'unit_price' => $item ? (float) $item->unit_price : 0,
@@ -233,7 +234,7 @@ class PurchaseQuotationService
     public function orderGridLines(PurchaseOrder $order): array
     {
         $order->loadMissing(['items.product', 'items.pieces']);
-        $items = $order->items->filter(fn ($item) => filled($item->product_id))->keyBy('id');
+        $items = $order->items->filter(fn ($item) => filled($item->product_id) || $item->isPriceGroupLine())->keyBy('id');
 
         return collect(ItemsGridState::rows($items))
             ->map(function (array $row) use ($items) {
@@ -460,17 +461,18 @@ class PurchaseQuotationService
     /**
      * سطور الطلبية بكمية الفوترة: الوزن (الفعلي ان سُجل) للصنف الموزون، والكمية لغيره.
      *
-     * @return Collection<int, array{purchase_order_item_id: int, product_id: int, barcode: ?string, description: ?string, quantity: float}>
+     * @return Collection<int, array{purchase_order_item_id: int, product_id: ?int, barcode: ?string, description: ?string, quantity: float}>
      */
     private function orderLines(PurchaseOrder $order): Collection
     {
         return $order->items
-            ->filter(fn (PurchaseOrderItem $item): bool => filled($item->product_id))
+            // سطر صنف، او سطر مجموعة سعر بلا صنف (يُسعَّر بالكيلو كسطر الصنف الرئيسي).
+            ->filter(fn (PurchaseOrderItem $item): bool => filled($item->product_id) || $item->isPriceGroupLine())
             ->map(fn (PurchaseOrderItem $item): array => [
                 'purchase_order_item_id' => (int) $item->id,
-                'product_id' => (int) $item->product_id,
+                'product_id' => $item->product_id ? (int) $item->product_id : null,
                 'barcode' => $item->barcode,
-                'description' => $item->description ?: ProductSearch::label($item->product_id),
+                'description' => $item->description ?: ($item->product_id ? ProductSearch::label($item->product_id) : null),
                 'quantity' => round($item->invoiceQuantity(), 4),
             ])
             ->values();

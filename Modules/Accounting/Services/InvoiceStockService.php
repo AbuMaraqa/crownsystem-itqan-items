@@ -260,7 +260,50 @@ class InvoiceStockService
             $byWarehouse[$warehouseId] = round(($byWarehouse[$warehouseId] ?? 0) + $change, 4);
         }
 
+        foreach ($this->priceGroupRevaluations($invoice, $order, $receiptIds->all(), $factor * $rate) as $warehouseId => $change) {
+            $byWarehouse[$warehouseId] = round(($byWarehouse[$warehouseId] ?? 0) + $change, 4);
+        }
+
         $this->postTrueUpJournal($invoice, 'PurchaseInvoice', $date, $byWarehouse, InventoryAccounts::PRICE_VARIANCE_KEY);
+    }
+
+    /**
+     * سطر مجموعة السعر في فاتورة من طلبية (D2-6): كل لون استُلم بنصيبه من قيمة الطلبية، فيُعاد
+     * تقييمه الى نصيبه من قيمة الفاتورة بنسبة وزنه المحسوب. العدد والوزن كما استُلما.
+     *
+     * @param  array<int, int>  $receiptIds
+     * @return array<int, float> المخزن => تغيّر قيمة المخزون
+     */
+    private function priceGroupRevaluations(PurchaseInvoice $invoice, PurchaseOrder $order, array $receiptIds, float $factor): array
+    {
+        $ledger = app(StockLedgerService::class);
+        $date = $invoice->invoice_date->toDateString();
+        $byWarehouse = [];
+        $lines = $invoice->items->filter(fn ($item) => filled($item->purchase_order_item_id) && $item->isPriceGroupLine() && $item->pieces->isNotEmpty());
+
+        foreach ($lines as $item) {
+            $pieces = $item->pieces->filter(fn ($piece) => $piece->product_id && filled($piece->purchase_order_item_piece_id))->values();
+            $shares = WeightPieces::actualShares($pieces->map(fn ($piece) => (float) $piece->total_weight)->all(), round((float) $item->line_total * $factor, 4));
+
+            foreach ($pieces as $index => $piece) {
+                $lineIds = GoodsReceiptItem::query()->whereIn('goods_receipt_id', $receiptIds)->where('purchase_order_item_piece_id', $piece->purchase_order_item_piece_id)->pluck('id');
+                $movements = $this->mainMovements((int) $piece->product_id, (new GoodsReceipt)->getMorphClass(), $receiptIds, $lineIds->all(), StockMovementType::RECEIPT);
+                $residual = round($shares[$index] - (float) $movements->sum('total_cost'), 4);
+
+                if ($movements->isEmpty() || $residual == 0.0) {
+                    continue;
+                }
+
+                $warehouseId = (int) $movements->last()->warehouse_id;
+                $change = $ledger->revalue(array_merge(
+                    $this->trueUpMovement($invoice, $item, (int) $piece->product_id, $warehouseId, $date),
+                    ['amount' => $residual, 'movements' => $movements->pluck('id')->all()]
+                ));
+                $byWarehouse[$warehouseId] = round(($byWarehouse[$warehouseId] ?? 0) + $change, 4);
+            }
+        }
+
+        return $byWarehouse;
     }
 
     /**

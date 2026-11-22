@@ -13,6 +13,7 @@ use Modules\Accounting\Entities\SalesOrder;
 use Modules\Accounting\Enums\PurchaseOrderDeliveryType;
 use Modules\Accounting\Enums\PurchaseOrderStatus;
 use Modules\Accounting\Enums\SalesOrderStatus;
+use Modules\Accounting\tests\Feature\Concerns\PriceGroupFixtures;
 use Modules\Accounting\tests\Feature\Concerns\PurchaseDocumentFixtures;
 use Modules\Core\Entities\User;
 use Modules\Items\Entities\ProductAccessory;
@@ -26,6 +27,7 @@ use Tests\TestCase;
  */
 class PurchaseOrderPagesTest extends TestCase
 {
+    use PriceGroupFixtures;
     use PurchaseDocumentFixtures;
     use RefreshDatabase;
 
@@ -116,6 +118,30 @@ class PurchaseOrderPagesTest extends TestCase
             ->assertSessionHas('error');
 
         $this->assertSame(0, PurchaseOrder::query()->where('notes', 'جديدة')->count());
+    }
+
+    public function test_a_price_group_line_is_saved_and_reopened(): void
+    {
+        ['white' => $white, 'whiteW45' => $w45, 'meshW45' => $meshW45] = $this->alpineGroups();
+
+        $this->post(route('accounting.purchase-orders.store'), [...$this->header(), 'items' => [$this->groupLine($white, [[$meshW45, 1]], 8, 0)]])
+            ->assertSessionHas('error');
+        $this->post(route('accounting.purchase-orders.store'), [...$this->header(), 'items' => [$this->groupLine($white, [[$w45, 2]], 16, 0)]])
+            ->assertSessionHas('success');
+
+        $order = PurchaseOrder::query()->latest('id')->firstOrFail();
+        $line = $order->items()->with('pieces')->sole();
+        $this->assertNull($line->product_id);
+        $this->assertSame($white->id, (int) $line->category_finish_id);
+        $this->assertSame('الوبين — أبيض', $line->description);
+        $this->assertEquals(16, (float) $line->actual_weight);
+
+        $this->get(route('accounting.purchase-orders.edit', $order->id))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('order.items.0.product_id', null)
+                ->where('order.items.0.category_finish_id', $white->id)
+                ->where('order.items.0.product_label', 'الوبين — أبيض')
+                ->where('order.items.0.pieces.0.product_id', $w45->id));
     }
 
     public function test_confirm_then_quotation_then_cancel(): void

@@ -400,6 +400,7 @@ class SalesReturnService
                 'id' => $item['id'] ?? null,
                 'sales_invoice_item_id' => $source->id,
                 'product_id' => $source->product_id,
+                'category_finish_id' => $source->category_finish_id,
                 'line_type' => $source->line_type ?: ($source->product?->isService() ? ItemType::SERVICE->value : ItemType::GOODS->value),
                 'barcode' => $source->barcode,
                 'description' => filled($item['description'] ?? null) ? $item['description'] : $source->description,
@@ -552,6 +553,19 @@ class SalesReturnService
         $lines = [];
 
         foreach ($return->items as $item) {
+            // سطر مجموعة السعر (D2-6): كل لون يعود بعدد قطعه وبنصيبه من الوزن المفوتر، بكلفة خروجه.
+            if ($item->isPriceGroupLine()) {
+                $factor = $item->salesInvoiceItem ? ReturnPieces::weightFactor($item->salesInvoiceItem) : 1.0;
+
+                foreach ($item->pieces as $piece) {
+                    if ($piece->product_id && (float) $piece->piece_count > 0) {
+                        $lines[] = ['item' => $item, 'piece' => $piece, 'product_id' => (int) $piece->product_id, 'quantity' => (float) $piece->piece_count, 'weight' => (float) $piece->total_weight * $factor];
+                    }
+                }
+
+                continue;
+            }
+
             $product = $item->product;
 
             if (! $product || $product->isService() || $item->line_type === ItemType::SERVICE->value) {

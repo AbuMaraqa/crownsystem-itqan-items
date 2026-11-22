@@ -18,6 +18,7 @@ use Modules\Accounting\Enums\PurchaseQuotationStatus;
 use Modules\Accounting\Enums\StockMovementType;
 use Modules\Accounting\Services\Concerns\PostsInventoryJournal;
 use Modules\Accounting\Support\MainItemShare;
+use Modules\Accounting\Support\WeightPieces;
 use Modules\Core\Services\ReferenceNumberService;
 
 /**
@@ -289,13 +290,21 @@ class GoodsReceiptService
         $lines = collect();
 
         foreach ($order->items as $item) {
-            if (! $item->product || $item->product->isService()) {
+            $isGroup = $item->isPriceGroupLine();
+
+            if (! $isGroup && (! $item->product || $item->product->isService())) {
                 continue;
             }
 
             $lineValue = $values[$item->id] ?? 0.0;
 
             if ($item->pieces->isNotEmpty()) {
+                // سطر مجموعة السعر بلا صنف رئيسي: كل قطعة تحمل نصيبها من الوزن الفعلي ومن قيمة السطر
+                // بنسبة وزنها المحسوب. قطع الصنف الرئيسي بوزنها المحسوب وبلا قيمة (القيمة على صنفها الرئيسي).
+                $calculated = $item->pieces->mapWithKeys(fn ($piece) => [$piece->id => (float) $piece->total_weight])->all();
+                $weights = $isGroup ? WeightPieces::actualShares($calculated, $item->actual_weight) : $calculated;
+                $shares = $isGroup && $lineValue > 0 ? WeightPieces::actualShares($calculated, $lineValue) : [];
+
                 foreach ($item->pieces as $piece) {
                     $count = (float) $piece->piece_count;
 
@@ -312,17 +321,21 @@ class GoodsReceiptService
                         'product_id' => $piece->product_id,
                         'barcode' => $piece->barcode ?: $piece->product?->barcode,
                         'description' => $piece->description ?: $piece->product?->name,
-                        'group' => $item->description ?: $item->product->name,
+                        'group' => $item->description ?: $item->product?->name,
                         'piece_length' => (float) $piece->piece_length,
                         'ordered' => $count,
                         'received' => $receivedQuantity,
                         'outstanding' => max(round($count - $receivedQuantity, 4), 0),
-                        'weight_per_unit' => round((float) $piece->total_weight / $count, 4),
-                        // القطعة بلا قيمة؛ قيمة السطر على صنفه الرئيسي (mainRows).
-                        'unit_cost' => 0.0,
+                        'weight_per_unit' => round($weights[$piece->id] / $count, 4),
+                        'unit_cost' => round(($shares[$piece->id] ?? 0.0) / $count, 6),
                     ]);
                 }
 
+                continue;
+            }
+
+            // سطر مجموعة السعر بلا قطع لا شيء فيه يُستلم.
+            if ($isGroup) {
                 continue;
             }
 
@@ -418,7 +431,8 @@ class GoodsReceiptService
         foreach ($grouped as $itemId => $itemRows) {
             $item = $order->items->firstWhere('id', $itemId);
 
-            if (! $item) {
+            // سطر مجموعة السعر لا صنف رئيسي له: قطعه تحمل الوزن والقيمة.
+            if (! $item || $item->isPriceGroupLine()) {
                 continue;
             }
 
