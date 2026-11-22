@@ -1742,5 +1742,8 @@
     "The return takes everything still returnable of the invoice; enter what really returns on its page after saving.": "يأخذ المرتجع كل ما بقي قابلاً للإرجاع من الفاتورة؛ أدخل ما يُرجَع فعلاً في صفحته بعد الحفظ.",
     "Something went wrong. Please try again.": "حدث خطأ، يُرجى المحاولة مرة أخرى.",
     "New Provider": "جهة منفذة جديدة",
-    "No customer materials added yet.": "لم تُضف أي مواد للعميل بعد."
+    "No customer materials added yet.": "لم تُضف أي مواد للعميل بعد.",
+    "Category · by weight: its profiles go inside it": "تصنيف بالوزن: تُضاف مقاطعه بداخله",
+    "Goes into:": "يُضاف داخل:",
+    "\":sub\" is not in \":group\"; add it under its own colour.": "«:sub» ليس من «:group»؛ أضفه تحت لونه."
 }

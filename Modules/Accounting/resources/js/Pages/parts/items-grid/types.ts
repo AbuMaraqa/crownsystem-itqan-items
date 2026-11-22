@@ -33,6 +33,8 @@ export interface GridRow {
     row_type: 'item' | 'category';
     category_id: number | null;
     category_label: string;
+    /** A price-group line («التصنيف — اللون»): no product; its pieces are that colour's profiles. */
+    category_finish_id: number | null;
     product_id: number | null;
     product_label: string;
     product_search: string;
@@ -81,7 +83,7 @@ export interface GridConfig {
     showLength?: boolean;
     /** The barcode entry above the grid (defaults to `editable`). */
     barcode?: boolean;
-    /** Group rows (a category with its items). Default true. */
+    /** The old "Category" tab (a plain category header). Default false: price groups come from the one search. */
     groups?: boolean;
 }
 
@@ -171,8 +173,20 @@ export interface CustomerMaterial {
 export interface SearchResult {
     id: number;
     label: string;
+    /** `group`: a price group (category × colour), the id is the group's. */
+    kind?: 'item' | 'group';
     main_label?: string | null;
+    /** A colour variation: the group line it goes into. */
+    group_label?: string | null;
     barcode?: string | null;
+}
+
+/** Support\ItemsGrid::groupPayload(): a price group and its kg price for the party. */
+export interface GroupPayload {
+    id: number;
+    label: string;
+    unit_price: string;
+    pricing_type: PricingType;
 }
 
 export interface MainProductPayload {
@@ -198,6 +212,8 @@ export interface ProductPayload {
     piece_count: string | null;
     has_sub_products: boolean;
     main_product: MainProductPayload | null;
+    /** A colour variation goes inside the line of its price group. */
+    group: GroupPayload | null;
     accessories?: AccessoryPayload[];
 }
 

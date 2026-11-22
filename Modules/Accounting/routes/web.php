@@ -353,6 +353,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                         Route::get('/categories', 'categories')->name('categories');
                         Route::get('/piece-outputs', 'pieceOutputs')->name('piece-outputs');
                         Route::get('/item', 'item')->name('item');
+                        Route::get('/group', 'group')->name('group');
+                        Route::get('/group-prices', 'groupPrices')->name('group-prices');
                         Route::get('/barcode', 'barcode')->name('barcode');
                         Route::get('/match-pieces', 'matchPieces')->name('match-pieces');
                         Route::get('/stock', 'stock')->name('stock');

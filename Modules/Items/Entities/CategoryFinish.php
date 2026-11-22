@@ -61,6 +61,14 @@ class CategoryFinish extends Model
     }
 
     /**
+     * اسم مجموعة السعر في المستندات: «التصنيف — اللون»، مثل «الوبين — أبيض». يحتاج category و finish محمّلين.
+     */
+    public function label(): string
+    {
+        return trim($this->category?->name.' — '.$this->finish?->name, ' —');
+    }
+
+    /**
      * اسم اللون كما يظهر في متغيّر صنف من التصنيفات المعطاة: «أبيض»، او «نابكو أبيض» اذا كانت
      * مجموعة السعر من تصنيف آخر (كما في النقل R-3). يحتاج category و finish محمّلين.
      *

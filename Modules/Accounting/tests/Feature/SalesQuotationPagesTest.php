@@ -17,9 +17,13 @@ use Modules\Accounting\Enums\AccountingPeriodStatus;
 use Modules\Accounting\Enums\SalesQuotationStatus;
 use Modules\Core\Entities\Currency;
 use Modules\Core\Entities\User;
+use Modules\Items\Entities\Category;
+use Modules\Items\Entities\CategoryFinish;
+use Modules\Items\Entities\Finish;
 use Modules\Items\Entities\PriceList;
 use Modules\Items\Entities\Product;
 use Modules\Items\Entities\ProductPrice;
+use Illuminate\Support\Str;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -312,5 +316,77 @@ class SalesQuotationPagesTest extends TestCase
 
         $this->signIn([]);
         $this->get(route('accounting.sales-quotations.index'))->assertForbidden();
+    }
+
+    /* ---------- سطر مجموعة السعر (المرحلة 2): «الوبين — أبيض» وقطعه ألوان مقاطعه ---------- */
+
+    /**
+     * @return array{white: CategoryFinish, mesh: CategoryFinish, whiteW45: Product, meshW45: Product}
+     */
+    private function alpineGroups(): array
+    {
+        $alpine = Category::create(['slug' => 'alpine-'.Str::lower(Str::random(5)), 'status' => 1, 'pricing_type' => 'weight']);
+        $alpine->translateOrNew('ar')->name = 'الوبين';
+        $alpine->save();
+        $white = CategoryFinish::create(['category_id' => $alpine->id, 'finish_id' => Finish::create(['name' => 'أبيض', 'is_active' => true])->id, 'is_active' => true]);
+        $mesh = CategoryFinish::create(['category_id' => $alpine->id, 'finish_id' => Finish::create(['name' => 'ميش', 'is_active' => true])->id, 'is_active' => true]);
+        $variation = function (string $name, CategoryFinish $group): Product {
+            $product = new Product(['slug' => 'v-'.Str::lower(Str::random(8)), 'base_price' => 0, 'pricing_type' => 'weight', 'weight_per_meter' => 1.25, 'length' => 6.5, 'category_finish_id' => $group->id, 'finish_id' => $group->finish_id]);
+            $product->save();
+            $product->translateOrNew('ar')->name = $name;
+            $product->save();
+
+            return $product;
+        };
+
+        return ['white' => $white, 'mesh' => $mesh, 'whiteW45' => $variation('ثابت مجرين W45 - أبيض', $white), 'meshW45' => $variation('ثابت مجرين W45 - ميش', $mesh)];
+    }
+
+    private function groupLine(CategoryFinish $group, array $pieces, ?float $actual = null): array
+    {
+        return [
+            '_key' => 'row-g', 'row_type' => 'item', 'product_id' => null, 'category_finish_id' => $group->id,
+            'product_label' => 'الوبين — أبيض', 'pricing_type' => 'weight', 'quantity' => 1, 'actual_weight' => $actual,
+            'unit_price' => '20', 'discount_mode' => 'rate', 'discount_rate' => 0, 'discount_amount' => 0, 'collapsed' => false,
+            'pieces' => array_map(fn (array $piece) => ['_key' => 'p-'.$piece[0]->id, 'product_id' => $piece[0]->id, 'piece_count' => $piece[1], 'piece_length' => 6.5, 'weight_per_meter' => 1.25], $pieces),
+        ];
+    }
+
+    public function test_a_price_group_line_saves_with_its_colour_pieces_and_reopens(): void
+    {
+        ['white' => $white, 'whiteW45' => $whiteW45] = $this->alpineGroups();
+
+        $this->post(route('accounting.sales-quotations.store'), $this->data([$this->groupLine($white, [[$whiteW45, 2]], 16)]))
+            ->assertSessionHas('success');
+
+        $line = SalesQuotation::query()->latest('id')->firstOrFail()->items()->with('pieces')->sole();
+        $this->assertNull($line->product_id);
+        $this->assertSame($white->id, (int) $line->category_finish_id);
+        $this->assertSame('الوبين — أبيض', $line->description);
+        // الوزن الكلي من القطع (2 × 6.5 × 1.25)، والمبلغ بالوزن الفعلي × سعر الكيلو.
+        $this->assertEquals(16.25, (float) $line->total_weight);
+        $this->assertEquals(320, (float) $line->line_total);
+        $this->assertSame([$whiteW45->id], $line->pieces->pluck('product_id')->map(fn ($id) => (int) $id)->all());
+
+        $this->get(route('accounting.sales-quotations.edit', $line->sales_quotation_id))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('quotation.items.0.product_id', null)
+                ->where('quotation.items.0.category_finish_id', $white->id)
+                ->where('quotation.items.0.product_label', 'الوبين — أبيض')
+                ->where('quotation.items.0.pricing_type', 'weight')
+                ->where('quotation.items.0.has_sub_products', true)
+                ->where('quotation.items.0.pieces.0.product_id', $whiteW45->id));
+    }
+
+    public function test_a_price_group_line_takes_only_its_colour_and_needs_pieces(): void
+    {
+        ['white' => $white, 'meshW45' => $meshW45] = $this->alpineGroups();
+
+        $this->post(route('accounting.sales-quotations.store'), $this->data([$this->groupLine($white, [[$meshW45, 1]])]))
+            ->assertSessionHas('error');
+        $this->post(route('accounting.sales-quotations.store'), $this->data([$this->groupLine($white, [])]))
+            ->assertSessionHas('error');
+
+        $this->assertSame(0, SalesQuotation::query()->count());
     }
 }

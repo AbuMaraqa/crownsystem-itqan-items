@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Accounting\Entities\Concerns\HasPriceGroup;
 use Modules\Core\Entities\User;
 use Modules\Items\Entities\Product;
 use Modules\Items\Enums\ItemType;
@@ -16,6 +17,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 class SalesOrderItem extends Model
 {
     use HasFactory;
+    use HasPriceGroup;
     use LogsActivity;
     use SoftDeletes;
 

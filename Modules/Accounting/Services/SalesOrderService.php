@@ -11,6 +11,7 @@ use Modules\Accounting\Entities\Tax;
 use Modules\Accounting\Enums\SalesOrderFulfillmentType;
 use Modules\Accounting\Enums\SalesOrderStatus;
 use Modules\Accounting\Enums\SalesQuotationStatus;
+use Modules\Accounting\Support\GridLine;
 use Modules\Accounting\Support\ItemsGrid;
 use Modules\Accounting\Support\ItemsGridState;
 use Modules\Accounting\Support\PurchasingNotifier;
@@ -380,9 +381,10 @@ class SalesOrderService
     private function normalizeItems(array $items): array
     {
         return collect($items)
-            ->filter(fn (array $item) => filled($item['product_id'] ?? null))
+            ->filter(fn (array $item) => GridLine::hasOwner($item))
             ->map(function (array $item): array {
-                $product = Product::query()->with('translations')->find($item['product_id']);
+                // سطر صنف، او سطر مجموعة سعر بلا صنف (التصنيف × اللون) قطعه ألوان مقاطعه.
+                $product = GridLine::product($item);
                 $quantity = $this->decimalValue($item['quantity'] ?? 1, 1);
                 $unitPrice = $this->decimalValue($item['unit_price'] ?? $product?->base_price ?? 0);
                 $discountMode = ($item['discount_mode'] ?? 'rate') === 'amount' ? 'amount' : 'rate';
@@ -403,7 +405,7 @@ class SalesOrderService
 
                 // الخدمة تُسعَّر بكميتها دائماً (كغم او نقلات او وحدات)، فلا قطع ولا وزن لها.
                 $isService = SalesServiceLine::isService($product);
-                $isWeightPriced = ! $isService && $product?->pricing_type === 'weight';
+                $isWeightPriced = ! $isService && GridLine::isWeight($item, $product);
                 $pieces = $isWeightPriced ? WeightPieces::normalize($item['pieces'] ?? []) : [];
                 $totalWeight = round(collect($pieces)->sum('total_weight'), 4);
                 $actualWeight = max($this->decimalValue($item['actual_weight'] ?? 0), 0);
@@ -429,9 +431,10 @@ class SalesOrderService
                 return array_merge([
                     'id' => $item['id'] ?? null,
                     'sales_quotation_item_id' => filled($item['sales_quotation_item_id'] ?? null) ? (int) $item['sales_quotation_item_id'] : null,
-                    'product_id' => (int) $item['product_id'],
+                    'product_id' => $product?->id,
+                    'category_finish_id' => GridLine::groupId($item),
                     'barcode' => $item['barcode'] ?? $product?->barcode,
-                    'description' => $item['description'] ?? $product?->name,
+                    'description' => GridLine::description($item, $product),
                     'quantity' => $quantity,
                     'unit_price' => $unitPrice,
                     'discount_rate' => $discountRate,
@@ -456,6 +459,7 @@ class SalesOrderService
             ->map(fn ($item): array => [
                 'sales_quotation_item_id' => $item->id,
                 'product_id' => $item->product_id,
+                'category_finish_id' => $item->category_finish_id,
                 'barcode' => $item->barcode,
                 'description' => $item->description,
                 'quantity' => $item->quantity,

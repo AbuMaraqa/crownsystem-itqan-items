@@ -65,7 +65,7 @@
         </thead>
         <tbody>
             @foreach ($order->items as $item)
-                @php $isWeightPriced = $item->product?->pricing_type === 'weight'; @endphp
+                @php $isWeightPriced = $item->isPriceGroupLine() || $item->product?->pricing_type === 'weight'; @endphp
                 <tr class="main-row">
                     <td>{{ $loop->iteration }}</td>
                     <td>{{ $item->description }}</td>

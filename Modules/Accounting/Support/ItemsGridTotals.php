@@ -21,17 +21,18 @@ final class ItemsGridTotals
      */
     public static function compute(array $items, float $documentDiscount = 0, float $taxRate = 0, array $extraLines = []): array
     {
-        $items = array_values(array_filter($items, fn ($item): bool => is_array($item) && filled($item['product_id'] ?? null)));
+        $items = array_values(array_filter($items, fn ($item): bool => is_array($item) && GridLine::hasOwner($item)));
         $products = Product::query()
-            ->whereIn('id', array_map(fn (array $item): int => (int) $item['product_id'], $items))
+            ->whereIn('id', array_filter(array_map(fn (array $item): int => (int) ($item['product_id'] ?? 0), $items)))
             ->get(['id', 'pricing_type', 'main_product_id', 'length', 'weight_per_meter', 'barcode'])
             ->keyBy('id');
 
         $lines = [];
 
         foreach ($items as $item) {
-            $product = $products->get((int) $item['product_id']);
-            $isWeight = $product?->pricing_type === 'weight';
+            $product = $products->get((int) ($item['product_id'] ?? 0));
+            // سطر مجموعة السعر (بلا صنف) سطر وزن ايضاً.
+            $isWeight = GridLine::isWeight($item, $product);
             $weight = WeightPieces::line($item, $product);
             $actual = $weight['actual_weight'] ?? 0.0;
             $factor = DocumentLineTotals::decimal($item['weight_factor'] ?? 0);
@@ -68,7 +69,7 @@ final class ItemsGridTotals
 
             $lines[] = [
                 'key' => (string) ($item['key'] ?? $item['_key'] ?? ''),
-                'pricing_type' => $product?->pricing_type ?? 'simple',
+                'pricing_type' => $isWeight ? 'weight' : ($product?->pricing_type ?? 'simple'),
                 'total_weight' => $isWeight ? round($weight['total_weight'], 4) : 0.0,
                 'pricing_quantity' => round(max($quantity, 0), 4),
                 ...$amounts,

@@ -50,7 +50,7 @@ const emit = defineEmits<{ choose: [result: SearchResult]; hover: [index: number
             <div class="min-h-0 flex-1 overflow-y-auto py-1">
                 <button
                     v-for="(result, index) in results"
-                    :key="result.id"
+                    :key="`${result.kind ?? 'item'}-${result.id}`"
                     type="button"
                     role="option"
                     :aria-selected="index === highlight"
@@ -60,10 +60,12 @@ const emit = defineEmits<{ choose: [result: SearchResult]; hover: [index: number
                     @mousemove="emit('hover', index)"
                 >
                     <span class="flex min-w-0 items-center gap-2">
-                        <Layers v-if="mode === 'category'" class="size-4 shrink-0 text-brand-500" />
+                        <Layers v-if="mode === 'category' || result.kind === 'group'" class="size-4 shrink-0 text-brand-500" />
                         <span class="min-w-0">
-                            <span class="block truncate">{{ result.label }}</span>
-                            <span v-if="result.main_label" class="block truncate text-[11px] text-muted">{{ t('Inside main item:') }} {{ result.main_label }}</span>
+                            <span class="block truncate" :class="{ 'font-semibold': result.kind === 'group' }">{{ result.label }}</span>
+                            <span v-if="result.kind === 'group'" class="block truncate text-[11px] text-muted">{{ t('Category · by weight: its profiles go inside it') }}</span>
+                            <span v-else-if="result.group_label" class="block truncate text-[11px] text-muted">{{ t('Goes into:') }} {{ result.group_label }}</span>
+                            <span v-else-if="result.main_label" class="block truncate text-[11px] text-muted">{{ t('Inside main item:') }} {{ result.main_label }}</span>
                         </span>
                     </span>
                     <span v-if="result.barcode" class="shrink-0 font-mono text-xs text-muted" dir="ltr">{{ result.barcode }}</span>

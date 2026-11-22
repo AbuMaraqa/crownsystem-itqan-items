@@ -2,6 +2,8 @@
 
 namespace Modules\Accounting\Http\Requests\Admin\Concerns;
 
+use Modules\Accounting\Support\GridLine;
+
 /**
  * شكل سطور جدول الاصناف (Pages/parts/items-grid) في طلب حفظ مستند: صنف السطر وكميته ووزنه
  * الفعلي وسعره وخصمه، وقطعه تحته.
@@ -20,6 +22,8 @@ trait ValidatesItemsGrid
             "{$key}.*.id" => ['nullable', 'integer'],
             "{$key}.*.product_id" => ['nullable', 'integer', $products],
             "{$key}.*.category_id" => ['nullable', 'integer', 'exists:'.config('items.table_prefix').'categories,id'],
+            // سطر مجموعة السعر (التصنيف × اللون): بلا صنف، وقطعه ألوان مقاطعه.
+            "{$key}.*.category_finish_id" => ['nullable', 'integer', 'exists:'.config('items.table_prefix').'category_finishes,id'],
             "{$key}.*.quantity" => ['nullable', 'numeric', 'min:0.0001'],
             "{$key}.*.length" => ['nullable', 'numeric', 'min:0'],
             "{$key}.*.unit_price" => ['nullable', 'numeric', 'min:0'],
@@ -64,7 +68,8 @@ trait ValidatesItemsGrid
     }
 
     /**
-     * سطور الجدول بلا الصفوف الفارغة ورؤوس المجموعات، كما تقرؤها خدمات المستندات.
+     * سطور الجدول بلا الصفوف الفارغة ورؤوس المجموعات، كما تقرؤها خدمات المستندات: سطر صنف، او سطر
+     * مجموعة سعر.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -72,7 +77,7 @@ trait ValidatesItemsGrid
     {
         return array_values(array_filter(
             (array) ($this->validated()[$key] ?? []),
-            fn ($item): bool => is_array($item) && filled($item['product_id'] ?? null),
+            fn ($item): bool => is_array($item) && GridLine::hasOwner($item),
         ));
     }
 }

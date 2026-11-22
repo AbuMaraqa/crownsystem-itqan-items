@@ -61,7 +61,8 @@ class WeightPieces
      */
     public static function line(array $item, ?Product $product, array $keep = []): array
     {
-        if ($product?->pricing_type !== 'weight') {
+        // سطر مجموعة السعر (بلا صنف) سطر وزن ايضاً: قطعه ألوان مقاطعه.
+        if (! GridLine::isWeight($item, $product)) {
             return ['pieces' => [], 'total_weight' => 0.0, 'actual_weight' => null, 'pricing_weight' => null];
         }
 

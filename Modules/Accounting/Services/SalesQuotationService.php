@@ -9,6 +9,7 @@ use Modules\Accounting\Entities\SalesQuotation;
 use Modules\Accounting\Entities\Tax;
 use Modules\Accounting\Enums\SalesQuotationStatus;
 use Modules\Accounting\Support\DocumentLineTotals;
+use Modules\Accounting\Support\GridLine;
 use Modules\Accounting\Support\ItemsGrid;
 use Modules\Accounting\Support\WeightPieces;
 use Modules\Core\Services\ReferenceNumberService;
@@ -170,9 +171,10 @@ class SalesQuotationService
     private function normalizeItems(array $items): array
     {
         return collect($items)
-            ->filter(fn (array $item) => filled($item['product_id'] ?? null))
+            ->filter(fn (array $item) => GridLine::hasOwner($item))
             ->map(function (array $item): array {
-                $product = Product::query()->with('translations')->find($item['product_id']);
+                // سطر صنف، او سطر مجموعة سعر بلا صنف (التصنيف × اللون) قطعه ألوان مقاطعه.
+                $product = GridLine::product($item);
                 $quantity = $this->decimalValue($item['quantity'] ?? 1, 1);
                 // صنف الوزن باصنافه الفرعية: الكمية المسعَّرة (كغم) = الوزن الفعلي، وصفر بدونه.
                 $weight = WeightPieces::line($item, $product);
@@ -213,9 +215,10 @@ class SalesQuotationService
 
                 return [
                     'id' => $item['id'] ?? null,
-                    'product_id' => (int) $item['product_id'],
+                    'product_id' => $product?->id,
+                    'category_finish_id' => GridLine::groupId($item),
                     'barcode' => $item['barcode'] ?? $product?->barcode,
-                    'description' => $item['description'] ?? $product?->name,
+                    'description' => GridLine::description($item, $product),
                     'quantity' => $quantity,
                     'total_weight' => $weight['total_weight'],
                     'actual_weight' => $weight['actual_weight'],

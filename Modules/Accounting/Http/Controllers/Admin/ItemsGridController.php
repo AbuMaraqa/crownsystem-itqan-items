@@ -48,9 +48,30 @@ class ItemsGridController extends Controller
             'q' => ['nullable', 'string', 'max:255'],
             'source_product_id' => ['nullable', 'integer'],
             'main_product_id' => ['nullable', 'integer'],
+            'group_id' => ['nullable', 'integer'],
         ]);
 
-        return response()->json(ItemsGrid::searchPieceOutputs($data['source_product_id'] ?? null, (string) ($data['q'] ?? ''), $data['main_product_id'] ?? null));
+        return response()->json(ItemsGrid::searchPieceOutputs($data['source_product_id'] ?? null, (string) ($data['q'] ?? ''), $data['main_product_id'] ?? null, $data['group_id'] ?? null));
+    }
+
+    /**
+     * سطر مجموعة السعر المختارة (التصنيف × اللون) بسعر الكيلو للطرف، او null.
+     */
+    public function group(Request $request, string $document): JsonResponse
+    {
+        $data = $request->validate(['group_id' => ['required', 'integer']]);
+
+        return $this->nullable($this->grid($request, $document)->groupPayload($data['group_id']));
+    }
+
+    /**
+     * سعر الكيلو لسطور المجموعات للطرف الحالي، ليُسأل المستخدم قبل تغييرها عند تغيير الطرف.
+     */
+    public function groupPrices(Request $request, string $document): JsonResponse
+    {
+        $data = $request->validate(['ids' => ['array', 'max:500'], 'ids.*' => ['integer']]);
+
+        return response()->json((object) $this->grid($request, $document)->groupPrices($data['ids'] ?? []));
     }
 
     /**

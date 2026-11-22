@@ -9,6 +9,7 @@ import type {
     GridConfig,
     GridContext,
     GridPiece,
+    GroupPayload,
     GridRow,
     LineNotice,
     PieceChoice,
@@ -80,6 +81,7 @@ export function normalizeRow(item: Partial<GridRow>): GridRow {
         // Always a number: a group header and its saved items ("5") must compare equal.
         category_id: categoryId === null || categoryId === undefined || (categoryId as unknown) === '' ? null : Number(categoryId),
         category_label: item.category_label ?? '',
+        category_finish_id: item.category_finish_id ? Number(item.category_finish_id) : null,
         product_id: item.product_id ? Number(item.product_id) : null,
         product_label: item.product_label ?? '',
         product_search: item.product_search ?? item.product_label ?? '',
@@ -160,7 +162,7 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
             showDiscount: showPrices && Boolean(source.showDiscount),
             showLength: Boolean(source.showLength),
             barcode: source.barcode ?? source.editable,
-            groups: source.groups ?? true,
+            groups: source.groups ?? false,
         };
     });
 
@@ -344,7 +346,7 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
 
             setIfChanged(row, 'line_total', fixed4(Math.max(gross - discountAmount, 0)));
 
-            if (row.product_id) {
+            if (row.product_id || row.category_finish_id) {
                 subTotal += gross;
                 itemsDiscount += discountAmount;
             }
@@ -404,11 +406,12 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
 
     function payloadRows(): Record<string, unknown>[] {
         return rows.value
-            .filter((row) => row.row_type !== 'category' && row.product_id)
+            .filter((row) => row.row_type !== 'category' && (row.product_id || row.category_finish_id))
             .map((row) => ({
                 key: row._key,
                 id: row.id ?? null,
                 product_id: row.product_id,
+                category_finish_id: row.category_finish_id,
                 quantity: row.quantity,
                 actual_weight: row.actual_weight,
                 unit_price: row.unit_price,
@@ -768,7 +771,10 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
 
         if (!row) return;
 
-        if (mode === 'item') row.product_id = null;
+        if (mode === 'item') {
+            row.product_id = null;
+            row.category_finish_id = null;
+        }
 
         // In group mode the categories show even without text, to browse them.
         if (document.activeElement !== input || (needle === '' && mode === 'item')) {
@@ -832,7 +838,7 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
         setTimeout(() => {
             const row = rows.value[rowIndex];
 
-            if (row && row.row_type !== 'category') row.product_label = row.product_id ? row.product_search : '';
+            if (row && row.row_type !== 'category') row.product_label = row.product_id || row.category_finish_id ? row.product_search : '';
 
             closeSearch();
         }, 150);
@@ -861,6 +867,7 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
         if (!option) return;
 
         if (search.mode === 'category') chooseCategory(rowIndex, option);
+        else if (option.kind === 'group') void chooseGroup(rowIndex, option);
         else void chooseProduct(rowIndex, option);
     }
 
@@ -910,6 +917,14 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
         }
 
         if (!product || rows.value[rowIndex]?.product_id !== option.id) return;
+
+        // A colour variation goes inside the line of its price group («الوبين — أبيض»).
+        if (product.group) {
+            const target = placeInGroup(rowIndex, product);
+            setSuggestions(rows.value[target], product.accessories);
+
+            return;
+        }
 
         // A sub-item is never a line of its own: it goes inside its main item's line.
         if (product.main_product) {
@@ -1016,6 +1031,99 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
         return target;
     }
 
+    /** The row becomes a price-group line: priced per kg, its pieces picked from that colour's profiles. */
+    async function chooseGroup(rowIndex: number, option: SearchResult): Promise<void> {
+        const row = rows.value[rowIndex];
+
+        Object.assign(row, groupLine(option.id, option.label, row.unit_price));
+        closeSearch();
+
+        let group: GroupPayload | null = null;
+
+        try {
+            group = await api.group(option.id);
+        } catch {
+            return;
+        }
+
+        if (!group || rows.value[rowIndex]?.category_finish_id !== option.id) return;
+
+        row.unit_price = group.unit_price ?? '0.0000';
+        await nextTick();
+        openSubItems(rowIndex);
+    }
+
+    /** The fields of a price-group line. */
+    function groupLine(groupId: number, label: string, unitPrice: number | string = '0.0000'): Partial<GridRow> {
+        return {
+            category_finish_id: groupId,
+            product_id: null,
+            product_label: label,
+            product_search: label,
+            barcode: null,
+            description: label,
+            unit_price: unitPrice,
+            pricing_type: 'weight',
+            has_sub_products: true,
+            quantity: 1,
+            actual_weight: null,
+            discount_mode: 'rate',
+            discount_rate: 0,
+            discount_amount: '0.0000',
+            pieces: [],
+            collapsed: false,
+        };
+    }
+
+    /**
+     * A colour variation goes into the line of its price group in the same group header, or the current
+     * row becomes that line (with its kg price). Then its piece count is focused.
+     */
+    function placeInGroup(rowIndex: number, product: ProductPayload, pieceCount: number | string = 1): number {
+        const row = rows.value[rowIndex];
+        const group = product.group!;
+        const sameGroup = (other: GridRow): boolean => (other.category_id ?? null) === (row.category_id ?? null);
+
+        let target = rows.value.findIndex(
+            (other, index) => index !== rowIndex && isItem(other) && !other.product_id && Number(other.category_finish_id) === Number(group.id) && sameGroup(other),
+        );
+
+        if (target === -1) {
+            Object.assign(row, groupLine(group.id, group.label, group.unit_price ?? '0.0000'));
+            target = rowIndex;
+        } else {
+            rows.value.splice(rowIndex, 1);
+
+            if (target > rowIndex) target--;
+            if (rows.value.length === 0) rows.value.push(blankRow());
+        }
+
+        const line = rows.value[target];
+        const piece = normalizePiece({
+            product_id: product.id,
+            product_label: product.label,
+            barcode: product.barcode ?? null,
+            description: product.description ?? null,
+            piece_count: pieceCount,
+            piece_length: product.length ?? '0.0000',
+            weight_per_meter: product.weight_per_meter ?? '0.0000',
+            image_url: product.image ?? null,
+        });
+        let pieceIndex = line.pieces.findIndex((other) => !other.product_id);
+
+        if (pieceIndex === -1) {
+            line.pieces.push(piece);
+            pieceIndex = line.pieces.length - 1;
+        } else {
+            line.pieces.splice(pieceIndex, 1, piece);
+        }
+
+        line.collapsed = false;
+        focusPieceCell(target, pieceIndex, 'piece_count');
+
+        return target;
+    }
+
     /* ---------- pieces of a line whose main item changed ---------- */
 
     const pieceChoices = ref<Record<string, PieceChoice>>({});
@@ -1113,7 +1221,7 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
         try {
             const results =
                 which === 'output'
-                    ? await api.searchPieceOutputs(needle, piece.source_product_id, row.product_id, pieceRequest.signal)
+                    ? await api.searchPieceOutputs(needle, piece.source_product_id, row.product_id, pieceRequest.signal, row.product_id ? null : row.category_finish_id)
                     : await api.searchProducts(needle, null, pieceRequest.signal);
 
             if (token !== pieceSearchToken || pieceSearch.rowIndex !== rowIndex || pieceSearch.pieceIndex !== pieceIndex) return;
@@ -1239,7 +1347,7 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
     }
 
     function emptyRowIndex(): number {
-        const index = rows.value.findIndex((other) => isItem(other) && !other.product_id && !other.category_id);
+        const index = rows.value.findIndex((other) => isItem(other) && !other.product_id && !other.category_finish_id && !other.category_id);
 
         if (index !== -1) return index;
 
@@ -1256,6 +1364,17 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
 
         const pack = num(match.pack_quantity) || 1;
         const lineOf = (id: number): number => rows.value.findIndex((other) => isItem(other) && Number(other.product_id) === Number(id));
+
+        // A colour variation: more pieces in its group line, or a new piece there.
+        if (product.group) {
+            const groupIndex = rows.value.findIndex((other) => isItem(other) && !other.product_id && Number(other.category_finish_id) === Number(product.group!.id));
+            const existing = groupIndex === -1 ? null : rows.value[groupIndex].pieces.find((piece) => Number(piece.product_id) === Number(product.id));
+
+            if (existing) existing.piece_count = num(existing.piece_count) + pack;
+            else placeInGroup(emptyRowIndex(), product, pack);
+
+            return;
+        }
 
         if (product.main_product) {
             const mainIndex = lineOf(product.main_product.id);
@@ -1405,6 +1524,8 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
 
     /* ---------- prices of a new party ---------- */
 
+    const priceKey = (row: GridRow): string => (row.product_id ? String(row.product_id) : `g${row.category_finish_id}`);
+
     const reprice = ref<Record<string, string> | null>(null);
 
     /** The party changed: compare the lines' prices with the new party's and ask before changing them. */
@@ -1414,13 +1535,23 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
 
         if (!c.editable || !c.pricesEditable || !c.showPrices) return;
 
-        const lines = rows.value.filter((row) => isItem(row) && row.product_id);
+        const lines = rows.value.filter((row) => isItem(row) && (row.product_id || row.category_finish_id));
 
         if (lines.length === 0) return;
 
         try {
-            const prices = await api.prices(lines.map((row) => Number(row.product_id)));
-            const differs = lines.some((row) => prices[String(row.product_id)] !== undefined && num(prices[String(row.product_id)]) !== num(row.unit_price));
+            const productIds = lines.filter((row) => row.product_id).map((row) => Number(row.product_id));
+            const groupIds = lines.filter((row) => !row.product_id).map((row) => Number(row.category_finish_id));
+            const [productPrices, groupPrices] = await Promise.all([
+                productIds.length ? api.prices(productIds) : Promise.resolve({} as Record<string, string>),
+                groupIds.length ? api.groupPrices(groupIds) : Promise.resolve({} as Record<string, string>),
+            ]);
+            // Price-group lines are keyed `g<id>` beside the products' ids.
+            const prices: Record<string, string> = { ...productPrices };
+
+            for (const [id, price] of Object.entries(groupPrices)) prices[`g${id}`] = price;
+
+            const differs = lines.some((row) => prices[priceKey(row)] !== undefined && num(prices[priceKey(row)]) !== num(row.unit_price));
 
             reprice.value = differs ? prices : null;
         } catch {
@@ -1434,7 +1565,7 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
         if (!prices) return;
 
         for (const row of rows.value) {
-            if (row.product_id && prices[String(row.product_id)] !== undefined) row.unit_price = prices[String(row.product_id)];
+            if ((row.product_id || row.category_finish_id) && prices[priceKey(row)] !== undefined) row.unit_price = prices[priceKey(row)];
         }
 
         reprice.value = null;

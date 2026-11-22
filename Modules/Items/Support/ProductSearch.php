@@ -395,6 +395,8 @@ class ProductSearch
                     'unit_cost' => number_format($cost((int) $product->id), 4, '.', ''),
                     // الصنف الفرعي لا يُضاف بنداً مستقلاً بل داخل صنفه الرئيسي.
                     'main_product_id' => $product->main_product_id ? (int) $product->main_product_id : null,
+                    // لون صنف الوزن: يُضاف داخل سطر مجموعة سعره (التصنيف × اللون).
+                    'category_finish_id' => $product->category_finish_id ? (int) $product->category_finish_id : null,
                     'has_sub_products' => in_array((int) $product->id, $mainIds, true),
                 ],
             ])
@@ -490,7 +492,7 @@ class ProductSearch
     private static function baseQuery(): Builder
     {
         return Product::query()
-            ->select(['id', 'sku', 'barcode', 'base_price', 'parent_id', 'main_product_id', 'weight_per_meter', 'length', 'pricing_type', 'item_type', 'service_kind', 'service_cost_source'])
+            ->select(['id', 'sku', 'barcode', 'base_price', 'parent_id', 'main_product_id', 'category_finish_id', 'weight_per_meter', 'length', 'pricing_type', 'item_type', 'service_kind', 'service_cost_source'])
             ->with(['translations' => fn ($query) => $query
                 ->select(['id', 'product_id', 'locale', 'name'])
                 ->whereIn('locale', self::searchLocales())]);
