@@ -11,6 +11,7 @@ use Modules\Accounting\Enums\ProductionOrderStatus;
 use Modules\Accounting\Enums\SalesOrderStatus;
 use Modules\Accounting\Services\ProductionOrderService;
 use Modules\Accounting\Support\ProductionCost;
+use Modules\Accounting\tests\Feature\Concerns\PriceGroupFixtures;
 use Modules\Core\Entities\User;
 use Modules\Items\Entities\Product;
 use Modules\Items\Enums\ItemType;
@@ -23,6 +24,7 @@ use Tests\TestCase;
  */
 class ProductionOrderCostingTest extends TestCase
 {
+    use PriceGroupFixtures;
     use RefreshDatabase;
 
     public function test_cost_rules(): void
@@ -183,6 +185,48 @@ class ProductionOrderCostingTest extends TestCase
 
         $this->expectException(DomainException::class);
         $service->createFromSalesOrder($salesOrder);
+    }
+
+    public function test_a_weight_material_stocked_by_piece_is_costed_per_kg(): void
+    {
+        $this->actingAs(User::factory()->create());
+        // قطعة 6 م × 1.5 كغم/م = 9 كغم، متوسط تكلفتها 36 للقطعة = 4 للكغم.
+        $profile = ConsolidatedTestFactory::product('weight', 6);
+        ConsolidatedTestFactory::averageCost($profile, 36);
+        $service = app(ProductionOrderService::class);
+
+        $this->assertSame('4.0000', $service->materialDefaults($profile->id)['unit_cost']);
+
+        $order = $service->create([
+            'currency_id' => ConsolidatedTestFactory::currency()->id,
+            'produced_quantity' => 1,
+            'materials' => [['product_id' => $profile->id, 'quantity' => 10, 'weight' => 90]],
+            'labor' => [],
+            'services' => [],
+        ]);
+
+        // 90 كغم × 4، لا 90 × 36.
+        $this->assertSame(360.0, (float) $order->materials_cost);
+    }
+
+    public function test_a_price_group_line_becomes_one_material_per_colour_at_its_cost_per_kg(): void
+    {
+        $this->actingAs(User::factory()->create());
+        ['white' => $white, 'whiteW45' => $w45, 'whiteW60' => $w60] = $this->alpineGroups();
+        ConsolidatedTestFactory::averageCost($w45, 32.5);   // 8.125 كغم للقطعة → 4 للكغم
+        ConsolidatedTestFactory::averageCost($w60, 65);     // 13 كغم للقطعة → 5 للكغم
+        $salesOrder = $this->salesOrder();
+        $line = $salesOrder->items()->create(['product_id' => null, 'category_finish_id' => $white->id, 'description' => 'الوبين — أبيض', 'quantity' => 40, 'unit_price' => 8, 'total_weight' => 29.25, 'actual_weight' => 40, 'line_total' => 320]);
+        $line->pieces()->create(['product_id' => $w45->id, 'description' => $w45->name, 'piece_count' => 2, 'piece_length' => 6.5, 'weight_per_meter' => 1.25, 'total_weight' => 16.25, 'sort_order' => 0]);
+        $line->pieces()->create(['product_id' => $w60->id, 'description' => $w60->name, 'piece_count' => 1, 'piece_length' => 6.5, 'weight_per_meter' => 2, 'total_weight' => 13, 'sort_order' => 1]);
+
+        $materials = app(ProductionOrderService::class)->linesFromSalesOrder($salesOrder->refresh())['materials'];
+
+        $this->assertCount(2, $materials);
+        $this->assertSame([$w45->id, $w60->id], array_column($materials, 'product_id'));
+        $this->assertSame([22.2222, 17.7778], array_column($materials, 'weight'));
+        $this->assertSame([4.0, 5.0], array_column($materials, 'unit_cost'));
+        $this->assertSame(['weight', 'weight'], array_column($materials, 'pricing_type'));
     }
 
     private function product(string $pricingType, float $cost): Product

@@ -10,8 +10,11 @@ use Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect;
 use Modules\Accounting\Entities\SalesOrder;
 use Modules\Accounting\Enums\PurchaseOrderDeliveryType;
 use Modules\Accounting\Enums\SalesOrderFulfillmentType;
+use Modules\Accounting\Services\PurchaseOrderService;
 use Modules\Accounting\Services\SalesOrderService;
+use Modules\Accounting\Support\DirectPurchaseOrderDraft;
 use Modules\Accounting\Support\PurchasingNotifier;
+use Modules\Accounting\tests\Feature\Concerns\PriceGroupFixtures;
 use Modules\Core\Entities\Currency;
 use Modules\Core\Entities\User;
 use Modules\Items\Entities\Product;
@@ -24,6 +27,7 @@ use Tests\TestCase;
  */
 class DirectSupplySalesOrderTest extends TestCase
 {
+    use PriceGroupFixtures;
     use RefreshDatabase;
 
     private User $seller;
@@ -125,6 +129,27 @@ class DirectSupplySalesOrderTest extends TestCase
         $item = array_values($data['items'])[0];
         $this->assertSame(3.0, (float) $item['quantity']);
         $this->assertSame(0.0, (float) $item['unit_price'], 'purchase orders carry no prices; the supplier price comes in the purchase quotation');
+    }
+
+    public function test_a_price_group_line_goes_to_the_direct_purchase_order_with_its_colours(): void
+    {
+        ['white' => $white, 'whiteW45' => $whiteW45] = $this->alpineGroups();
+        $data = array_replace($this->orderData(SalesOrderFulfillmentType::DIRECT), ['items' => [$this->groupLine($white, [[$whiteW45, 2]], 16)]]);
+        $order = app(SalesOrderService::class)->confirm(app(SalesOrderService::class)->create($data));
+
+        $draft = DirectPurchaseOrderDraft::state($order->load(['items.product', 'items.pieces.product']));
+        $line = array_values($draft['items'])[0];
+        $this->assertNull($line['product_id']);
+        $this->assertSame($white->id, $line['category_finish_id']);
+        $this->assertSame('weight', $line['pricing_type']);
+        $this->assertSame('الوبين — أبيض', $line['product_label']);
+
+        // الطلبية المحفوظة من المسودة تحمل السطر بمجموعته وقطعه.
+        $this->actingAs($this->purchaser);
+        $purchase = app(PurchaseOrderService::class)->create(array_replace($draft, ['order_date' => now()->toDateString()]));
+        $saved = $purchase->items()->with('pieces')->sole();
+        $this->assertSame($white->id, (int) $saved->category_finish_id);
+        $this->assertSame([$whiteW45->id], $saved->pieces->pluck('product_id')->map(fn ($id) => (int) $id)->all());
     }
 
     private function purchasingNotifications(User $user)

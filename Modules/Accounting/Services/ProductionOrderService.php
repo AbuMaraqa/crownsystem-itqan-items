@@ -6,10 +6,12 @@ use DomainException;
 use Illuminate\Support\Facades\DB;
 use Modules\Accounting\Entities\ProductionOrder;
 use Modules\Accounting\Entities\SalesOrder;
+use Modules\Accounting\Entities\SalesOrderItem;
 use Modules\Accounting\Enums\LaborRateBasis;
 use Modules\Accounting\Enums\ProductionOrderStatus;
 use Modules\Accounting\Enums\SalesOrderStatus;
 use Modules\Accounting\Support\ProductionCost;
+use Modules\Accounting\Support\WeightPieces;
 use Modules\Core\Entities\User;
 use Modules\Core\Services\ReferenceNumberService;
 use Modules\Items\Entities\Product;
@@ -193,7 +195,7 @@ class ProductionOrderService
      */
     public function linesFromSalesOrder(SalesOrder $salesOrder): array
     {
-        $salesOrder->loadMissing(['items.product.translations']);
+        $salesOrder->loadMissing(['items.product.translations', 'items.pieces.product.translations']);
 
         $materials = [];
         $services = [];
@@ -215,6 +217,13 @@ class ProductionOrderService
                 continue;
             }
 
+            // سطر مجموعة السعر: مادة لكل لون، بنصيبه من الوزن وتكلفة كغمه.
+            if ($item->isPriceGroupLine()) {
+                array_push($materials, ...$this->groupMaterials($item));
+
+                continue;
+            }
+
             $isWeight = $product?->pricing_type === 'weight' || (float) $item->total_weight > 0;
             $weight = (float) $item->actual_weight > 0 ? (float) $item->actual_weight : (float) $item->total_weight;
 
@@ -225,7 +234,7 @@ class ProductionOrderService
                 'pricing_type' => $isWeight ? 'weight' : 'simple',
                 'quantity' => (float) $item->quantity,
                 'weight' => $isWeight ? $weight : 0,
-                'unit_cost' => $this->averageCost($product?->id),
+                'unit_cost' => $this->materialUnitCost($product, $isWeight ? 'weight' : 'simple'),
             ];
         }
 
@@ -331,7 +340,7 @@ class ProductionOrderService
         return [
             'description' => $product->name,
             'pricing_type' => $product->pricing_type === 'weight' ? 'weight' : 'simple',
-            'unit_cost' => number_format($this->averageCost($product->id), 4, '.', ''),
+            'unit_cost' => number_format($this->materialUnitCost($product, $product->pricing_type === 'weight' ? 'weight' : 'simple'), 4, '.', ''),
         ];
     }
 
@@ -520,7 +529,7 @@ class ProductionOrderService
                 'pricing_type' => $pricingType,
                 'quantity' => $this->nonNegative($line['quantity'] ?? 0),
                 'weight' => $pricingType === 'weight' ? $this->nonNegative($line['weight'] ?? 0) : 0,
-                'unit_cost' => $this->nonNegative($line['unit_cost'] ?? null, $this->averageCost($product?->id)),
+                'unit_cost' => $this->nonNegative($line['unit_cost'] ?? null, $this->materialUnitCost($product, $pricingType)),
                 'notes' => $line['notes'] ?? null,
                 'sort_order' => $index,
             ];
@@ -624,6 +633,43 @@ class ProductionOrderService
      * تكلفة المادة المقترحة: المتوسط المرجّح من المشتريات الفعلية (مبدأ التكلفة التاريخية)، لا رقم
      * يُكتب في بطاقة الصنف. ما لم يُشترَ بعد تكلفته صفر حتى تُكتب في السطر.
      */
+    /**
+     * تكلفة وحدة المادة: الموزونة بتكلفة الكغم (StockLedgerService::costPerKg) لان مبلغها الوزن × التكلفة،
+     * وغيرها بمتوسط تكلفة الوحدة.
+     */
+    private function materialUnitCost(?Product $product, string $pricingType): float
+    {
+        if (! $product) {
+            return 0.0;
+        }
+
+        return $pricingType === 'weight'
+            ? app(StockLedgerService::class)->costPerKg($product)
+            : $this->averageCost((int) $product->id);
+    }
+
+    /**
+     * مواد سطر مجموعة السعر: مادة لكل لون (مقطع) بعدد قطعه ونصيبه من وزن السطر وتكلفة كغمه.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function groupMaterials(SalesOrderItem $item): array
+    {
+        $pieces = $item->pieces->filter(fn ($piece) => $piece->product_id && (float) $piece->piece_count > 0)->values();
+        $weight = (float) $item->actual_weight > 0 ? (float) $item->actual_weight : (float) $item->total_weight;
+        $shares = WeightPieces::actualShares($pieces->map(fn ($piece) => (float) $piece->total_weight)->all(), $weight);
+
+        return $pieces->map(fn ($piece, int $index) => [
+            'sales_order_item_id' => $item->id,
+            'product_id' => (int) $piece->product_id,
+            'description' => $piece->description ?: $piece->product?->name,
+            'pricing_type' => 'weight',
+            'quantity' => (float) $piece->piece_count,
+            'weight' => $shares[$index],
+            'unit_cost' => $piece->product ? app(StockLedgerService::class)->costPerKg($piece->product) : 0.0,
+        ])->all();
+    }
+
     private function averageCost(?int $productId): float
     {
         return $productId ? app(StockLedgerService::class)->averageCost($productId) : 0.0;

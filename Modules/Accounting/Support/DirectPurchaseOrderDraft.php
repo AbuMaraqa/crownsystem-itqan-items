@@ -5,6 +5,7 @@ namespace Modules\Accounting\Support;
 use Modules\Accounting\Entities\SalesOrder;
 use Modules\Accounting\Enums\PurchaseOrderDeliveryType;
 use Modules\Accounting\Enums\SalesOrderStatus;
+use Modules\Items\Support\PriceGroupSearch;
 use Modules\Items\Support\ProductSearch;
 
 /**
@@ -35,17 +36,23 @@ class DirectPurchaseOrderDraft
         $goods = $order->items->reject(fn ($item): bool => $item->isService())->values();
         $payloads = ProductSearch::invoiceItemPayloads($goods->pluck('product_id')->all());
 
-        $items = $goods->map(function ($item) use ($payloads): array {
+        // سطر مجموعة السعر (التصنيف × اللون) ينتقل بمجموعته واسمها، وقطعه ألوان مقاطعه.
+        $groupLabels = PriceGroupSearch::labels($goods->filter->isPriceGroupLine()->pluck('category_finish_id')->all());
+
+        $items = $goods->map(function ($item) use ($payloads, $groupLabels): array {
             $payload = $payloads[(int) $item->product_id] ?? [];
+            $isGroup = $item->isPriceGroupLine();
+            $label = $isGroup ? ($groupLabels[(int) $item->category_finish_id] ?? $item->description) : ProductSearch::label($item->product_id);
 
             return [
                 '_key' => 'sales-order-item-'.$item->id,
                 'id' => null,
                 'row_type' => 'item',
-                'has_sub_products' => (bool) ($payload['has_sub_products'] ?? false),
+                'has_sub_products' => $isGroup || (bool) ($payload['has_sub_products'] ?? false),
                 'product_id' => $item->product_id,
-                'product_label' => ProductSearch::label($item->product_id),
-                'product_search' => ProductSearch::label($item->product_id),
+                'category_finish_id' => $item->category_finish_id,
+                'product_label' => $label,
+                'product_search' => $label,
                 'barcode' => $item->barcode,
                 'description' => $item->description,
                 'quantity' => number_format((float) $item->quantity, 4, '.', ''),
@@ -54,7 +61,7 @@ class DirectPurchaseOrderDraft
                 'discount_rate' => '0.0000',
                 'discount_amount' => '0.0000',
                 'line_total' => '0.0000',
-                'pricing_type' => $item->product?->pricing_type ?? 'simple',
+                'pricing_type' => $isGroup ? 'weight' : ($item->product?->pricing_type ?? 'simple'),
                 'total_weight' => number_format((float) $item->total_weight, 4, '.', ''),
                 'length' => $payload['length'] ?? null,
                 'actual_weight' => $item->actual_weight,

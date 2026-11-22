@@ -512,7 +512,8 @@ final class ItemsGrid
             $group = $labels[$groupId] ?? (string) $groupId;
             $pieces = collect($item['pieces'] ?? [])->filter(fn ($piece): bool => is_array($piece) && filled($piece['product_id'] ?? null));
 
-            if (blank($item['id'] ?? null) && $pieces->isEmpty()) {
+            // سطر المجموعة بلا صنف رئيسي: بلا قطع بوزن لا يتحرك شيء في المخزون، جديداً كان او محفوظاً.
+            if ($pieces->isEmpty()) {
                 throw new DomainException(__('Add the sub-items of the main item ":item"; its total weight is the sum of their weights.', ['item' => $group]));
             }
 
@@ -525,7 +526,7 @@ final class ItemsGrid
                 ]));
             }
 
-            $weightless = $pieces->first(fn (array $piece): bool => blank($piece['id'] ?? null) && WeightPieces::weight($piece) <= 0);
+            $weightless = $pieces->first(fn (array $piece): bool => WeightPieces::weight($piece) <= 0);
 
             if ($weightless) {
                 throw new DomainException(__('The sub-item ":sub" in ":item" has no weight; enter its piece count, piece length and weight per meter.', [

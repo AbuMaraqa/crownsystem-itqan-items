@@ -305,6 +305,28 @@ class StockLedgerService
     }
 
     /**
+     * تكلفة الكغم من مخزون الصنف، ايّاً كانت وحدة رصيده:
+     * - الصنف الرئيسي يُخزَّن بالكغم: متوسطه هو تكلفة الكغم.
+     * - المقطع (صنف فرعي قديم) بلا قيمة: قيمته على صنفه الرئيسي، فتكلفة كغمه تكلفة كغم الرئيسي.
+     * - صنف وزن يُخزَّن بالقطعة (لون مقطع): متوسط القطعة ÷ وزن القطعة (الطول × وزن المتر).
+     * - غير ذلك: المتوسط كما هو.
+     */
+    public function costPerKg(Product $product): float
+    {
+        if ($this->isPiece((int) $product->id)) {
+            return $this->averageCost((int) $product->main_product_id);
+        }
+
+        $perPiece = (float) $product->length * (float) $product->weight_per_meter;
+
+        if ($product->pricing_type !== 'weight' || $perPiece <= 0 || $this->isMainItem($product)) {
+            return $this->averageCost((int) $product->id);
+        }
+
+        return round($this->averageCost((int) $product->id) / $perPiece, 6);
+    }
+
+    /**
      * متوسط التكلفة المرجّح لعدة اصناف باستعلام واحد؛ الصنف الذي لم يُشترَ بعد تكلفته صفر.
      *
      * @param  array<int, int>  $productIds

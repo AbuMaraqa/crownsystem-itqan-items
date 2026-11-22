@@ -344,6 +344,23 @@ class SalesQuotationPagesTest extends TestCase
                 ->where('quotation.items.0.pieces.0.product_id', $whiteW45->id));
     }
 
+    public function test_a_saved_price_group_line_cannot_lose_all_its_pieces(): void
+    {
+        ['white' => $white, 'whiteW45' => $whiteW45] = $this->alpineGroups();
+        $this->post(route('accounting.sales-quotations.store'), $this->data([$this->groupLine($white, [[$whiteW45, 2]], 16)]))
+            ->assertSessionHas('success');
+        $quotation = SalesQuotation::query()->latest('id')->firstOrFail();
+        $line = $quotation->items()->sole();
+
+        // سطر محفوظ (له id) بلا قطع، او بقطعة عددها صفر: مرفوض كالسطر الجديد.
+        $edited = array_replace($this->groupLine($white, [[$whiteW45, 2]], 16), ['id' => $line->id, 'pieces' => []]);
+        $this->put(route('accounting.sales-quotations.update', $quotation->id), $this->data([$edited]))->assertSessionHas('error');
+        $edited = array_replace($this->groupLine($white, [[$whiteW45, 0]], 16), ['id' => $line->id]);
+        $this->put(route('accounting.sales-quotations.update', $quotation->id), $this->data([$edited]))->assertSessionHas('error');
+
+        $this->assertSame(1, $quotation->items()->sole()->pieces()->count());
+    }
+
     public function test_a_price_group_line_takes_only_its_colour_and_needs_pieces(): void
     {
         ['white' => $white, 'meshW45' => $meshW45] = $this->alpineGroups();
