@@ -25,4 +25,12 @@ trait HasPriceGroup
     {
         return $this->category_finish_id !== null && $this->product_id === null;
     }
+
+    /**
+     * السطر مسعّر بالوزن: سطر مجموعة سعر، او صنف وزن.
+     */
+    public function isWeightPricedLine(): bool
+    {
+        return $this->isPriceGroupLine() || $this->product?->pricing_type === 'weight';
+    }
 }

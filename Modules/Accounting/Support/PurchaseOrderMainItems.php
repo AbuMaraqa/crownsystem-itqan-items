@@ -102,7 +102,7 @@ final class PurchaseOrderMainItems
      */
     public static function weights(PurchaseOrderItem|ConsolidatedPurchaseOrderItem $item): array
     {
-        if ($item->product?->pricing_type !== 'weight') {
+        if (! $item->isWeightPricedLine()) {
             return ['total_weight' => null, 'actual_weight' => null, 'pieces' => []];
         }
 
@@ -143,7 +143,7 @@ final class PurchaseOrderMainItems
      */
     private static function mainItemFor(PurchaseOrderItem|ConsolidatedPurchaseOrderItem $line, Collection $mainProducts, array $categoryLabels): array
     {
-        $isWeightPriced = $line->product?->pricing_type === 'weight';
+        $isWeightPriced = $line->isWeightPricedLine();
         $weights = self::weights($line);
         // بند الطلبية التجميعية لا يحفظ الطول؛ يؤخذ من بند طلبية الشراء المصدر.
         $length = $line instanceof PurchaseOrderItem ? $line->length : $line->sourcePurchaseOrderItem?->length;

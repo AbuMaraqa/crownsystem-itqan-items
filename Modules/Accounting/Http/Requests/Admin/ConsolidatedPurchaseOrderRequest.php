@@ -28,7 +28,9 @@ class ConsolidatedPurchaseOrderRequest extends FormRequest
             'expected_delivery_date' => ['nullable', 'date'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.source_purchase_order_item_id' => ['required', 'integer', 'exists:'.$prefix.'purchase_order_items,id'],
-            'items.*.product_id' => ['required', 'integer', $products],
+            // سطر صنف، او سطر مجموعة سعر (التصنيف × اللون) بلا صنف.
+            'items.*.product_id' => ['nullable', 'required_without:items.*.category_finish_id', 'integer', $products],
+            'items.*.category_finish_id' => ['nullable', 'integer', 'exists:'.config('items.table_prefix').'category_finishes,id'],
             'items.*.description' => ['nullable', 'string'],
             'items.*.quantity' => ['required', 'numeric', 'min:0.0001'],
             'items.*.unit_price' => ['nullable', 'numeric', 'min:0'],

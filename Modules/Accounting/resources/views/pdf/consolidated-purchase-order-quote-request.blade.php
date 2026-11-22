@@ -37,7 +37,7 @@
         </thead>
         <tbody>
             @forelse ($order->items as $item)
-                @php $isWeightPriced = $item->product?->pricing_type === 'weight'; @endphp
+                @php $isWeightPriced = $item->isWeightPricedLine(); @endphp
                 <tr>
                     <td>{{ $loop->iteration }}</td>
                     <td>{{ $item->description }}</td>

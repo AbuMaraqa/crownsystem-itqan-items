@@ -9,6 +9,7 @@ use Modules\Accounting\Entities\ConsolidatedPurchaseOrder;
 use Modules\Accounting\Entities\ConsolidatedPurchaseOrderItem;
 use Modules\Accounting\Entities\Tax;
 use Modules\Accounting\Enums\ConsolidatedPurchaseOrderStatus;
+use Modules\Accounting\Support\GridLine;
 use Modules\Core\Services\ReferenceNumberService;
 use Modules\Items\Entities\Product;
 
@@ -240,9 +241,10 @@ class ConsolidatedPurchaseOrderService
     private function normalizeItems(array $items): array
     {
         return collect($items)
-            ->filter(fn (array $item) => filled($item['product_id'] ?? null))
+            ->filter(fn (array $item) => GridLine::hasOwner($item))
             ->map(function (array $item): array {
-                $product = Product::query()->with('translations')->find($item['product_id']);
+                // سطر صنف، او سطر مجموعة سعر بلا صنف (التصنيف × اللون) قطعه ألوان مقاطعه.
+                $product = GridLine::product($item);
                 $quantity = $this->decimalValue($item['quantity'] ?? 1, 1);
                 $unitPrice = $this->decimalValue($item['unit_price'] ?? ($product ? app(StockLedgerService::class)->averageCost((int) $product->id) : 0));
                 $discountMode = ($item['discount_mode'] ?? 'rate') === 'amount' ? 'amount' : 'rate';
@@ -261,7 +263,7 @@ class ConsolidatedPurchaseOrderService
                     throw new DomainException(__('Purchase order item discount must be between 0 and 100.'));
                 }
 
-                $isWeightPriced = $product?->pricing_type === 'weight';
+                $isWeightPriced = GridLine::isWeight($item, $product);
                 $pieces = $isWeightPriced ? $this->normalizePieces($item['pieces'] ?? []) : [];
                 $totalWeight = round(collect($pieces)->sum('total_weight'), 4);
                 $actualWeight = max($this->decimalValue($item['actual_weight'] ?? 0), 0);
@@ -287,9 +289,10 @@ class ConsolidatedPurchaseOrderService
                 return [
                     'id' => $item['id'] ?? null,
                     'source_purchase_order_item_id' => $item['source_purchase_order_item_id'] ?? null,
-                    'product_id' => (int) $item['product_id'],
+                    'product_id' => $product?->id,
+                    'category_finish_id' => GridLine::groupId($item),
                     'barcode' => $item['barcode'] ?? $product?->barcode,
-                    'description' => $item['description'] ?? $product?->name,
+                    'description' => GridLine::description($item, $product),
                     'quantity' => $quantity,
                     'unit_price' => $unitPrice,
                     'discount_rate' => $discountRate,

@@ -168,7 +168,7 @@ final class PurchaseOrderConsumption
      */
     public static function isWeightPriced(PurchaseOrderItem $item): bool
     {
-        return $item->product?->pricing_type === 'weight';
+        return $item->isWeightPricedLine();
     }
 
     /**
@@ -312,6 +312,7 @@ final class PurchaseOrderConsumption
         return [
             'source_purchase_order_item_id' => $item->id,
             'product_id' => $item->product_id,
+            'category_finish_id' => $item->category_finish_id,
             'description' => $item->description,
             'quantity' => $quantity,
             'unit_price' => $item->unit_price,

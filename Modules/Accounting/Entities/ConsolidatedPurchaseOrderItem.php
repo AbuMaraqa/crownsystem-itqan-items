@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Accounting\Entities\Concerns\HasPriceGroup;
 use Modules\Core\Entities\User;
 use Modules\Items\Entities\Product;
 use Spatie\Activitylog\LogOptions;
@@ -14,6 +15,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class ConsolidatedPurchaseOrderItem extends Model
 {
+    use HasPriceGroup;
     use HasFactory;
     use LogsActivity;
     use SoftDeletes;

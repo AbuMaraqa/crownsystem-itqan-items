@@ -82,7 +82,7 @@ final class ConsolidatedPurchaseOrderTabs
         $picker = app(ConsolidatedPurchaseOrderPickerService::class);
 
         $rows = $items->map(function (ConsolidatedPurchaseOrderItem $item) use ($mainItems, $consumed, $picker): array {
-            $isWeight = $item->product?->pricing_type === 'weight';
+            $isWeight = $item->isWeightPricedLine();
             $weights = PurchaseOrderMainItems::weights($item);
             $source = $item->sourcePurchaseOrderItem;
             $sourceIsWeight = $source && PurchaseOrderConsumption::isWeightPriced($source);
@@ -106,7 +106,7 @@ final class ConsolidatedPurchaseOrderTabs
             ];
         })->values()->all();
 
-        return ['rows' => $rows, 'has_weight_items' => $items->contains(fn (ConsolidatedPurchaseOrderItem $item): bool => $item->product?->pricing_type === 'weight')];
+        return ['rows' => $rows, 'has_weight_items' => $items->contains(fn (ConsolidatedPurchaseOrderItem $item): bool => $item->isWeightPricedLine())];
     }
 
     /**
@@ -369,7 +369,7 @@ final class ConsolidatedPurchaseOrderTabs
             ->map(fn (ConsolidatedPurchaseOrderItem $item): array => [
                 'consolidated_purchase_order_item_id' => $item->id,
                 'description' => $item->description,
-                'quantity' => Number::clean($item->product?->pricing_type === 'weight' ? $item->total_weight : $item->quantity),
+                'quantity' => Number::clean($item->isWeightPricedLine() ? $item->total_weight : $item->quantity),
                 'unit_price' => '0',
                 'discount_rate' => '0',
                 'bonus_note' => null,

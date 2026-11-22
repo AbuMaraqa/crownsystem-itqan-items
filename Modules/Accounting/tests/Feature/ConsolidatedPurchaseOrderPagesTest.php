@@ -18,6 +18,8 @@ use Modules\Accounting\Enums\ConsolidatedPurchaseOrderStatus;
 use Modules\Accounting\Enums\FinancialEntryStatus;
 use Modules\Accounting\Enums\ShippingClassification;
 use Modules\Accounting\Services\AccountingPdfService;
+use Modules\Accounting\Services\PurchaseOrderService;
+use Modules\Accounting\tests\Feature\Concerns\PriceGroupFixtures;
 use Modules\Accounting\tests\Unit\ConsolidatedTestFactory;
 use Modules\Core\Entities\User;
 use Spatie\Permission\Models\Permission;
@@ -30,6 +32,7 @@ use Tests\TestCase;
  */
 class ConsolidatedPurchaseOrderPagesTest extends TestCase
 {
+    use PriceGroupFixtures;
     use RefreshDatabase;
 
     private const PERMISSIONS = ['View List', 'View', 'Create', 'Update', 'Delete'];
@@ -137,6 +140,47 @@ class ConsolidatedPurchaseOrderPagesTest extends TestCase
         // الباقي 6 لطلبية اخرى.
         $row = $this->postJson(route('accounting.consolidated-purchase-orders.picker.items'), ['purchase_order_id' => $po->id, 'rows' => []])->json('items.0');
         $this->assertEquals(6, $row['remaining']);
+    }
+
+    public function test_a_price_group_line_is_consolidated_whole_or_by_its_colours(): void
+    {
+        $this->signIn();
+        ['white' => $white, 'whiteW45' => $w45, 'whiteW60' => $w60] = $this->alpineGroups();
+        // 2 × W45 (16.25 كغم) + 1 × W60 (13 كغم)، 40 كغم فعلي × 5.
+        $po = app(PurchaseOrderService::class)->create([
+            'client_id' => User::factory()->create()->id,
+            'order_date' => now()->toDateString(),
+            'items' => [$this->groupLine($white, [[$w45, 2], [$w60, 1]], 40, 5)],
+        ]);
+        $line = $po->items()->with('pieces')->sole();
+
+        // سحب لون W60 وحده: سطر بمجموعته. وزن الميزان يخص السطر بقطعه كلها، فالجزء المسحوب بلا وزن
+        // فعلي ومبلغه صفر حتى يُدخل وزنه (القاعدة نفسها لسطر الصنف الرئيسي).
+        $rows = $this->postJson(route('accounting.consolidated-purchase-orders.picker.rows'), [
+            'rows' => [], 'keys' => ['piece-'.$line->pieces->firstWhere('product_id', $w60->id)->id],
+        ])->assertOk()->json('rows');
+
+        $this->assertCount(1, $rows);
+        $this->assertNull($rows[0]['product_id']);
+        $this->assertSame($white->id, $rows[0]['category_finish_id']);
+        $this->assertSame('weight', $rows[0]['pricing_type']);
+
+        $this->post(route('accounting.consolidated-purchase-orders.store'), ['order_date' => now()->toDateString(), 'items' => $rows])
+            ->assertSessionHas('success');
+
+        $order = ConsolidatedPurchaseOrder::query()->latest('id')->firstOrFail();
+        $item = $order->items()->with('pieces')->sole();
+        $this->assertNull($item->product_id);
+        $this->assertSame($white->id, (int) $item->category_finish_id);
+        $this->assertSame([$w60->id], $item->pieces->pluck('product_id')->map(fn ($id) => (int) $id)->all());
+        $this->assertEquals(13, (float) $item->total_weight);
+        $this->assertNull($item->actual_weight);
+
+        // الباقي لونه W45 فقط لطلبية اخرى، وسحب W60 مرة ثانية مرفوض.
+        $rows = $this->postJson(route('accounting.consolidated-purchase-orders.picker.rows'), [
+            'rows' => [], 'keys' => ['piece-'.$line->pieces->firstWhere('product_id', $w45->id)->id, 'piece-'.$line->pieces->firstWhere('product_id', $w60->id)->id],
+        ])->assertOk()->json('rows');
+        $this->assertSame([$w45->id], array_map('intval', array_column($rows[0]['pieces'], 'product_id')));
     }
 
     public function test_index_lists_changes_status_and_deletes(): void

@@ -358,7 +358,7 @@ class ConsolidatedPurchaseOrderPickerService
     {
         $item->loadMissing(['product', 'pieces', 'consolidatedPurchaseOrder']);
 
-        if ($item->product?->pricing_type === 'weight') {
+        if ($item->isWeightPricedLine()) {
             throw new DomainException(__('Weight-priced items cannot be adjusted here.'));
         }
 
