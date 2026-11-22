@@ -187,6 +187,8 @@ class LedgerReportsTest extends TestCase
         app(FiscalYearService::class)->reopen($this->lastYear);
         app(PeriodClosingVoucherService::class)->cancel($voucher);
         $this->assertSame(600.0, $reports->balanceSheet('2026-01-31')['unclosed_profit']);
+        // قيد عكس الاقفال لا يدخل قائمة الدخل كما لا يدخلها قيد الاقفال نفسه.
+        $this->assertSame(600.0, $reports->incomeStatement('2025-01-01', '2025-12-31')['net_profit']);
     }
 
     public function test_a_closed_month_blocks_posting_and_reversal_moves_to_today(): void

@@ -424,9 +424,17 @@ class AccountingReportService
             ->selectRaw("{$lineTable}.account_id, SUM({$lineTable}.debit_base) as debit_base, SUM({$lineTable}.credit_base) as credit_base")
             ->when($from, fn ($query) => $query->where('posted_entries.entry_date', '>=', $from))
             ->when($to, fn ($query) => $query->where('posted_entries.entry_date', '<=', $to))
-            ->when($excludeClosing, fn ($query) => $query->where(fn ($query) => $query
-                ->whereNull('posted_entries.source_type')
-                ->orWhere('posted_entries.source_type', '!=', self::CLOSING_SOURCE_TYPE)))
+            // قيد الاقفال وقيد عكسه (عند الغاء الاقفال) خارج قائمة الدخل معاً.
+            ->when($excludeClosing, fn ($query) => $query
+                ->where(fn ($query) => $query
+                    ->whereNull('posted_entries.source_type')
+                    ->orWhere('posted_entries.source_type', '!=', self::CLOSING_SOURCE_TYPE))
+                ->where(fn ($query) => $query
+                    ->whereNull('posted_entries.reversal_of_entry_id')
+                    ->orWhereNotIn('posted_entries.reversal_of_entry_id', JournalEntry::query()
+                        ->withTrashed()
+                        ->select('id')
+                        ->where('source_type', self::CLOSING_SOURCE_TYPE))))
             ->groupBy("{$lineTable}.account_id")
             ->get()
             ->keyBy('account_id');
