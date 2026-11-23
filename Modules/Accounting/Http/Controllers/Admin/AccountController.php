@@ -42,13 +42,15 @@ class AccountController extends Controller
 
         $accounts = $this->accounts->forTree();
         $tree = new AccountTree($filters);
-        $built = $tree->build($accounts, $this->accounts->rolledUpBalances($accounts));
+        $balances = $this->accounts->rolledUpBalances($accounts);
+        $built = $tree->build($accounts, $balances);
 
         return Inertia::render('Accounting/Account/Index', [
             'tree' => $built['nodes'],
             'visibleCount' => $built['visible'],
             'totalCount' => $accounts->count(),
             'expandAll' => $tree->narrows(),
+            'summary' => $tree->summary($accounts, $balances),
             'filters' => [
                 'search' => $filters['search'],
                 'type' => $filters['type'] !== null ? (int) $filters['type'] : null,

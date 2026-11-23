@@ -5,6 +5,8 @@ namespace Modules\Accounting\tests\Feature;
 use DomainException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter;
+use Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect;
 use Modules\Accounting\database\seeders\AccountMappingSeeder;
 use Modules\Accounting\database\seeders\DefaultChartOfAccountsSeeder;
 use Modules\Accounting\Entities\Account;
@@ -32,6 +34,7 @@ use Modules\Accounting\Services\WarehouseLayoutService;
 use Modules\Core\Entities\Currency;
 use Modules\Core\Entities\User;
 use Modules\Items\Entities\Product;
+use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
 /**
@@ -87,6 +90,35 @@ class InventoryFlowTest extends TestCase
         $this->seed(AccountMappingSeeder::class);
 
         $this->warehouse = $this->warehouse('المخزن الرئيسي', 'WH1');
+    }
+
+    public function test_the_items_grid_shows_a_sub_items_stock_and_incoming_purchase_orders(): void
+    {
+        $this->withoutMiddleware([LocaleSessionRedirect::class, LaravelLocalizationRedirectFilter::class]);
+        [$order, $subA] = $this->weightPurchaseOrder();
+
+        foreach (['Sales Order Create', 'Stock View List'] as $name) {
+            Permission::findOrCreate($name, 'web');
+        }
+
+        $user = User::factory()->create();
+        $user->givePermissionTo('Sales Order Create');
+        $this->actingAs($user);
+        $url = route('accounting.items-grid.details', ['document' => 'sales-order', 'product_id' => $subA->id]);
+
+        // من لا يرى المخزون لا يفتح التفاصيل.
+        $this->getJson($url)->assertForbidden();
+
+        $user->givePermissionTo('Stock View List');
+        $this->getJson($url)
+            ->assertOk()
+            ->assertJsonPath('product.barcode', 'BLT476')
+            ->assertJsonPath('card.levels.on_hand', '0')
+            ->assertJsonPath('card.levels.incoming', '10')
+            ->assertJsonPath('card.purchase_orders.0.reference', $order->reference_no)
+            ->assertJsonPath('card.purchase_orders.0.party', 'مورد الصين')
+            ->assertJsonPath('card.purchase_orders.0.quantity', '10')
+            ->assertJsonPath('card.sales_orders', []);
     }
 
     public function test_receiving_a_weight_order_puts_sub_items_in_stock_and_posts_to_grni(): void

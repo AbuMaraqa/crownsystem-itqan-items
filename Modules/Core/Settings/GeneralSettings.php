@@ -18,6 +18,9 @@ class GeneralSettings extends Settings
     // لون لوحة التحكم وخطها (DashboardTheme).
     public string $dashboard_color = '#1570EF';
     public string $dashboard_font = 'tajawal';
+    // لون الرصيد عند الحد الادنى 1 او تحته، ولونه عند الحد الادنى 2 او تحته (DashboardTheme::stockColors).
+    public string $stock_min_1_color = '#F79009';
+    public string $stock_min_2_color = '#D92D20';
 
     public static function group(): string
     {

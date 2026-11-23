@@ -35,6 +35,8 @@ class SettingRequest extends FormRequest
                 }
             }],
             'dashboard_font' => ['sometimes', 'required', Rule::in(array_keys(DashboardTheme::fonts()))],
+            'stock_min_1_color' => ['sometimes', 'required', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'stock_min_2_color' => ['sometimes', 'required', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
 
             'app_versions' => ['sometimes', 'array'],
             'app_versions.*.platform' => ['required', 'string', 'max:255', 'distinct'],
@@ -65,6 +67,8 @@ class SettingRequest extends FormRequest
             'logo' => __('Site Logo'),
             'dashboard_color' => __('Dashboard color'),
             'dashboard_font' => __('Dashboard font'),
+            'stock_min_1_color' => __('Min Limit 1 color'),
+            'stock_min_2_color' => __('Min Limit 2 color'),
             'app_versions.*.platform' => __('Platform (e.g., android, ios)'),
             'app_versions.*.store_url' => __('Store URL'),
             'app_versions.*.min_version' => __('Min Version'),

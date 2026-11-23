@@ -4,6 +4,7 @@ import type {
     BarcodeResult,
     GridContext,
     GroupPayload,
+    ItemDetails,
     MatchPiecesResult,
     ProductPayload,
     SearchResult,
@@ -111,6 +112,7 @@ export function createGridApi(document: string, context: () => GridContext) {
             getJson<MatchPiecesResult>(url('match-pieces', priced({ main_product_id: mainProductId, piece_ids: pieceIds }))),
         stock: (productId: number, warehouseId: number | string | null | undefined) =>
             getJson<StockInfo | null>(url('stock', { product_id: productId, warehouse_id: warehouseId || undefined })),
+        details: (productId: number) => getJson<ItemDetails>(url('details', { product_id: productId })),
         prices: (ids: number[]) => getJson<Record<string, string>>(url('prices', priced({ ids }))),
         totals: (body: { items: unknown[]; extra_lines?: unknown[]; document_discount: unknown; tax_rate: unknown }, signal?: AbortSignal) =>
             postJson<ServerTotals>(url('totals'), body, signal),

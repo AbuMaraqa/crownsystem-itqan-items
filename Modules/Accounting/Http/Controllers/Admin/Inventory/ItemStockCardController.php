@@ -17,6 +17,7 @@ use Modules\Accounting\Entities\WarehouseLocation;
 use Modules\Accounting\Enums\LocationDirection;
 use Modules\Accounting\Services\ItemStockCardService;
 use Modules\Accounting\Services\WarehouseLayoutService;
+use Modules\Accounting\Support\ItemCardData;
 use Modules\Accounting\Support\Quantity;
 use Modules\Accounting\Support\SelectOptions;
 use Modules\Accounting\Support\StatusBadge;
@@ -49,7 +50,7 @@ class ItemStockCardController extends Controller
         return Inertia::render('Accounting/Inventory/ItemCard/Index', [
             'filters' => ['warehouse' => $warehouseId, 'from' => $from, 'to' => $to],
             'warehouseOptions' => SelectOptions::from($warehouses),
-            'product' => $record ? $this->product($record) : null,
+            'product' => $record ? ItemCardData::product($record) : null,
             'card' => $record ? $this->card($record, $warehouseId, $from, $to) : null,
             'locationOptions' => SelectOptions::from(WarehouseLocation::options($warehouseId)),
             'directionOptions' => SelectOptions::from(LocationDirection::options()),
@@ -109,64 +110,14 @@ class ItemStockCardController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function product(Product $product): array
-    {
-        return [
-            'id' => $product->id,
-            'name' => $product->name,
-            'image' => $product->image ?: null,
-            'main_product' => $product->mainProduct?->name,
-            'barcode' => $product->barcode,
-            'sku' => $product->sku,
-            'weight_per_meter' => (float) $product->weight_per_meter ? Quantity::format($product->weight_per_meter, 3) : null,
-            'length' => (float) $product->length ? Quantity::format($product->length, 3) : null,
-            'shelf' => $product->shelf,
-            'max_limit' => Quantity::format($product->max_limit),
-            'min_limit_1' => Quantity::format($product->min_limit_1),
-            'min_limit_2' => Quantity::format($product->min_limit_2),
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
     private function card(Product $product, ?int $warehouseId, ?string $from, ?string $to): array
     {
         $card = $this->cards->card($product, $warehouseId, $from, $to);
-        $levels = $card['levels'];
-        $main = $card['mainLevels'];
         $fmt = fn ($value, int $decimals = 2): string => Quantity::format($value, $decimals);
         $canSeeCost = (bool) auth()->user()?->can('Stock Value View');
-        $cost = null;
-
-        if ($canSeeCost && ! $main && $card['cost']) {
-            $average = (float) $card['cost']->average_cost;
-            $value = (float) $levels['on_hand'] * $average;
-            // المخزون يُعدّ بالقطع: صنف الوزن يعرض ايضاً كلفة الكغم (القيمة ÷ الوزن).
-            $cost = ['average' => $fmt($average, 4), 'per_kg' => (float) $levels['weight'] > 0 ? $fmt($value / (float) $levels['weight'], 4) : null, 'value' => $fmt($value)];
-        }
 
         return [
-            'levels' => [
-                'on_hand' => $fmt($levels['on_hand']),
-                'reserved' => $fmt($levels['reserved']),
-                'incoming' => $fmt($levels['incoming']),
-                'available' => $fmt($levels['available']),
-                'available_negative' => (float) $levels['available'] < 0,
-                'weight' => (float) $levels['weight'] > 0 ? $fmt($levels['weight']) : null,
-            ],
-            'status' => ['label' => $card['status']->getLabel(), 'tone' => StatusBadge::tone($card['status']->color())],
-            'value' => $canSeeCost && $main ? $fmt($main['value']) : null,
-            'cost' => $cost,
-            'main' => $main ? [
-                'sub_items' => (int) $main['sub_items'],
-                'on_hand' => $fmt($main['on_hand']),
-                'weight' => $fmt($main['weight']),
-                'reserved' => $fmt($main['reserved']),
-                'incoming' => $fmt($main['incoming']),
-                'available' => $fmt($main['available']),
-                'value' => $canSeeCost ? $fmt($main['value']) : null,
-            ] : null,
+            ...ItemCardData::summary($card),
             'sub_items' => $card['subItems']->map(fn (array $row) => [
                 'id' => $row['product']->id,
                 'code' => $row['product']->barcode ?: $row['product']->sku,
@@ -179,11 +130,6 @@ class ItemStockCardController extends Controller
                 'available_negative' => (float) $row['levels']['available'] < 0,
                 'value' => $canSeeCost ? $fmt($row['levels']['value']) : null,
             ])->values()->all(),
-            'warehouses' => $card['byWarehouse']->map(fn ($row) => [
-                'name' => $row->warehouse?->name,
-                'quantity' => $fmt($row->quantity),
-                'weight' => (float) $row->weight ? $fmt($row->weight) : null,
-            ])->values()->all(),
             'placements' => $card['placements']->map(fn (ProductLocation $place) => [
                 'id' => $place->id,
                 'code' => $place->location?->code,
@@ -192,8 +138,6 @@ class ItemStockCardController extends Controller
                 'warehouse' => $place->warehouse?->name,
                 'quantity' => $card['locationStock']->has($place->location_id) ? $fmt($card['locationStock'][$place->location_id]['quantity']) : null,
             ])->values()->all(),
-            'sales_orders' => $card['salesOrders']->map(fn (array $row) => [...$row, 'quantity' => $fmt($row['quantity'])])->values()->all(),
-            'purchase_orders' => $card['purchaseOrders']->map(fn (array $row) => [...$row, 'quantity' => $fmt($row['quantity'])])->values()->all(),
             'movements' => [
                 'opening' => $fmt($card['movements']['opening']),
                 'rows' => $card['movements']['rows']->map(fn (StockMovement $movement) => [

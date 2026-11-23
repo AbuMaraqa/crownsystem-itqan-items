@@ -11,8 +11,10 @@
         h2.group { font-size: 13pt; background: #0c456f; color: #fff; padding: 4px 8px; margin: 4mm 0 0; }
         table.items td.qty { background: #e5e7eb; font-weight: bold; text-align: center; }
         table.items td.num, table.items th.num { text-align: center; }
-        .low { color: #b45309; font-weight: bold; }
-        .critical { color: #b91c1c; font-weight: bold; }
+        {{-- لونا الحدين الادنيين من الاعدادات العامة (DashboardTheme::stockColors) --}}
+        .low { color: {{ $stockColors['min_1'] }}; font-weight: bold; }
+        .critical { color: {{ $stockColors['min_2'] }}; font-weight: bold; }
+        .out { color: #b91c1c; font-weight: bold; }
         .section img { max-height: 11mm; max-width: 30mm; }
     </style>
 </head>
@@ -67,7 +69,7 @@
                         <td class="num">{{ $fmt($product->min_limit_1, 0) }}</td>
                         <td class="num">{{ $fmt($product->min_limit_2, 0) }}</td>
                         <td class="num">{{ $product->categories->first()?->name }}</td>
-                        <td class="qty {{ in_array($status->value, ['out', 'critical']) ? 'critical' : ($status->value === 'low' ? 'low' : '') }}">{{ $fmt($product->stock_on_hand) }}</td>
+                        <td class="qty {{ match ($status->value) { 'out' => 'out', 'critical' => 'critical', 'low' => 'low', default => '' } }}">{{ $fmt($product->stock_on_hand) }}</td>
                         <td class="num">{{ $fmt($reserved[$product->id] ?? 0) }}</td>
                         <td class="num">{{ $fmt($incoming[$product->id] ?? 0) }}</td>
                         <td class="num">{{ $fmt($product->stock_weight) }}</td>

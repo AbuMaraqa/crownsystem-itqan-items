@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, inject } from 'vue';
 
-import { t } from '@/lib/i18n';
+import { can, t } from '@/lib/i18n';
 import { CircleAlert, Plus, X } from '@/lib/icons';
 
 import { pieceInput, pieceInputMissing, pieceInputOk } from './classes';
@@ -19,6 +19,7 @@ const grid = inject(gridKey)!;
 const row = computed(() => grid.rows.value[props.rowIndex]);
 const config = grid.config;
 const picked = computed(() => row.value.pieces.filter((piece) => piece.product_id).length);
+const canSeeDetails = can('Stock View List');
 
 const measures = ['piece_count', 'piece_length', 'weight_per_meter'] as const;
 const measureLabels: Record<(typeof measures)[number], string> = {
@@ -91,7 +92,19 @@ const readonlyMeasure = (measure: (typeof measures)[number]): boolean =>
                             />
                         </td>
 
-                        <td class="px-2 py-1 font-mono text-muted" dir="ltr">{{ piece.barcode || '—' }}</td>
+                        <!-- The barcode opens the sub-item's details: stock, open sales orders and incoming purchase orders. -->
+                        <td class="px-2 py-1 font-mono text-muted" dir="ltr">
+                            <button
+                                v-if="piece.product_id && canSeeDetails"
+                                type="button"
+                                class="rounded px-1 text-brand-600 underline decoration-dotted underline-offset-2 hover:bg-brand-50 hover:decoration-solid dark:text-brand-400 dark:hover:bg-brand-500/10"
+                                :title="t('Show item details')"
+                                @click="grid.showDetails(piece.product_id)"
+                            >
+                                {{ piece.barcode || '—' }}
+                            </button>
+                            <template v-else>{{ piece.barcode || '—' }}</template>
+                        </td>
 
                         <td v-if="config.quantityLimitLabel" class="px-2 py-1 text-end text-muted tabular-nums" dir="ltr">{{ piece.max_piece_count ?? '—' }}</td>
 

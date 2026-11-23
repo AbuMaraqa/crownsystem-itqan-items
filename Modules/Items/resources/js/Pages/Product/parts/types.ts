@@ -1,5 +1,6 @@
 import type { ExistingImage } from '@/Components/form/ImageUpload.vue';
 import type { Option } from '@/Components/form/SelectInput.vue';
+import type { Tone } from '@/lib/tones';
 
 export type ErrorOf = (field: string) => string | undefined;
 
@@ -165,7 +166,7 @@ export interface MadeFromRow {
     yield: string;
 }
 
-export type BadgeTone = 'neutral' | 'success' | 'warning' | 'danger' | 'info' | 'brand';
+export type BadgeTone = Tone;
 
 export interface StockSummary {
     is_main: boolean;

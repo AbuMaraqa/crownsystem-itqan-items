@@ -26,13 +26,37 @@ class ItemStockCardService
      */
     public function card(Product $product, ?int $warehouseId, ?string $from, ?string $to): array
     {
-        // الصنف الرئيسي: رصيده مجموع اصنافه الفرعية، وتظهر فروعه برصيد كل منها.
+        $summary = $this->summary($product, $warehouseId);
+
+        return [
+            ...$summary,
+            'subItems' => $summary['mainLevels'] ? $this->subItems($product, $warehouseId) : collect(),
+            'placements' => ProductLocation::query()
+                ->with(['location', 'warehouse.translations'])
+                ->where('product_id', $product->id)
+                ->when($warehouseId, fn ($q) => $q->where('warehouse_id', $warehouseId))
+                ->orderByDesc('is_primary')
+                ->get(),
+            'locationStock' => $warehouseId ? collect($this->stock->locations([$product->id], $warehouseId)[$product->id] ?? [])->keyBy('location_id') : collect(),
+            'movements' => $this->movements($product, $warehouseId, $from, $to),
+        ];
+    }
+
+    /**
+     * ملخص الصنف بلا حركات ولا اماكن: الارصدة والحالة والكلفة، الرصيد في كل مخزن، والطلبيات
+     * المفتوحة (المحجوز في طلبيات البيع والقادم في طلبيات الشراء). تعرضه بطاقة الصنف ونافذة
+     * تفاصيل الصنف في جدول الاصناف.
+     *
+     * @return array<string, mixed>
+     */
+    public function summary(Product $product, ?int $warehouseId): array
+    {
+        // الصنف الرئيسي: رصيده مجموع اصنافه الفرعية.
         ['levels' => $levels, 'mainLevels' => $mainLevels] = $this->stock->productLevels($product->id, $warehouseId);
 
         return [
             'levels' => $levels,
             'mainLevels' => $mainLevels,
-            'subItems' => $mainLevels ? $this->subItems($product, $warehouseId) : collect(),
             'status' => StockStatus::for($product, $levels['on_hand']),
             'cost' => ProductCost::query()->where('product_id', $product->id)->first(),
             'byWarehouse' => StockBalance::query()
@@ -41,16 +65,8 @@ class ItemStockCardService
                 ->groupBy('warehouse_id')
                 ->selectRaw('warehouse_id, SUM(quantity) as quantity, SUM(weight) as weight')
                 ->get(),
-            'placements' => ProductLocation::query()
-                ->with(['location', 'warehouse.translations'])
-                ->where('product_id', $product->id)
-                ->when($warehouseId, fn ($q) => $q->where('warehouse_id', $warehouseId))
-                ->orderByDesc('is_primary')
-                ->get(),
-            'locationStock' => $warehouseId ? collect($this->stock->locations([$product->id], $warehouseId)[$product->id] ?? [])->keyBy('location_id') : collect(),
             'salesOrders' => $this->openOrders($product, $warehouseId, 'sales'),
             'purchaseOrders' => $this->openOrders($product, $warehouseId, 'purchase'),
-            'movements' => $this->movements($product, $warehouseId, $from, $to),
         ];
     }
 

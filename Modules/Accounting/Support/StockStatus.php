@@ -68,11 +68,15 @@ enum StockStatus: string implements HasLabel
         };
     }
 
+    /**
+     * المنخفض والحرج بلوني حدَّي المخزون من الاعدادات (DashboardTheme::stockColors).
+     */
     public function color(): string
     {
         return match ($this) {
-            self::OUT, self::CRITICAL => 'danger',
-            self::LOW => 'warning',
+            self::OUT => 'danger',
+            self::CRITICAL => 'stock-min-2',
+            self::LOW => 'stock-min-1',
             self::OK => 'success',
             self::OVER => 'info',
         };

@@ -12,6 +12,7 @@ use Modules\Accounting\Entities\StockTransfer;
 use Modules\Accounting\Entities\Warehouse;
 use Modules\Accounting\Support\StockStatus;
 use Modules\Core\Services\PdfService;
+use Modules\Core\Support\DashboardTheme;
 use Modules\Items\Entities\Product;
 
 /**
@@ -107,6 +108,7 @@ class InventoryPdfService extends PdfService
             'incoming' => $incoming,
             'locations' => $locations,
             'statusLabel' => $status ? (StockStatus::options()[$status] ?? null) : null,
+            'stockColors' => app(DashboardTheme::class)->stockColors(),
         ], __('Stock Report').'.pdf', ['orientation' => 'L', 'format' => 'A4-L']);
     }
 

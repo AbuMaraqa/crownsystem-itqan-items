@@ -69,11 +69,14 @@ enum StockAlertLevel: string implements HasColor, HasLabel
         };
     }
 
+    /**
+     * التنبيه ويجب الطلب بلوني الحدين الادنيين من الاعدادات، كحالة الرصيد في StockStatus.
+     */
     public function getColor(): string
     {
         return match ($this) {
-            self::WARNING => 'warning',
-            self::REORDER => 'danger',
+            self::WARNING => 'stock-min-1',
+            self::REORDER => 'stock-min-2',
             self::OUT => 'dark',
         };
     }

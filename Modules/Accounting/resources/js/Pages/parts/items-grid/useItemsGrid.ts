@@ -1623,6 +1623,14 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
 
     watch(() => context().warehouseId, () => void refreshStock());
 
+    /* ---------- item details window (a sub-item's barcode, the stock strip) ---------- */
+
+    const detailsProductId = ref<number | null>(null);
+
+    function showDetails(productId: number | string | null | undefined): void {
+        if (productId) detailsProductId.value = Number(productId);
+    }
+
     onBeforeUnmount(() => {
         clearTimeout(totalsTimer);
         clearTimeout(searchTimer);
@@ -1693,6 +1701,9 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
         // stock
         stock,
         noteStockFocus,
+        // item details
+        detailsProductId,
+        showDetails,
     };
 }
 

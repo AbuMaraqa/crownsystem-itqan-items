@@ -8,11 +8,12 @@ import PageHeader from '@/Components/ui/PageHeader.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { confirm } from '@/lib/confirm';
 import { can, t } from '@/lib/i18n';
-import { ChevronDown, ChevronUp, Returns, Search } from '@/lib/icons';
+import { Check, ChevronDown, ChevronUp, Plus, Returns, Search } from '@/lib/icons';
 import { route } from '@/lib/route';
 
+import AccountClassBand from './parts/AccountClassBand.vue';
 import AccountTreeNode from './parts/AccountTreeNode.vue';
-import type { AccountNode } from './parts/types';
+import type { AccountNode, AccountSummary } from './parts/types';
 
 defineOptions({ layout: AdminLayout });
 
@@ -29,6 +30,7 @@ const props = defineProps<{
     totalCount: number;
     /** A filter narrows the tree: every branch is shown open. */
     expandAll: boolean;
+    summary: AccountSummary;
     filters: Filters;
     types: Option[];
 }>();
@@ -52,7 +54,7 @@ function reload(): void {
             preserveState: true,
             preserveScroll: true,
             replace: true,
-            only: ['tree', 'visibleCount', 'totalCount', 'expandAll', 'filters'],
+            only: ['tree', 'visibleCount', 'totalCount', 'expandAll', 'summary', 'filters'],
             onStart: () => (loading.value = true),
             onFinish: () => (loading.value = false),
         },
@@ -97,6 +99,8 @@ const collapseEverything = (): void => {
     expanded.value = new Set();
 };
 
+const filtered = computed(() => filters.search !== '' || filters.type !== null || filters.postable || !filters.active);
+
 function resetFilters(): void {
     Object.assign(filters, { search: '', type: null, postable: false, active: true });
 }
@@ -114,60 +118,98 @@ async function remove(node: AccountNode): Promise<void> {
     }
 }
 
-const control = 'h-control w-full rounded-control border border-line bg-card px-3 text-sm outline-none focus:border-brand-300 focus:shadow-focus-ring';
-const columns = computed(() => [t('Account'), t('Type'), t('Normal Balance'), t('Balance'), t('Status')]);
+const description = computed(() =>
+    props.visibleCount === props.totalCount
+        ? t(':count accounts', { count: props.totalCount })
+        : t('Showing :visible of :total accounts', { visible: props.visibleCount, total: props.totalCount }),
+);
+
+const chips = computed(() => [
+    { key: 'postable' as const, label: t('Postable Only') },
+    { key: 'active' as const, label: t('Active Only') },
+]);
+
+const segment =
+    'inline-flex h-7 items-center gap-1.5 rounded-[5px] px-2.5 text-[13px] text-muted hover:bg-surface hover:text-ink disabled:pointer-events-none disabled:opacity-40';
+
+// Shared by the column header and every row of the tree.
+const columns = '--account-columns: minmax(22rem,1fr) 7rem minmax(10rem,13rem) 6.5rem 3rem';
 </script>
 
 <template>
-    <PageHeader :title="t('Chart of Accounts')" :description="`${visibleCount} / ${totalCount}`">
+    <PageHeader :title="t('Chart of Accounts')" :description="description">
         <template #actions>
-            <Button v-if="can('Account Create')" variant="primary" :href="route('accounting.accounts.add')">{{ t('Add Account') }}</Button>
+            <Button v-if="can('Account Create')" variant="primary" :href="route('accounting.accounts.add')"><Plus class="size-4" />{{ t('Add Account') }}</Button>
         </template>
     </PageHeader>
 
-    <div class="overflow-hidden rounded-xl border border-line bg-card shadow-card">
-        <div class="grid gap-3 border-b border-line p-4 md:grid-cols-12 md:items-center">
-            <label class="relative md:col-span-4">
-                <span class="sr-only">{{ t('Search accounts') }}</span>
-                <Search class="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-gray-400" />
-                <input v-model="filters.search" type="search" :placeholder="t('Search accounts')" :class="[control, 'ps-9']" />
-            </label>
+    <div class="space-y-5">
+        <AccountClassBand :summary="summary" :selected="filters.type" @select="(value) => (filters.type = value)" />
 
-            <select v-model="filters.type" :class="[control, 'md:col-span-3']" :aria-label="t('Type')">
-                <option :value="null">{{ t('All Types') }}</option>
-                <option v-for="type in types" :key="type.value" :value="type.value">{{ type.label }}</option>
-            </select>
-
-            <div class="flex flex-wrap items-center gap-4 text-sm md:col-span-3">
-                <label class="inline-flex items-center gap-2">
-                    <input v-model="filters.postable" type="checkbox" class="size-4 rounded accent-brand-500" />
-                    <span>{{ t('Postable Only') }}</span>
+        <div class="overflow-hidden rounded-xl border border-line bg-card shadow-card">
+            <div class="flex flex-wrap items-center gap-3 border-b border-line p-3 lg:px-4">
+                <label class="relative w-full sm:w-80">
+                    <span class="sr-only">{{ t('Search accounts') }}</span>
+                    <Search class="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-gray-400" />
+                    <input
+                        v-model="filters.search"
+                        type="search"
+                        :placeholder="t('Search by code or name')"
+                        class="h-control w-full rounded-control border border-line bg-surface ps-9 pe-3 text-sm outline-none placeholder:text-gray-400 focus:border-brand-300 focus:bg-card focus:shadow-focus-ring"
+                    />
                 </label>
-                <label class="inline-flex items-center gap-2">
-                    <input v-model="filters.active" type="checkbox" class="size-4 rounded accent-brand-500" />
-                    <span>{{ t('Active Only') }}</span>
-                </label>
-            </div>
 
-            <div class="flex items-center gap-2 md:col-span-2 md:justify-end">
-                <Button size="icon-md" :aria-label="t('Expand All')" :disabled="expandAll" @click="expandEverything"><ChevronDown /></Button>
-                <Button size="icon-md" :aria-label="t('Collapse All')" :disabled="expandAll" @click="collapseEverything"><ChevronUp /></Button>
-                <Button size="icon-md" :aria-label="t('Reset')" @click="resetFilters"><Returns /></Button>
-            </div>
-        </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button
+                        v-for="chip in chips"
+                        :key="chip.key"
+                        type="button"
+                        class="inline-flex h-control items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium transition-colors"
+                        :class="
+                            filters[chip.key]
+                                ? 'border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/15 dark:text-brand-300'
+                                : 'border-line bg-card text-muted hover:border-gray-300 hover:text-ink dark:hover:border-white/20'
+                        "
+                        :aria-pressed="filters[chip.key]"
+                        @click="filters[chip.key] = !filters[chip.key]"
+                    >
+                        <Check v-if="filters[chip.key]" class="size-3.5" />
+                        {{ chip.label }}
+                    </button>
 
-        <div class="overflow-x-auto transition-opacity" :class="{ 'opacity-50': loading }" :aria-busy="loading">
-            <div class="lg:min-w-[70rem]">
-                <div class="hidden gap-4 border-b border-line bg-gray-50/80 px-4 py-3 text-[13px] font-medium text-gray-500 lg:grid lg:grid-cols-[minmax(20rem,1.8fr)_7rem_13rem_minmax(10rem,0.9fr)_7rem_3.5rem] dark:bg-white/[0.02] dark:text-gray-400">
-                    <div v-for="(column, index) in columns" :key="column" :class="{ 'text-end': index === 3 }">{{ column }}</div>
-                    <div><span class="sr-only">{{ t('Actions') }}</span></div>
+                    <button v-if="filtered" type="button" class="inline-flex h-control items-center gap-1.5 px-2 text-[13px] font-medium text-muted hover:text-ink" @click="resetFilters">
+                        <Returns class="size-3.5" />{{ t('Reset') }}
+                    </button>
                 </div>
 
-                <div class="divide-y divide-line">
-                    <AccountTreeNode v-for="node in tree" :key="node.id" :node="node" :expand-all="expandAll" :expanded="expanded" @toggle="toggle" @delete="remove" />
+                <div class="ms-auto flex items-center rounded-control border border-line p-0.5">
+                    <button type="button" :class="segment" :disabled="expandAll" @click="expandEverything"><ChevronDown class="size-3.5" />{{ t('Expand All') }}</button>
+                    <button type="button" :class="segment" :disabled="expandAll" @click="collapseEverything"><ChevronUp class="size-3.5" />{{ t('Collapse All') }}</button>
                 </div>
+            </div>
 
-                <p v-if="!tree.length" class="p-8 text-center text-sm text-muted">{{ t('No accounts found') }}</p>
+            <div class="overflow-x-auto transition-opacity" :class="{ 'opacity-50': loading }" :style="columns" :aria-busy="loading">
+                <div class="lg:min-w-[60rem]">
+                    <div class="hidden gap-4 border-b border-line px-4 py-2.5 text-xs font-medium text-muted lg:grid lg:grid-cols-(--account-columns)">
+                        <div class="ps-14">{{ t('Account') }}</div>
+                        <div>{{ t('Normal Balance') }}</div>
+                        <div class="pe-10 text-end">{{ t('Balance') }}</div>
+                        <div>{{ t('Status') }}</div>
+                        <div><span class="sr-only">{{ t('Actions') }}</span></div>
+                    </div>
+
+                    <div class="divide-y divide-line">
+                        <AccountTreeNode v-for="node in tree" :key="node.id" :node="node" :expand-all="expandAll" :expanded="expanded" @toggle="toggle" @delete="remove" />
+                    </div>
+
+                    <div v-if="!tree.length" class="flex flex-col items-center gap-3 px-6 py-14 text-center">
+                        <p class="text-sm font-medium text-ink">{{ t('No accounts found') }}</p>
+                        <template v-if="filtered">
+                            <p class="text-sm text-muted">{{ t('No account matches these filters.') }}</p>
+                            <Button size="sm" @click="resetFilters">{{ t('Reset') }}</Button>
+                        </template>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

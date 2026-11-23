@@ -5,6 +5,7 @@ namespace Modules\Accounting\Support;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Modules\Accounting\Entities\Account;
+use Modules\Accounting\Enums\AccountType;
 use Modules\Accounting\Enums\NormalBalance;
 
 /**
@@ -51,6 +52,47 @@ final class AccountTree
             'nodes' => $this->level($childrenByParent, 0, $balances),
             'visible' => $visible->count(),
         ];
+    }
+
+    /**
+     * رصيد كل صنف من اصناف الدليل (من حسابات الجذر) وعدد حساباته، دون اي فلتر، مع فرق
+     * المدين عن الدائن ان وُجد. رأس الصفحة يعرضه على هيئة المعادلة المحاسبية.
+     *
+     * @param  Collection<int, Account>  $accounts
+     * @param  array<int, float>  $balances
+     * @return array{classes: list<array<string, mixed>>, difference: string|null}
+     */
+    public function summary(Collection $accounts, array $balances): array
+    {
+        $total = 0.0;
+        $classes = [];
+
+        foreach (AccountType::cases() as $type) {
+            $ofType = $accounts->filter(fn (Account $account) => $account->type === $type);
+            $balance = round((float) $ofType
+                ->filter(fn (Account $account) => ! $account->parent_id)
+                ->sum(fn (Account $account) => $balances[(int) $account->id] ?? 0), 4);
+            $total += $balance;
+
+            $classes[] = [
+                'value' => $type->value(),
+                'label' => $type->pluralLabel(),
+                'tone' => StatusBadge::tone($type->getColor()),
+                'count' => $ofType->count(),
+                'balance' => Number::money(abs($balance)),
+                'balance_direction' => StatusBadge::of($this->direction($balance)),
+            ];
+        }
+
+        return [
+            'classes' => $classes,
+            'difference' => abs($total) < 0.005 ? null : Number::money(abs($total)),
+        ];
+    }
+
+    private function direction(float $balance): ?NormalBalance
+    {
+        return abs($balance) < 0.0001 ? null : ($balance > 0 ? NormalBalance::DEBIT : NormalBalance::CREDIT);
     }
 
     private function matches(Account $account): bool
@@ -104,7 +146,7 @@ final class AccountTree
     private function node(Account $account, Collection $childrenByParent, array $balances): array
     {
         $balance = round((float) ($balances[(int) $account->id] ?? 0), 4);
-        $direction = abs($balance) < 0.0001 ? null : ($balance > 0 ? NormalBalance::DEBIT : NormalBalance::CREDIT);
+        $direction = $this->direction($balance);
 
         return [
             'id' => (int) $account->id,

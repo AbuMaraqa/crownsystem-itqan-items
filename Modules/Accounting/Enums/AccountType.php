@@ -31,6 +31,20 @@ enum AccountType: int implements HasLabel, HasColor
         };
     }
 
+    /**
+     * اسم الصنف بصيغة الجمع، كما في رأس دليل الحسابات (الأصول، الالتزامات...).
+     */
+    public function pluralLabel(): string
+    {
+        return match ($this) {
+            self::ASSET => __('Assets'),
+            self::LIABILITY => __('Liabilities'),
+            self::EQUITY => __("Owners' Equity"),
+            self::REVENUE => __('Revenues'),
+            self::EXPENSE => __('Expenses'),
+        };
+    }
+
     public function getColor(): string | array | null
     {
         return match ($this) {

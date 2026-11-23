@@ -16,3 +16,22 @@ export interface AccountNode {
     has_children: boolean;
     children: AccountNode[];
 }
+
+/** One class of the chart (assets, liabilities...), as `AccountTree::summary()` sends it. */
+export interface AccountClass {
+    value: number;
+    label: string;
+    tone: StatusBadge['tone'];
+    count: number;
+    balance: string;
+    balance_direction: StatusBadge | null;
+}
+
+export interface AccountSummary {
+    classes: AccountClass[];
+    /** Debits minus credits of the whole chart; null when they are equal. */
+    difference: string | null;
+}
+
+/** Text color of a tone; rails and dots take it with `bg-current`. */
+export { toneText } from '@/lib/tones';

@@ -11,6 +11,7 @@ import Card from '@/Components/ui/Card.vue';
 import { t } from '@/lib/i18n';
 
 import DashboardThemeCard from './DashboardThemeCard.vue';
+import StockColorsCard from './StockColorsCard.vue';
 import type { FontOption, SettingsForm } from './types';
 
 const props = defineProps<{ form: InertiaForm<SettingsForm>; logo: ExistingImage[]; colorPresets: string[]; fonts: FontOption[]; currencyOptions: Option[] }>();
@@ -25,6 +26,7 @@ watch(removed, (ids) => {
 <template>
     <div class="grid gap-4 lg:grid-cols-3">
         <DashboardThemeCard class="lg:col-span-3 lg:order-last" :form="form" :color-presets="colorPresets" :fonts="fonts" />
+        <StockColorsCard class="lg:col-span-3 lg:order-last" :form="form" />
         <Card class="lg:col-span-2">
             <div class="space-y-4">
                 <TextInput v-model="form.site_name" :label="t('Site Name')" required :maxlength="255" :error="form.errors.site_name" />

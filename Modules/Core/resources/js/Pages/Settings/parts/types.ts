@@ -29,6 +29,8 @@ export interface SettingsForm {
     weight_variance_tolerance: number | string;
     dashboard_color: string;
     dashboard_font: string;
+    stock_min_1_color: string;
+    stock_min_2_color: string;
     logo: File | null;
     remove_logo: boolean;
     app_versions: AppVersionForm[];

@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
+import { computed } from 'vue';
 
-import DropdownItem from '@/Components/ui/DropdownItem.vue';
 import Badge from '@/Components/ui/Badge.vue';
-import { can, t } from '@/lib/i18n';
-import { ChevronDown, ChevronRight, Layers, MinusSmall, Plus } from '@/lib/icons';
-import { route } from '@/lib/route';
+import DropdownItem from '@/Components/ui/DropdownItem.vue';
 import RecordActions from '@/Components/table/RecordActions.vue';
+import { can, t } from '@/lib/i18n';
+import { ChevronDown, ChevronRight, FileText, Folder, FolderOpen, Plus } from '@/lib/icons';
+import { route } from '@/lib/route';
 
-import type { AccountNode } from './types';
+import { toneText, type AccountNode } from './types';
 
 defineOptions({ name: 'AccountTreeNode' });
 
@@ -21,77 +22,105 @@ const props = defineProps<{
 
 const emit = defineEmits<{ toggle: [id: number]; delete: [node: AccountNode] }>();
 
-const isOpen = (): boolean => props.expandAll || props.expanded.has(props.node.id);
-// Debit balances read green and credit amber, as the normal balance badges.
-const directionClasses: Record<string, string> = {
-    success: 'text-success-700 dark:text-success-400',
-    warning: 'text-warning-700 dark:text-warning-400',
-};
-const directionClass = (): string => directionClasses[props.node.balance_direction?.tone ?? ''] ?? 'text-muted';
+const isOpen = computed(() => props.expandAll || props.expanded.has(props.node.id));
+const depth = computed(() => Math.max(props.node.level - 1, 0));
+const isRoot = computed(() => depth.value === 0);
+
+// One step of the tree is 1.5rem, after the row's 1rem padding; the arrow's middle is 0.75rem in.
+// A guide runs down under each ancestor's arrow; the last one bends into this row, up to the
+// arrow, or up to the icon when there is no arrow.
+const STEP = 1.5;
+const guideAt = (d: number): string => `${1 + d * STEP + 0.75}rem`;
+const tickWidth = computed(() => `${props.node.children.length ? STEP - 0.75 : STEP + 0.75}rem`);
 </script>
 
 <template>
     <div>
-        <div class="grid gap-3 px-4 py-3 lg:grid-cols-[minmax(20rem,1.8fr)_7rem_13rem_minmax(10rem,0.9fr)_7rem_3.5rem] transition-colors hover:bg-gray-50/70 lg:items-center lg:gap-4 dark:hover:bg-white/[0.02]">
-            <div class="min-w-0">
-                <div class="flex min-w-0 items-start gap-2" :style="{ paddingInlineStart: `${Math.max(node.level - 1, 0) * 1.25}rem` }">
-                    <button
-                        v-if="node.children.length"
-                        type="button"
-                        class="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted hover:bg-surface hover:text-ink"
-                        :aria-expanded="isOpen()"
-                        :aria-label="isOpen() ? t('Collapse') : t('Expand')"
-                        :title="isOpen() ? t('Collapse') : t('Expand')"
-                        @click="emit('toggle', node.id)"
-                    >
-                        <ChevronDown v-if="isOpen()" class="size-4" />
-                        <ChevronRight v-else class="size-4 rtl:rotate-180" />
-                    </button>
-                    <span v-else class="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center text-gray-400" aria-hidden="true">
-                        <Layers v-if="node.has_children" class="size-4" />
-                        <MinusSmall v-else class="size-4" />
-                    </span>
+        <div
+            class="relative grid gap-3 px-4 py-2.5 transition-colors lg:grid-cols-(--account-columns) lg:items-center lg:gap-4"
+            :class="[isRoot ? 'bg-gray-50/70 dark:bg-white/[0.02]' : 'hover:bg-gray-50/60 dark:hover:bg-white/[0.02]', { 'opacity-60': !node.is_active }]"
+        >
+            <!-- Class rail on the top-level accounts. -->
+            <span v-if="isRoot && node.type" class="absolute inset-y-0 start-0 w-[3px] bg-current" :class="toneText[node.type.tone]" aria-hidden="true" />
 
-                    <div class="min-w-0 flex-1">
-                        <div class="flex min-w-0 items-center gap-2">
-                            <bdi class="shrink-0 font-mono text-sm font-semibold text-ink" dir="ltr">{{ node.code }}</bdi>
-                            <Link
-                                v-if="can('Account Update')"
-                                :href="route('accounting.accounts.edit', node.id)"
-                                :title="node.name"
-                                class="block min-w-0 truncate text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
-                            >
-                                {{ node.name }}
-                            </Link>
-                            <span v-else :title="node.name" class="block min-w-0 truncate text-sm font-medium text-ink">{{ node.name }}</span>
-                        </div>
-                        <p v-if="node.description" class="mt-1 max-w-2xl truncate text-xs text-muted">{{ node.description }}</p>
+            <!-- Tree guides. -->
+            <template v-if="!isRoot">
+                <span
+                    v-for="d in depth"
+                    :key="d"
+                    class="pointer-events-none absolute inset-y-0 hidden border-s border-gray-200 lg:block dark:border-white/10"
+                    :style="{ insetInlineStart: guideAt(d - 1) }"
+                    aria-hidden="true"
+                />
+                <span
+                    class="pointer-events-none absolute top-1/2 hidden border-t border-gray-200 lg:block dark:border-white/10"
+                    :style="{ insetInlineStart: guideAt(depth - 1), width: tickWidth }"
+                    aria-hidden="true"
+                />
+            </template>
+
+            <div class="flex min-w-0 items-center gap-2" :style="{ paddingInlineStart: `${depth * STEP}rem` }">
+                <button
+                    v-if="node.children.length"
+                    type="button"
+                    class="relative inline-flex h-7 shrink-0 items-center gap-1 rounded-md ps-0.5 pe-1 text-muted transition-colors hover:bg-surface hover:text-ink"
+                    :aria-expanded="isOpen"
+                    :aria-label="isOpen ? t('Collapse') : t('Expand')"
+                    :title="isOpen ? t('Collapse') : t('Expand')"
+                    @click="emit('toggle', node.id)"
+                >
+                    <span class="inline-flex size-5 items-center justify-center">
+                        <ChevronDown v-if="isOpen" class="size-3.5" />
+                        <ChevronRight v-else class="size-3.5 rtl:rotate-180" />
+                    </span>
+                    <span :class="node.type ? toneText[node.type.tone] : 'text-gray-400'">
+                        <FolderOpen v-if="isOpen" class="size-[18px]" />
+                        <Folder v-else class="size-[18px]" />
+                    </span>
+                </button>
+                <!-- No arrow, the icon sits under its siblings' folders: a folder whose sub-accounts the filter hides, or a final account. -->
+                <span v-else class="relative inline-flex h-7 shrink-0 items-center gap-1 ps-0.5 pe-1" aria-hidden="true">
+                    <span class="size-5" />
+                    <Folder v-if="node.has_children" class="size-[18px] text-gray-400" />
+                    <FileText v-else class="size-[18px] text-gray-400 dark:text-gray-500" />
+                </span>
+
+                <div class="min-w-0 flex-1">
+                    <div class="flex min-w-0 items-center gap-2.5">
+                        <bdi dir="ltr" class="shrink-0 text-sm tabular-nums" :class="isRoot ? 'font-bold text-ink' : 'font-medium text-muted'">{{ node.code }}</bdi>
+                        <Link
+                            v-if="can('Account Update')"
+                            :href="route('accounting.accounts.edit', node.id)"
+                            :title="node.name"
+                            class="block min-w-0 truncate text-ink decoration-brand-400 underline-offset-4 hover:text-brand-600 hover:underline dark:hover:text-brand-400"
+                            :class="isRoot ? 'text-[15px] font-semibold' : 'text-sm'"
+                        >
+                            {{ node.name }}
+                        </Link>
+                        <span v-else :title="node.name" class="block min-w-0 truncate text-ink" :class="isRoot ? 'text-[15px] font-semibold' : 'text-sm'">{{ node.name }}</span>
+                        <Badge v-if="node.is_postable" tone="brand" class="shrink-0">{{ t('Postable') }}</Badge>
                     </div>
+                    <p v-if="node.description" class="mt-0.5 max-w-2xl truncate text-xs text-muted">{{ node.description }}</p>
                 </div>
             </div>
 
-            <div>
-                <Badge v-if="node.type" :tone="node.type.tone">{{ node.type.label }}</Badge>
-            </div>
-
-            <div class="flex flex-wrap items-center gap-2">
-                <Badge v-if="node.normal_balance" :tone="node.normal_balance.tone">{{ node.normal_balance.label }}</Badge>
-                <Badge v-if="node.is_postable" tone="brand">{{ t('Postable') }}</Badge>
-            </div>
+            <div class="text-sm text-muted max-lg:hidden">{{ node.normal_balance?.label }}</div>
 
             <div class="lg:text-end">
-                <span class="mb-1 block text-xs font-medium text-muted lg:hidden">{{ t('Balance') }}</span>
-                <span class="inline-flex items-baseline gap-1.5 font-mono text-sm font-semibold tabular-nums" :class="directionClass()">
-                    <bdi dir="ltr">{{ node.balance }}</bdi>
-                    <span v-if="node.balance_direction" class="font-sans text-xs font-medium">{{ node.balance_direction.label }}</span>
+                <span class="me-2 text-xs text-muted lg:hidden">{{ t('Balance') }}</span>
+                <span class="inline-flex items-baseline gap-1.5 tabular-nums">
+                    <bdi dir="ltr" class="text-sm" :class="[isRoot ? 'font-bold' : 'font-semibold', node.balance_direction ? 'text-ink' : 'text-gray-400 dark:text-gray-600']">{{ node.balance }}</bdi>
+                    <span v-if="node.balance_direction" class="w-8 text-start text-xs font-medium" :class="toneText[node.balance_direction.tone]">{{ node.balance_direction.label }}</span>
+                    <span v-else class="w-8" aria-hidden="true" />
                 </span>
             </div>
 
-            <div>
-                <Badge :tone="node.is_active ? 'success' : 'neutral'">{{ node.is_active ? t('Active') : t('Inactive') }}</Badge>
+            <div class="flex items-center gap-1.5 text-xs" :class="node.is_active ? 'text-muted' : 'text-gray-400'">
+                <span class="size-1.5 rounded-full" :class="node.is_active ? 'bg-success-500' : 'bg-gray-300 dark:bg-white/25'" aria-hidden="true" />
+                {{ node.is_active ? t('Active') : t('Inactive') }}
             </div>
 
-            <div class="flex items-center lg:justify-end">
+            <div class="flex items-center max-lg:absolute max-lg:top-2 max-lg:end-2 lg:justify-end">
                 <RecordActions
                     entity="Account"
                     routes="accounting.accounts"
@@ -114,7 +143,7 @@ const directionClass = (): string => directionClasses[props.node.balance_directi
             </div>
         </div>
 
-        <div v-if="isOpen() && node.children.length">
+        <div v-if="isOpen && node.children.length" class="divide-y divide-line/60 border-t border-line/60">
             <AccountTreeNode
                 v-for="child in node.children"
                 :key="child.id"

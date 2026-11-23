@@ -5,6 +5,10 @@
  * WeightPieces::normalize); `_key`, `collapsed`, `product_search` and the labels are UI only.
  */
 
+import type { Tone } from '@/lib/tones';
+
+import type { ItemCardProduct, ItemCardSummary } from '../../Inventory/parts/item-card/types';
+
 export type PricingType = 'simple' | 'weight' | string;
 
 export interface GridPiece {
@@ -240,10 +244,20 @@ export interface MatchPiecesResult {
 }
 
 /** Support\ItemsGrid::itemStock(). */
+/** The item details window (`items-grid.details`): ItemCardData::product() + ItemCardData::summary() over all warehouses. */
+export interface ItemDetails {
+    product: ItemCardProduct;
+    card: ItemCardSummary;
+}
+
 export interface StockInfo {
+    product_id: number;
     label: string | null;
     here: string | null;
     all: string;
+    /** Set when the total is at or below a minimum limit, or out of stock: its color and status label. */
+    tone: Tone | null;
+    status: string | null;
     unit: string;
     cost: string | null;
 }

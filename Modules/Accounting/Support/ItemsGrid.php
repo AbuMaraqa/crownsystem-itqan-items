@@ -388,7 +388,7 @@ final class ItemsGrid
      * رصيد الصنف وتكلفته للسطر الذي عليه المؤشر، كما يعرضهما اتقان بجانب الفاتورة. الصنف
      * الرئيسي رصيده كغمه، والمقطع رصيده عدد قطعه. التكلفة لمن يعدّل الصنف فقط.
      *
-     * @return array{label: ?string, here: ?string, all: string, unit: string, cost: ?string}|null
+     * @return array{product_id: int, label: ?string, here: ?string, all: string, tone: ?string, status: ?string, unit: string, cost: ?string}|null
      */
     public static function itemStock(mixed $productId, mixed $warehouseId = null): ?array
     {
@@ -404,19 +404,28 @@ final class ItemsGrid
         $isPiece = $product->pricing_type === 'weight' && ! $isMain;
         $warehouseId = filled($warehouseId) ? (int) $warehouseId : null;
 
-        $balance = fn (?int $warehouse): string => number_format((float) StockBalance::query()
+        $sum = fn (?int $warehouse): float => (float) StockBalance::query()
             ->where('product_id', $product->id)
             ->when($warehouse, fn ($query) => $query->where('warehouse_id', $warehouse))
-            ->sum($isMain ? 'weight' : 'quantity'), 2, '.', '');
+            ->sum($isMain ? 'weight' : 'quantity');
+        $balance = fn (?int $warehouse): string => number_format($sum($warehouse), 2, '.', '');
+        $total = $sum(null);
+
+        // رصيد كل المخازن عند حده الادنى 1 او 2 او نافد يُلوَّن بلون حالته؛ كغم الصنف الرئيسي لا يقارَن بحدود.
+        $status = ! $isMain && StockLimits::isMonitored($product) ? StockStatus::for($product, $total) : null;
+        $low = in_array($status, [StockStatus::OUT, StockStatus::CRITICAL, StockStatus::LOW], true);
 
         $cost = $isPiece || ! $user->can('Product Update')
             ? null
             : app(StockLedgerService::class)->averageCost($product->id);
 
         return [
+            'product_id' => $product->id,
             'label' => ProductSearch::label($product->id),
             'here' => $warehouseId ? $balance($warehouseId) : null,
-            'all' => $balance(null),
+            'all' => number_format($total, 2, '.', ''),
+            'tone' => $low ? StatusBadge::tone($status->color()) : null,
+            'status' => $low ? $status->getLabel() : null,
             'unit' => $isMain ? __('kg') : ($isPiece ? __('pcs') : ''),
             'cost' => $cost === null ? null : number_format($cost, 2, '.', ''),
         ];

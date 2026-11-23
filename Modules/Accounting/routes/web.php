@@ -374,6 +374,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                         Route::get('/barcode', 'barcode')->name('barcode');
                         Route::get('/match-pieces', 'matchPieces')->name('match-pieces');
                         Route::get('/stock', 'stock')->name('stock');
+                        Route::get('/details', 'details')->name('details')->can('Stock View List');
                         Route::get('/services', 'services')->name('services');
                         Route::get('/goods', 'goods')->name('goods');
                         Route::get('/service', 'service')->name('service');

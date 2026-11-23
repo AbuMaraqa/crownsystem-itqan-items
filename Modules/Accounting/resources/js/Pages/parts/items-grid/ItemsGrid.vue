@@ -7,6 +7,7 @@ import { ChevronDown, CircleAlert, Layers, Package, Plus, Trash2 } from '@/lib/i
 import BarcodeEntry from './BarcodeEntry.vue';
 import { computedCell, iconButton, numberInput, cellInput } from './classes';
 import GridSearchDropdown from './GridSearchDropdown.vue';
+import ItemDetailsModal from './ItemDetailsModal.vue';
 import PiecesPanel from './PiecesPanel.vue';
 import StockPanel from './StockPanel.vue';
 import type { DocumentTotals, GridConfig, GridContext, GridRow } from './types';
@@ -340,6 +341,7 @@ const priceFields = ['discount_rate', 'discount_amount'] as const;
         <p v-if="error" class="text-sm text-danger" role="alert">{{ error }}</p>
 
         <StockPanel />
+        <ItemDetailsModal :warehouse-id="context.warehouseId" />
 
         <div class="flex flex-wrap items-center justify-between gap-2">
             <button

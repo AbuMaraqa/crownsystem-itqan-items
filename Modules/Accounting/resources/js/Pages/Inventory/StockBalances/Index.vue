@@ -14,6 +14,7 @@ import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { can, t } from '@/lib/i18n';
 import { CheckRead, Eye, Printer, QrCode } from '@/lib/icons';
 import { route } from '@/lib/route';
+import { toneText } from '@/lib/tones';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
 
 import type { Option, StatusBadge } from '../parts/types';
@@ -55,15 +56,6 @@ const props = defineProps<{
     canSeeCost: boolean;
     printUrl: string;
 }>();
-
-const tones: Record<string, string> = {
-    neutral: '',
-    success: 'text-success-600 dark:text-success-400',
-    warning: 'text-warning-600 dark:text-warning-400',
-    danger: 'text-error-600 dark:text-error-400',
-    info: 'text-blue-light-600 dark:text-blue-light-400',
-    brand: 'text-brand-600 dark:text-brand-400',
-};
 
 const columns = computed<TableColumn[]>(() => [
     { key: 'image', label: t('Section'), toggleable: true },
@@ -154,7 +146,7 @@ function labelsUrl(ids: (number | string)[]): string {
             </div>
         </template>
         <template #cell-location="{ row }"><bdi class="font-mono text-xs" dir="ltr">{{ row.location ?? '-' }}</bdi></template>
-        <template #cell-on_hand="{ row }"><b class="tabular-nums" :class="tones[row.on_hand_tone]" dir="ltr">{{ row.on_hand }}</b></template>
+        <template #cell-on_hand="{ row }"><b class="tabular-nums" :class="toneText[row.on_hand_tone]" dir="ltr">{{ row.on_hand }}</b></template>
         <template #cell-weight="{ row }"><span class="tabular-nums" :class="row.is_main ? 'font-semibold' : ''" dir="ltr">{{ row.weight }}</span></template>
         <template #cell-reserved="{ row }"><span class="tabular-nums text-warning-600 dark:text-warning-400" dir="ltr">{{ row.reserved }}</span></template>
         <template #cell-incoming="{ row }"><span class="tabular-nums text-blue-light-600 dark:text-blue-light-400" dir="ltr">{{ row.incoming }}</span></template>

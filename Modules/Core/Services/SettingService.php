@@ -36,6 +36,8 @@ class SettingService
             $this->general->weight_variance_tolerance = (float) $data['weight_variance_tolerance'];
             $this->general->dashboard_color = strtoupper($data['dashboard_color'] ?? $this->general->dashboard_color);
             $this->general->dashboard_font = $data['dashboard_font'] ?? $this->general->dashboard_font;
+            $this->general->stock_min_1_color = strtoupper($data['stock_min_1_color'] ?? $this->general->stock_min_1_color);
+            $this->general->stock_min_2_color = strtoupper($data['stock_min_2_color'] ?? $this->general->stock_min_2_color);
             $this->general->site_logo_url = $this->settings->logoHolder()->getFirstMediaUrl('logo') ?: null;
             $this->general->save();
 

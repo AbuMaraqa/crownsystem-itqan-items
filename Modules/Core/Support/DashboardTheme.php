@@ -5,11 +5,17 @@ namespace Modules\Core\Support;
 use Modules\Core\Settings\GeneralSettings;
 
 /**
- * مظهر لوحة التحكم كما اختير في الاعدادات العامة: لون واحد يصبح سلم brand-* كاملاً، وخط واحد.
+ * مظهر لوحة التحكم كما اختير في الاعدادات العامة: لون واحد يصبح سلم brand-* كاملاً، وخط واحد،
+ * ولونا حدَّي المخزون الادنيين (--color-stock-min-1 / --color-stock-min-2) لنغمتي Badge
+ * «stock-min-1» و«stock-min-2» اللتين يرسلهما StockStatus وStockAlertLevel.
  */
 final class DashboardTheme
 {
     public const DEFAULT_COLOR = '#1570EF';
+
+    public const DEFAULT_STOCK_MIN_1_COLOR = '#F79009';
+
+    public const DEFAULT_STOCK_MIN_2_COLOR = '#D92D20';
 
     /** نص الازرار ابيض دائماً، فاللون الافتح من هذا يجعلها غير مقروءة. */
     public const MINIMUM_CONTRAST = 3.0;
@@ -33,7 +39,30 @@ final class DashboardTheme
             $vars["--color-brand-{$shade}"] = $hex;
         }
 
+        $stock = $this->stockColors();
+        $vars['--color-stock-min-1'] = $stock['min_1'];
+        $vars['--color-stock-min-2'] = $stock['min_2'];
+
         return ':root{'.implode(';', array_map(fn ($name, $value) => "{$name}:{$value}", array_keys($vars), $vars)).'}';
+    }
+
+    /**
+     * لون الرصيد عند الحد الادنى 1 او تحته (min_1) وعند الحد الادنى 2 او تحته (min_2)، للوحة وملفات PDF.
+     *
+     * @return array{min_1: string, min_2: string}
+     */
+    public function stockColors(): array
+    {
+        $color = function (string $name, string $default): string {
+            $value = $this->setting($name, $default);
+
+            return BrandColor::isValid($value) ? strtoupper($value) : $default;
+        };
+
+        return [
+            'min_1' => $color('stock_min_1_color', self::DEFAULT_STOCK_MIN_1_COLOR),
+            'min_2' => $color('stock_min_2_color', self::DEFAULT_STOCK_MIN_2_COLOR),
+        ];
     }
 
     public function fontsUrl(): string

@@ -12,6 +12,7 @@ import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { t } from '@/lib/i18n';
 import { ArrowUpDown, Printer, X } from '@/lib/icons';
 import { route } from '@/lib/route';
+import { toneText } from '@/lib/tones';
 
 import type { StatusBadge } from '../parts/statusBadge';
 import { tableClasses as c } from './parts/types';
@@ -133,11 +134,8 @@ const statementModes = computed<Option[]>(() => [
 ]);
 
 const toneClasses: Record<Tone, string> = {
-    brand: 'text-brand-600 dark:text-brand-400',
-    success: 'text-success-600 dark:text-success-400',
-    warning: 'text-warning-600 dark:text-warning-400',
+    ...toneText,
     danger: 'text-danger',
-    info: 'text-blue-light-600 dark:text-blue-light-400',
     neutral: 'text-gray-900 dark:text-white',
 };
 

@@ -17,66 +17,28 @@ import { route } from '@/lib/route';
 
 import { tableClasses as c } from '../../Report/parts/types';
 import { useReportFilters } from '../../Report/parts/useReportFilters';
+import ItemLevelFigures from '../parts/item-card/ItemLevelFigures.vue';
+import OpenOrdersTable from '../parts/item-card/OpenOrdersTable.vue';
+import type { ItemCardProduct, ItemCardSummary } from '../parts/item-card/types';
 import SearchPicker from '../parts/SearchPicker.vue';
 import type { Option, StatusBadge } from '../parts/types';
 
 defineOptions({ layout: AdminLayout });
 
-interface Levels {
-    on_hand: string;
-    reserved: string;
-    incoming: string;
-    available: string;
-    available_negative: boolean;
-    weight: string | null;
-}
-
-interface OpenOrder {
-    order_id: number;
-    reference: string | null;
-    party: string | null;
-    date: string | null;
-    expected: string | null;
-    quantity: string;
-}
-
-/** ItemStockCardController::card(), figures formatted by the server. */
-interface CardData {
-    levels: Levels;
-    status: StatusBadge;
-    value: string | null;
-    cost: { average: string; per_kg: string | null; value: string } | null;
-    main: { sub_items: number; on_hand: string; weight: string; reserved: string; incoming: string; available: string; value: string | null } | null;
+/** ItemStockCardController::card(): ItemCardData::summary() plus the card page's own parts. */
+interface CardData extends ItemCardSummary {
     sub_items: { id: number; code: string | null; name: string; on_hand: string; weight: string; reserved: string; incoming: string; available: string; available_negative: boolean; value: string | null }[];
-    warehouses: { name: string | null; quantity: string; weight: string | null }[];
     placements: { id: number; code: string | null; is_primary: boolean; arrow: string | null; warehouse: string | null; quantity: string | null }[];
-    sales_orders: OpenOrder[];
-    purchase_orders: OpenOrder[];
     movements: {
         opening: string;
         rows: { id: number; date: string | null; type: StatusBadge | null; reference_no: string | null; url: string | null; warehouse: string | null; location: string | null; in: string | null; out: string | null; balance: string; unit_cost: string | null }[];
     };
 }
 
-interface ProductData {
-    id: number;
-    name: string;
-    image: string | null;
-    main_product: string | null;
-    barcode: string | null;
-    sku: string | null;
-    weight_per_meter: string | null;
-    length: string | null;
-    shelf: string | null;
-    max_limit: string;
-    min_limit_1: string;
-    min_limit_2: string;
-}
-
 const props = defineProps<{
     filters: { warehouse: number | null; from: string | null; to: string | null };
     warehouseOptions: Option[];
-    product: ProductData | null;
+    product: ItemCardProduct | null;
     card: CardData | null;
     locationOptions: Option[];
     directionOptions: Option[];
@@ -127,26 +89,12 @@ const details = computed(() =>
         : [],
 );
 
-const figures = computed(() =>
-    props.product && props.card
-        ? [
-              { label: t('Max Limit'), value: props.product.max_limit, tone: 'text-gray-900 dark:text-white' },
-              { label: t('Min Limit 1'), value: props.product.min_limit_1, tone: 'text-gray-900 dark:text-white' },
-              { label: t('Min Limit 2'), value: props.product.min_limit_2, tone: 'text-gray-900 dark:text-white' },
-              { label: t('Warehouse Qty'), value: props.card.levels.on_hand, tone: 'text-brand-600 dark:text-brand-400' },
-              { label: t('Sales Orders Qty'), value: props.card.levels.reserved, tone: 'text-warning-600 dark:text-warning-400' },
-              { label: t('Purchase Orders Qty'), value: props.card.levels.incoming, tone: 'text-blue-light-600 dark:text-blue-light-400' },
-              { label: t('Available'), value: props.card.levels.available, tone: props.card.levels.available_negative ? 'text-error-600' : 'text-success-600 dark:text-success-400' },
-          ]
-        : [],
-);
-
 const cardUrl = (id: number): string => route('accounting.inventory.item-card', { product: id, warehouse: filters.warehouse || undefined });
 const orderBlocks = computed(() =>
     props.card
         ? [
-              { title: t('Open Sales Orders (reserved)'), rows: props.card.sales_orders, icon: ShoppingBag, route: 'accounting.sales-orders.edit' },
-              { title: t('Open Purchase Orders (incoming)'), rows: props.card.purchase_orders, icon: ShoppingCart, route: 'accounting.purchase-orders.edit' },
+              { title: t('Open Sales Orders (reserved)'), rows: props.card.sales_orders, icon: ShoppingBag, type: 'sales' as const },
+              { title: t('Open Purchase Orders (incoming)'), rows: props.card.purchase_orders, icon: ShoppingCart, type: 'purchase' as const },
           ]
         : [],
 );
@@ -202,12 +150,7 @@ const orderBlocks = computed(() =>
                         </dl>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-px border-t border-line bg-gray-200 sm:grid-cols-4 lg:grid-cols-7 dark:bg-white/10">
-                        <div v-for="figure in figures" :key="figure.label" class="bg-card p-3 text-center">
-                            <div class="text-xs text-muted">{{ figure.label }}</div>
-                            <div class="mt-1 text-xl font-bold tabular-nums" :class="figure.tone" dir="ltr">{{ figure.value }}</div>
-                        </div>
-                    </div>
+                    <ItemLevelFigures :levels="card.levels" :status="card.status" :limits="product" class="border-t border-line" />
 
                     <div class="flex flex-wrap items-center justify-between gap-2 border-t border-line px-4 py-3">
                         <div class="flex flex-wrap items-center gap-2 text-sm">
@@ -330,17 +273,7 @@ const orderBlocks = computed(() =>
             <div class="grid gap-4 lg:grid-cols-2">
                 <Card v-for="block in orderBlocks" :key="block.title">
                     <h3 class="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white"><component :is="block.icon" class="size-4 text-brand-500" />{{ block.title }}</h3>
-                    <table class="w-full text-sm">
-                        <tbody>
-                            <tr v-for="row in block.rows" :key="row.order_id" class="border-b border-line last:border-0">
-                                <td class="py-2"><a :href="route(block.route, row.order_id)" :class="[c.link, 'font-mono font-semibold']" dir="ltr">{{ row.reference }}</a></td>
-                                <td class="py-2 text-gray-600 dark:text-gray-300">{{ row.party }}</td>
-                                <td class="py-2 text-xs text-muted" dir="ltr">{{ row.expected ?? row.date }}</td>
-                                <td class="py-2 text-end font-semibold tabular-nums" dir="ltr">{{ row.quantity }}</td>
-                            </tr>
-                            <tr v-if="!block.rows.length"><td class="py-6 text-center text-muted">{{ t('None') }}</td></tr>
-                        </tbody>
-                    </table>
+                    <OpenOrdersTable :rows="block.rows" :type="block.type" />
                 </Card>
             </div>
 

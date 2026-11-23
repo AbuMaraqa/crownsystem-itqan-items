@@ -7,6 +7,7 @@ import Badge from '@/Components/ui/Badge.vue';
 import Button from '@/Components/ui/Button.vue';
 import { Info } from '@/lib/icons';
 import { t } from '@/lib/i18n';
+import { isLowStockTone, toneText } from '@/lib/tones';
 
 import type { StockSummary } from './types';
 
@@ -27,7 +28,7 @@ defineProps<{ stock: StockSummary | null; links: { label: string; href: string }
         <div v-if="stock" class="overflow-hidden rounded-xl border border-line bg-card">
             <div class="grid grid-cols-2 gap-px bg-line sm:grid-cols-4">
                 <div v-for="[label, value, tone] in [
-                    [t('Warehouse Qty'), stock.levels.on_hand, 'text-brand-600'],
+                    [t('Warehouse Qty'), stock.levels.on_hand, isLowStockTone(stock.status.tone) ? toneText[stock.status.tone] : 'text-brand-600'],
                     [t('Sales Orders Qty'), stock.levels.reserved, 'text-warning-600'],
                     [t('Purchase Orders Qty'), stock.levels.incoming, 'text-blue-light-600'],
                     [t('Available'), stock.levels.available, stock.levels.available_negative ? 'text-error-600' : 'text-success-600'],

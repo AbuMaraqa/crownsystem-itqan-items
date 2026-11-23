@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Accounting\Services\CurrencyExchangeRateService;
+use Modules\Accounting\Services\ItemStockCardService;
 use Modules\Accounting\Support\CustomerProfitMargin;
+use Modules\Accounting\Support\ItemCardData;
 use Modules\Accounting\Support\ItemsGrid;
 use Modules\Accounting\Support\ItemsGridDocuments;
 use Modules\Accounting\Support\ItemsGridTotals;
@@ -14,6 +16,7 @@ use Modules\Accounting\Support\PartySelect;
 use Modules\Accounting\Support\QuickCreate;
 use Modules\Accounting\Support\SalesServiceLine;
 use Modules\Accounting\Support\SelectOptions;
+use Modules\Items\Entities\Product;
 use Modules\Items\Enums\ItemType;
 use Modules\Items\Support\LinePriceContext;
 use Modules\Items\Support\PriceResolver;
@@ -113,6 +116,22 @@ class ItemsGridController extends Controller
         $data = $request->validate(['product_id' => ['required', 'integer'], 'warehouse_id' => ['nullable', 'integer']]);
 
         return $this->nullable(ItemsGrid::itemStock($data['product_id'], $data['warehouse_id'] ?? null));
+    }
+
+    /**
+     * تفاصيل الصنف عند الضغط على باركوده او على شريط الرصيد: تعريفه، رصيده في كل المخازن،
+     * المحجوز في طلبيات البيع المفتوحة والقادم في طلبيات الشراء المفتوحة. الرابط مقيد بـ
+     * «Stock View List».
+     */
+    public function details(Request $request, ItemStockCardService $cards): JsonResponse
+    {
+        $data = $request->validate(['product_id' => ['required', 'integer']]);
+        $product = Product::query()->with(['translations', 'mainProduct.translations', 'media'])->findOrFail($data['product_id']);
+
+        return $this->nullable([
+            'product' => ItemCardData::product($product),
+            'card' => ItemCardData::summary($cards->summary($product, null)),
+        ]);
     }
 
     /**

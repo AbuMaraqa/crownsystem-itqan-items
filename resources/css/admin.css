@@ -73,6 +73,11 @@
     --color-brand-700: #0e4aa3;
     --color-brand-800: #0f3d82;
     --color-brand-900: #10336a;
+
+    /* Stock at or below Min Limit 1 / Min Limit 2. The general settings replace both (DashboardTheme::stockColors);
+       their badge and text classes are the stock tones of resources/js/lib/tones.ts. */
+    --color-stock-min-1: #f79009;
+    --color-stock-min-2: #d92d20;
     --color-brand-950: #0b2045;
 
     /* A neutral (zinc) gray: text, borders and surfaces. */

@@ -18,6 +18,9 @@ final class StatusBadge
         'warning' => 'warning',
         'danger' => 'danger',
         'info' => 'info',
+        // لونا حدَّي المخزون الادنيين من الاعدادات (DashboardTheme::stockColors).
+        'stock-min-1' => 'stock-min-1',
+        'stock-min-2' => 'stock-min-2',
     ];
 
     /**

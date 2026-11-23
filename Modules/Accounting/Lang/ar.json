@@ -1742,5 +1742,22 @@
     "No customer materials added yet.": "لم تُضف أي مواد للعميل بعد.",
     "Category · by weight: its profiles go inside it": "تصنيف بالوزن: تُضاف مقاطعه بداخله",
     "Goes into:": "يُضاف داخل:",
-    "\":sub\" is not in \":group\"; add it under its own colour.": "«:sub» ليس من «:group»؛ أضفه تحت لونه."
+    "\":sub\" is not in \":group\"; add it under its own colour.": "«:sub» ليس من «:group»؛ أضفه تحت لونه.",
+    "Item Details": "تفاصيل الصنف",
+    "Show item details": "عرض تفاصيل الصنف",
+    "Stock in all warehouses and open orders.": "الرصيد في جميع المخازن والطلبيات المفتوحة.",
+    "The item details could not be loaded.": "تعذّر تحميل تفاصيل الصنف.",
+    "Open Item Stock Card": "فتح بطاقة الصنف",
+    "This document": "مخزن هذا المستند",
+    "Loading...": "جارٍ التحميل...",
+    "Owners' Equity": "حقوق الملكية",
+    "Revenues": "الإيرادات",
+    ":count accounts": ":count حساب",
+    "Showing :visible of :total accounts": "عرض :visible من :total حساب",
+    "Search by code or name": "ابحث برقم الحساب أو اسمه",
+    "Account classes": "أصناف الحسابات",
+    "Filter by this class": "عرض حسابات هذا الصنف فقط",
+    "Debits and credits differ by :amount": "يوجد فرق بين المدين والدائن مقداره :amount",
+    "Total debits equal total credits": "مجموع الأرصدة المدينة يساوي مجموع الأرصدة الدائنة",
+    "No account matches these filters.": "لا يوجد حساب يطابق عوامل التصفية الحالية."
 }

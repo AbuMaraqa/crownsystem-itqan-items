@@ -91,3 +91,6 @@ export { default as MoreVertical } from '~icons/solar/menu-dots-vertical-linear'
 export { default as Widgets } from '~icons/solar/widget-linear';
 export { default as PlusSmall } from '~icons/solar/add-linear';
 export { default as Translation } from '~icons/solar/translation-linear';
+export { default as Folder } from '~icons/solar/folder-bold-duotone';
+export { default as FolderOpen } from '~icons/solar/folder-open-bold-duotone';
+export { default as FileText } from '~icons/solar/file-text-linear';
