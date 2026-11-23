@@ -338,10 +338,19 @@ class JournalEntryService
                 throw new DomainException(__('Journal lines can only use postable accounts.'));
             }
 
-            if (! $line->account->is_active) {
+            // قيد العكس وقيد اقفال السنة ينقلان ارصدة قائمة فعلاً، فيُسمح لهما بالحساب الموقوف.
+            if (! $line->account->is_active && ! $this->movesExistingBalances($entry)) {
                 throw new DomainException(__('Journal lines cannot use inactive accounts.'));
             }
         }
+    }
+
+    /**
+     * قيد عكس قيد آخر، او قيد اقفال سنة: لا يضيف حركة جديدة بل ينقل ارصدة موجودة.
+     */
+    private function movesExistingBalances(JournalEntry $entry): bool
+    {
+        return filled($entry->reversal_of_entry_id) || $entry->source_type === AccountingReportService::CLOSING_SOURCE_TYPE;
     }
 
     private function resolveOpenPeriod(string $date): AccountingPeriod

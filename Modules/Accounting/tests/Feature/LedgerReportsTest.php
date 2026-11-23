@@ -138,6 +138,31 @@ class LedgerReportsTest extends TestCase
         $this->assertSame($payables->normal_balance, $account->normal_balance);
     }
 
+    public function test_an_inactive_account_does_not_block_reversals_or_closing_the_year(): void
+    {
+        $sale = $this->postEntry('2025-05-01', '1110', '4100', 900);
+        $this->postEntry('2025-06-01', '5410', '1110', 300);
+        // الحسابات توقفت عن الاستعمال بعد قيودها.
+        $this->account('4100')->update(['is_active' => false]);
+        $this->account('5410')->update(['is_active' => false]);
+
+        // قيد جديد على الحساب الموقوف ممنوع.
+        try {
+            $this->postEntry('2025-07-01', '1110', '4100', 10);
+            $this->fail('A new entry on an inactive account must be rejected.');
+        } catch (DomainException) {
+        }
+
+        // عكس قيد قديم عليه جائز، وكذلك اقفال السنة التي فيها ارصدته.
+        $reversed = app(JournalEntryService::class)->void($sale, 'test');
+        $this->assertTrue($reversed->hasReversal());
+        $this->postEntry('2025-05-02', '1110', '4200', 900);
+
+        app(FiscalYearService::class)->close($this->lastYear);
+
+        $this->assertSame(PeriodClosingVoucherStatus::POSTED, PeriodClosingVoucher::query()->sole()->status);
+    }
+
     public function test_balance_sheet_balances_with_the_unclosed_profit(): void
     {
         $this->postEntry('2026-02-01', '1110', '3100', 1000);   // رأس مال
