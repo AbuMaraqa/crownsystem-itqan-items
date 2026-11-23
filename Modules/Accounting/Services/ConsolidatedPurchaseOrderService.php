@@ -126,6 +126,11 @@ class ConsolidatedPurchaseOrderService
 
     public function changeStatus(ConsolidatedPurchaseOrder $order, ConsolidatedPurchaseOrderStatus $status): ConsolidatedPurchaseOrder
     {
+        // الملغاة لا تعود: بنودها حُرّرت وقد تكون سُحبت في طلبية اخرى، فعودتها تكرر البنود.
+        if ($order->status === ConsolidatedPurchaseOrderStatus::CANCELLED && $status !== ConsolidatedPurchaseOrderStatus::CANCELLED) {
+            throw new DomainException(__('A cancelled consolidated purchase order cannot be reopened; create a new one.'));
+        }
+
         $order->update(['status' => $status->value()]);
 
         return $order->refresh();

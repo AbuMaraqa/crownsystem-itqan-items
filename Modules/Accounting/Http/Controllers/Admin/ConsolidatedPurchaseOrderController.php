@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -124,13 +125,16 @@ class ConsolidatedPurchaseOrderController extends Controller
         $currencyId = $rates->baseCurrencyId();
 
         try {
-            PurchaseOrderConsumption::for()->assertRowQuantities($data['items']);
+            // التحقق والحفظ في معاملة واحدة: قفل بنود المصدر يبقى حتى تُنشأ الطلبية.
+            $order = DB::transaction(function () use ($data, $currencyId, $rates) {
+                PurchaseOrderConsumption::for()->assertRowQuantities($data['items']);
 
-            $order = $this->service->create([
-                ...$data,
-                'currency_id' => $currencyId,
-                'exchange_rate' => $rates->rateFor($currencyId, $data['order_date']) ?? 1,
-            ]);
+                return $this->service->create([
+                    ...$data,
+                    'currency_id' => $currencyId,
+                    'exchange_rate' => $rates->rateFor($currencyId, $data['order_date']) ?? 1,
+                ]);
+            });
         } catch (DomainException $exception) {
             return back()->with('error', $exception->getMessage());
         }
@@ -183,7 +187,11 @@ class ConsolidatedPurchaseOrderController extends Controller
     {
         $data = $request->validate(['status' => ['required', Rule::enum(ConsolidatedPurchaseOrderStatus::class)]], [], ['status' => __('Status')]);
 
-        $this->service->changeStatus($this->find($consolidatedPurchaseOrder), ConsolidatedPurchaseOrderStatus::from((int) $data['status']));
+        try {
+            $this->service->changeStatus($this->find($consolidatedPurchaseOrder), ConsolidatedPurchaseOrderStatus::from((int) $data['status']));
+        } catch (DomainException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
 
         return back()->with('success', __('Consolidated purchase order status updated successfully'));
     }

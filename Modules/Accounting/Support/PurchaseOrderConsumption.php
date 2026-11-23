@@ -293,10 +293,54 @@ final class PurchaseOrderConsumption
      */
     public function assertRowQuantities(array $rows): void
     {
+        // بنود المصدر مقفلة حتى نهاية المعاملة: صفحتا اضافة مفتوحتان معاً لا تسحبان القطع نفسها.
+        $sourceIds = collect($rows)->pluck('source_purchase_order_item_id')->filter()->map(fn ($id): int => (int) $id)->unique()->values()->all();
+        $sources = PurchaseOrderItem::query()->with(['pieces', 'product'])->whereKey($sourceIds)->lockForUpdate()->get()->keyBy('id');
+        $consumed = $this->consumed($sourceIds);
+
         foreach (array_keys($rows) as $index) {
-            if (($rows[$index]['pricing_type'] ?? 'simple') !== 'weight') {
-                $this->applyRowQuantity($rows, $index, $rows[$index]['quantity'] ?? null);
+            $source = $sources->get((int) ($rows[$index]['source_purchase_order_item_id'] ?? 0));
+
+            if (! $source) {
+                throw new DomainException(__('This item was not found.'));
             }
+
+            // نوع البند من المصدر نفسه، لا مما ارسلته الصفحة.
+            if (self::isWeightPriced($source)) {
+                $this->assertPiecesAvailable($source, $rows[$index], $consumed);
+
+                continue;
+            }
+
+            $rows[$index]['pricing_type'] = 'simple';
+            $this->applyRowQuantity($rows, $index, $rows[$index]['quantity'] ?? null);
+        }
+    }
+
+    /**
+     * قطع بند الوزن في الصف ما زالت متاحة: لم تُسحب في طلبية تجميعية اخرى. صف بلا قطع يعني
+     * البند كله.
+     *
+     * @param  array<string, mixed>  $row
+     * @param  array<int, array{quantity: float, total_weight: float, piece_ids: array<int, int>, whole_line: bool}>  $consumed
+     *
+     * @throws DomainException
+     */
+    private function assertPiecesAvailable(PurchaseOrderItem $source, array $row, array $consumed): void
+    {
+        if ($source->pieces->isEmpty()) {
+            if (array_key_exists((int) $source->id, $consumed)) {
+                throw new DomainException(__('This item was already added to another consolidated purchase order.'));
+            }
+
+            return;
+        }
+
+        $requested = collect($row['pieces'] ?? [])->pluck('source_purchase_order_item_piece_id')->filter()->map(fn ($id): int => (int) $id)->all();
+        $requested = $requested === [] ? $source->pieces->pluck('id')->map(fn ($id): int => (int) $id)->all() : $requested;
+
+        if (array_diff($requested, $this->availablePieceIds($source, $consumed)) !== []) {
+            throw new DomainException(__('This item was already added to another consolidated purchase order.'));
         }
     }
 

@@ -183,6 +183,35 @@ class ConsolidatedPurchaseOrderPagesTest extends TestCase
         $this->assertSame([$w45->id], array_map('intval', array_column($rows[0]['pieces'], 'product_id')));
     }
 
+    public function test_two_add_pages_cannot_take_the_same_pieces_and_a_cancelled_order_stays_cancelled(): void
+    {
+        $this->signIn();
+        ['white' => $white, 'whiteW45' => $w45] = $this->alpineGroups();
+        $po = app(PurchaseOrderService::class)->create([
+            'client_id' => User::factory()->create()->id,
+            'order_date' => now()->toDateString(),
+            'items' => [$this->groupLine($white, [[$w45, 2]], 16, 5)],
+        ]);
+        $line = $po->items()->with('pieces')->sole();
+
+        // صفحتان فُتحتا معاً وسحبتا القطعة نفسها: الاولى تُحفظ، والثانية تُرفض ولو قالت انها «كمية».
+        $first = $this->postJson(route('accounting.consolidated-purchase-orders.picker.rows'), ['rows' => [], 'keys' => ['piece-'.$line->pieces->first()->id]])->json('rows');
+        $second = $first;
+        $second[0]['pricing_type'] = 'simple';
+
+        $this->post(route('accounting.consolidated-purchase-orders.store'), ['order_date' => now()->toDateString(), 'items' => $first])->assertSessionHas('success');
+        $this->post(route('accounting.consolidated-purchase-orders.store'), ['order_date' => now()->toDateString(), 'items' => $second])
+            ->assertSessionHas('error', __('This item was already added to another consolidated purchase order.'));
+        $this->assertSame(1, ConsolidatedPurchaseOrder::query()->count());
+
+        // الملغاة لا تعود لحالة نشطة.
+        $order = ConsolidatedPurchaseOrder::query()->sole();
+        $status = fn (ConsolidatedPurchaseOrderStatus $to) => $this->post(route('accounting.consolidated-purchase-orders.status', $order->id), ['status' => $to->value]);
+        $status(ConsolidatedPurchaseOrderStatus::CANCELLED)->assertSessionHas('success');
+        $status(ConsolidatedPurchaseOrderStatus::CONFIRMED)->assertSessionHas('error');
+        $this->assertSame(ConsolidatedPurchaseOrderStatus::CANCELLED, $order->refresh()->status);
+    }
+
     public function test_index_lists_changes_status_and_deletes(): void
     {
         $this->signIn();
