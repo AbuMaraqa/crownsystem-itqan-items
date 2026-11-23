@@ -16,6 +16,7 @@ class ProductionOrderServiceLine extends Model
 {
     protected $fillable = [
         'production_order_id',
+        'sales_order_item_id',
         'product_id',
         'description',
         'cost_source',

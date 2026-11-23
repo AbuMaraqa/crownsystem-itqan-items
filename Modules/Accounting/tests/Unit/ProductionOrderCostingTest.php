@@ -12,6 +12,7 @@ use Modules\Accounting\Enums\SalesOrderStatus;
 use Modules\Accounting\Services\ProductionOrderService;
 use Modules\Accounting\Support\ProductionCost;
 use Modules\Accounting\tests\Feature\Concerns\PriceGroupFixtures;
+use Modules\Core\Entities\Currency;
 use Modules\Core\Entities\User;
 use Modules\Items\Entities\Product;
 use Modules\Items\Enums\ItemType;
@@ -227,6 +228,52 @@ class ProductionOrderCostingTest extends TestCase
         $this->assertSame([22.2222, 17.7778], array_column($materials, 'weight'));
         $this->assertSame([4.0, 5.0], array_column($materials, 'unit_cost'));
         $this->assertSame(['weight', 'weight'], array_column($materials, 'pricing_type'));
+    }
+
+    public function test_a_sales_order_in_another_currency_is_costed_in_the_base_currency(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $base = ConsolidatedTestFactory::currency();
+        $usd = Currency::query()->create(['code' => 'USD', 'symbol' => '$', 'is_default' => false]);
+
+        // 10 كغم × 10$ بسعر صرف 3.7، وتكلفة الكغم من المخزون 9 بالعملة الاساسية.
+        $aluminum = $this->product('weight', 9);
+        $salesOrder = $this->salesOrder();
+        $salesOrder->update(['currency_id' => $usd->id, 'exchange_rate' => 3.7, 'sub_total' => 100, 'tax_amount' => 0, 'total_amount' => 100]);
+        $salesOrder->items()->create(['product_id' => $aluminum->id, 'description' => 'المنيوم', 'quantity' => 1, 'unit_price' => 10, 'total_weight' => 10, 'actual_weight' => 10, 'line_total' => 100]);
+
+        $service = app(ProductionOrderService::class);
+        $order = $service->create(['sales_order_id' => $salesOrder->id, ...$service->linesFromSalesOrder($salesOrder->refresh())]);
+
+        $this->assertSame($base->id, (int) $order->currency_id);
+        $this->assertSame(370.0, (float) $order->sales_amount);
+        $this->assertSame(90.0, (float) $order->materials_cost);
+        $this->assertSame(280.0, $order->margin());
+
+        // بلا طلبية بيع تبقى التكاليف بالعملة الاساسية ولو اختيرت غيرها.
+        $this->assertSame($base->id, (int) $service->create(['currency_id' => $usd->id])->currency_id);
+    }
+
+    public function test_each_production_order_of_a_sales_order_counts_only_the_lines_it_makes(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $salesOrder = $this->salesOrder();
+        $salesOrder->items()->create(['product_id' => $this->product('weight', 9)->id, 'description' => 'المنيوم', 'quantity' => 1, 'unit_price' => 15, 'total_weight' => 100, 'actual_weight' => 98, 'line_total' => 1470]);
+        $salesOrder->items()->create(['product_id' => $this->service()->id, 'line_type' => ItemType::SERVICE->value, 'pricing_basis' => 'weight', 'description' => 'دهان', 'quantity' => 98, 'unit_price' => 3, 'unit_cost' => 2.5, 'cost_source' => ServiceCostSource::EXTERNAL->value, 'line_total' => 294]);
+
+        $service = app(ProductionOrderService::class);
+        $lines = $service->linesFromSalesOrder($salesOrder->refresh());
+
+        // امر للالمنيوم وآخر للدهان: لكلٍّ قيمة بيع سطره، لا الطلبية كلها مرتين.
+        $metal = $service->create(['sales_order_id' => $salesOrder->id, 'materials' => $lines['materials']]);
+        $paint = $service->create(['sales_order_id' => $salesOrder->id, 'services' => $lines['services']]);
+
+        $this->assertSame(1470.0, (float) $metal->sales_amount);
+        $this->assertSame(294.0, (float) $paint->sales_amount);
+        $this->assertSame(294.0, $service->costPreview(['sales_order_id' => $salesOrder->id, 'services' => $lines['services']])['summary']['sales_amount']);
+
+        // امر بلا سطر من الطلبية (ادخال يدوي) يأخذ قيمة الطلبية كلها كما كان.
+        $this->assertSame(1764.0, (float) $service->create(['sales_order_id' => $salesOrder->id])->sales_amount);
     }
 
     private function product(string $pricingType, float $cost): Product

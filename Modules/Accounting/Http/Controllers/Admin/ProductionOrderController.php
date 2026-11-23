@@ -385,6 +385,7 @@ class ProductionOrderController extends Controller
                 'work_date' => $line->work_date?->toDateString(),
             ])->values()->all(),
             'services' => $order->services->map(fn (ProductionOrderServiceLine $line): array => [
+                'sales_order_item_id' => $line->sales_order_item_id,
                 'product_id' => $line->product_id,
                 'product_label' => $line->product_id ? ProductSearch::label($line->product_id) : null,
                 'description' => $line->description,

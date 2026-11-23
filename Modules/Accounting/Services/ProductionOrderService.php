@@ -205,6 +205,7 @@ class ProductionOrderService
 
             if ($item->isService()) {
                 $services[] = [
+                    'sales_order_item_id' => $item->id,
                     'product_id' => $item->product_id,
                     'description' => $item->description ?: $product?->name,
                     'cost_source' => $item->cost_source ?: ServiceCostSource::INTERNAL->value,
@@ -259,7 +260,7 @@ class ProductionOrderService
         $salesOrder = filled($data['sales_order_id'] ?? null) ? SalesOrder::query()->find($data['sales_order_id']) : null;
 
         return [
-            'summary' => ProductionCost::summary($materials, $labor, $services, $data['produced_quantity'] ?? 1, $this->salesAmount($salesOrder)),
+            'summary' => ProductionCost::summary($materials, $labor, $services, $data['produced_quantity'] ?? 1, $this->salesAmount($salesOrder, $data)),
             'materials_weight' => self::materialsWeight($materials),
             'lines' => [
                 'materials' => array_map(fn (array $line): float => ProductionCost::materialTotal($line), $materials),
@@ -298,7 +299,7 @@ class ProductionOrderService
     }
 
     /**
-     * ما يأخذه الأمر من طلبية البيع المختارة: الزبون، العملة (تتبعها)، المستودع وتاريخ
+     * ما يأخذه الأمر من طلبية البيع المختارة: الزبون، المستودع وتاريخ
      * التسليم المقترحان، وبنودها المقترحة.
      *
      * @return array<string, mixed>|null
@@ -316,7 +317,7 @@ class ProductionOrderService
         return [
             'sales_order' => ['value' => (int) $salesOrder->id, 'label' => self::salesOrderLabel($salesOrder)],
             'client_label' => $salesOrder->client?->name,
-            'currency_id' => $salesOrder->currency_id,
+            'currency_id' => app(CurrencyExchangeRateService::class)->baseCurrencyId(),
             'warehouse_id' => $salesOrder->warehouse_id,
             'due_date' => $salesOrder->expected_delivery_date?->toDateString(),
             'sales_amount' => $this->salesAmount($salesOrder),
@@ -429,9 +430,38 @@ class ProductionOrderService
     /**
      * قيمة البيع للمقارنة بالتكلفة: صافي الطلبية بعد الخصومات وقبل الضريبة.
      */
-    public function salesAmount(?SalesOrder $salesOrder): float
+    /**
+     * قيمة البيع التي يقابلها الأمر، بالعملة الاساسية كتكاليفه (تكلفة المخزون بها):
+     * صافي الطلبية (بلا ضريبة) × سعر صرفها، ونصيب أسطر الطلبية التي يصنعها الأمر منها اذا
+     * ربطت موادُّه او خدماته أسطراً، فأمران لطلبية واحدة لا يأخذ كلٌّ منهما قيمتها كلها.
+     * أمر بلا سطر مربوط (ادخال يدوي) يأخذ قيمة الطلبية كلها.
+     *
+     * @param  array<string, mixed>  $lines  materials و services كما في النموذج
+     */
+    public function salesAmount(?SalesOrder $salesOrder, array $lines = []): float
     {
-        return $salesOrder ? round((float) $salesOrder->total_amount - (float) $salesOrder->tax_amount, 4) : 0.0;
+        if (! $salesOrder) {
+            return 0.0;
+        }
+
+        $net = (float) $salesOrder->total_amount - (float) $salesOrder->tax_amount;
+        $linked = collect([...(array) ($lines['materials'] ?? []), ...(array) ($lines['services'] ?? [])])
+            ->filter(fn ($line): bool => is_array($line))
+            ->pluck('sales_order_item_id')
+            ->filter()
+            ->map(fn ($id): int => (int) $id)
+            ->unique();
+
+        if ($linked->isNotEmpty()) {
+            $totals = $salesOrder->items()->pluck('line_total', 'id')->map(fn ($total): float => (float) $total);
+            $all = $totals->sum();
+
+            if ($all > 0) {
+                $net *= $totals->only($linked->all())->sum() / $all;
+            }
+        }
+
+        return round($net * ((float) $salesOrder->exchange_rate ?: 1.0), 4);
     }
 
     private function salesOrder(mixed $id): ?SalesOrder
@@ -459,7 +489,7 @@ class ProductionOrderService
     }
 
     /**
-     * العميل والعملة يتبعان طلبية البيع ان وُجدت، والا العملة الاساسية.
+     * العميل يتبع طلبية البيع ان وُجدت، والعملة هي الاساسية دائماً.
      */
     private function normalizeData(array $data, ?SalesOrder $salesOrder): array
     {
@@ -469,8 +499,8 @@ class ProductionOrderService
             throw new DomainException(__('Produced quantity must be greater than zero.'));
         }
 
-        $currencyId = $salesOrder?->currency_id
-            ?? (filled($data['currency_id'] ?? null) ? (int) $data['currency_id'] : app(CurrencyExchangeRateService::class)->baseCurrencyId());
+        // التكاليف من المخزون بالعملة الاساسية، فالأمر بها دائماً وقيمة البيع تُحوَّل اليها.
+        $currencyId = app(CurrencyExchangeRateService::class)->baseCurrencyId();
 
         if (! $currencyId) {
             throw new DomainException(__('Currency is required.'));
@@ -485,7 +515,7 @@ class ProductionOrderService
             'order_date' => $data['order_date'] ?? now()->toDateString(),
             'due_date' => filled($data['due_date'] ?? null) ? $data['due_date'] : null,
             'produced_quantity' => round($producedQuantity, 4),
-            'sales_amount' => $this->salesAmount($salesOrder),
+            'sales_amount' => $this->salesAmount($salesOrder, $data),
             'notes' => $data['notes'] ?? null,
             'materials' => $data['materials'] ?? [],
             'labor' => $data['labor'] ?? [],
@@ -580,6 +610,7 @@ class ProductionOrderService
             $isExternal = $source === ServiceCostSource::EXTERNAL->value;
 
             $row = [
+                'sales_order_item_id' => filled($line['sales_order_item_id'] ?? null) ? (int) $line['sales_order_item_id'] : null,
                 'product_id' => $product?->id,
                 'description' => filled($line['description'] ?? null) ? $line['description'] : $product?->name,
                 'cost_source' => $source,

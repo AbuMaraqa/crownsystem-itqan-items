@@ -24,6 +24,7 @@ export interface LaborLine {
 }
 
 export interface ServiceLine {
+    sales_order_item_id: number | null;
     product_id: number | null;
     product_label: string | null;
     description: string | null;
@@ -124,6 +125,7 @@ export const blankLabor = (): LaborLine => ({
 });
 
 export const blankService = (): ServiceLine => ({
+    sales_order_item_id: null,
     product_id: null,
     product_label: null,
     description: null,
