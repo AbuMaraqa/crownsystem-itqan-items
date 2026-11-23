@@ -8,7 +8,7 @@ use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
 /**
- * صلاحيات انواع الاصناف وقوائم الاسعار، وصفحة وحدات الصنف وباركوداته واسعاره.
+ * صلاحيات انواع الاصناف وقوائم الاسعار، وصفحة وحدات الصنف وباركوداته واسعاره، وقائمة الألوان.
  */
 class ItemModelPermissions
 {
@@ -33,6 +33,12 @@ class ItemModelPermissions
         ],
         'Product Management' => [
             self::UNITS_AND_PRICES,
+        ],
+        'Finish Management' => [
+            'Finish View List',
+            'Finish Create',
+            'Finish Update',
+            'Finish Delete',
         ],
     ];
 

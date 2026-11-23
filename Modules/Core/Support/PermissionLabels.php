@@ -132,6 +132,7 @@ final class PermissionLabels
         'Tag' => 'الوسوم',
         'Tax' => 'الضرائب',
         'Unit' => 'وحدات القياس',
+        'Finish' => 'الألوان',
         'User' => 'المستخدمون',
         'Warehouse' => 'المخازن',
         'Warehouse Location' => 'مواقع المخزن',

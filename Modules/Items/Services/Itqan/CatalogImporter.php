@@ -18,6 +18,7 @@ use Modules\Items\Support\Itqan\CategoryMapFile;
 use Modules\Items\Support\Itqan\CategoryMapProposer;
 use Modules\Items\Support\Itqan\ItqanCategoryNodes;
 use Modules\Items\Support\Itqan\ItqanNames;
+use Modules\Items\Support\ItemCode;
 use Modules\Items\Support\LegacyItemFields;
 use RuntimeException;
 
@@ -518,7 +519,7 @@ class CatalogImporter
         $now = now();
         foreach ($new as $key => $name) {
             $existing[$key] = (int) DB::table($table)->insertGetId([
-                'name' => $name, 'is_system' => false, 'is_active' => true, 'sort_order' => 0,
+                'name' => $name, 'code' => ItemCode::nextFinish(), 'is_system' => false, 'is_active' => true, 'sort_order' => 0,
                 'created_at' => $now, 'updated_at' => $now,
             ]);
         }

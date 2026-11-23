@@ -17,6 +17,7 @@ use Modules\Items\Repositories\Contracts\ManufacturerRepositoryInterface;
 use Modules\Items\Repositories\Contracts\OfferRepositoryInterface;
 use Modules\Items\Repositories\Contracts\PriceListRepositoryInterface;
 use Modules\Items\Repositories\Contracts\TagRepositoryInterface;
+use Modules\Items\Repositories\Contracts\FinishRepositoryInterface;
 use Modules\Items\Repositories\Contracts\UnitRepositoryInterface;
 use Modules\Items\Repositories\ItemTypeProfileRepository;
 use Modules\Items\Repositories\LabelRepository;
@@ -24,6 +25,7 @@ use Modules\Items\Repositories\ManufacturerRepository;
 use Modules\Items\Repositories\OfferRepository;
 use Modules\Items\Repositories\PriceListRepository;
 use Modules\Items\Repositories\TagRepository;
+use Modules\Items\Repositories\FinishRepository;
 use Modules\Items\Repositories\UnitRepository;
 
 class RepositoryServiceProvider extends ServiceProvider
@@ -41,6 +43,7 @@ class RepositoryServiceProvider extends ServiceProvider
         PriceListRepositoryInterface::class => PriceListRepository::class,
         TagRepositoryInterface::class => TagRepository::class,
         UnitRepositoryInterface::class => UnitRepository::class,
+        FinishRepositoryInterface::class => FinishRepository::class,
         \Modules\Items\Repositories\Contracts\ProductRepositoryInterface::class => \Modules\Items\Repositories\ProductRepository::class,
         \Modules\Items\Repositories\Contracts\ItemTreeRepositoryInterface::class => \Modules\Items\Repositories\ItemTreeRepository::class,
         \Modules\Items\Repositories\Contracts\OrderRepositoryInterface::class => \Modules\Items\Repositories\OrderRepository::class,

@@ -5,6 +5,7 @@ namespace Modules\Items\Support;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Support\SqlDialect;
 use Modules\Items\Entities\Category;
+use Modules\Items\Entities\Finish;
 use Modules\Items\Entities\Product;
 
 /**
@@ -92,5 +93,20 @@ class ItemCode
         $parentCode = Category::withTrashed()->whereKey($parentId)->value('code');
 
         return filled($parentCode) ? self::nextChild($parentCode) : null;
+    }
+
+    /**
+     * رقم اللون التالي بنمط النظام القديم: تسلسل بثلاث خانات (001، 002 ...) بعد اكبر رقم مستخدم،
+     * ولو لون محذوف، فلا يُعاد رقم محذوف. الرمز الذي يكتبه المستخدم بغير ارقام لا يدخل الحساب.
+     */
+    public static function nextFinish(): string
+    {
+        $last = Finish::withTrashed()
+            ->pluck('code')
+            ->filter(fn (?string $code): bool => $code !== null && ctype_digit($code))
+            ->map(fn (string $code): int => (int) $code)
+            ->max() ?? 0;
+
+        return str_pad((string) ($last + 1), self::CHILD_DIGITS, '0', STR_PAD_LEFT);
     }
 }

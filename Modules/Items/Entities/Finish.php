@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Entities\User;
+use Modules\Items\Support\ItemCode;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
@@ -42,6 +43,16 @@ class Finish extends Model
         parent::__construct($attributes);
 
         $this->setTable(config('items.table_prefix').'finishes');
+    }
+
+    protected static function booted(): void
+    {
+        // رقم اللون كما في النظام القديم (001، 002 ...) اذا لم يُكتب رقم، من اي طريق أُنشئ.
+        static::creating(function (Finish $finish): void {
+            if (blank($finish->code)) {
+                $finish->code = ItemCode::nextFinish();
+            }
+        });
     }
 
     public function getActivitylogOptions(): LogOptions
@@ -101,5 +112,14 @@ class Finish extends Model
     public function categoryFinishes(): HasMany
     {
         return $this->hasMany(CategoryFinish::class, 'finish_id');
+    }
+
+    /**
+     * مستخدم اذا ربطه تصنيف (مجموعة سعر) او صنف، ولو كان الصنف محذوفاً حذفاً مؤقتاً.
+     */
+    public function isUsed(): bool
+    {
+        return $this->categoryFinishes()->exists()
+            || Product::withTrashed()->where('finish_id', $this->id)->exists();
     }
 }

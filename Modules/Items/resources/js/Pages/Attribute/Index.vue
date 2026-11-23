@@ -58,14 +58,16 @@ const { remove } = useRecordDelete('attributes');
 
     <DataTable :table="table" :columns="columns" :filters="filters" :bulk-delete-url="can('Attribute Delete') ? route('attributes.destroy-many') : undefined" :reorder-url="can('Attribute Update') ? route('attributes.reorder') : undefined" :empty-title="t('No attributes found')">
         <template #cell-name="{ row }">
-            <Link v-if="can('Attribute Update')" :href="route('attributes.edit', row.id)" class="font-medium text-brand-600 hover:underline dark:text-brand-400">{{ row.name }}</Link>
+            <Link v-if="!row.editable && can('Finish View List')" :href="route('finishes.index')" class="font-medium text-brand-600 hover:underline dark:text-brand-400">{{ row.name }}</Link>
+            <Link v-else-if="row.editable && can('Attribute Update')" :href="route('attributes.edit', row.id)" class="font-medium text-brand-600 hover:underline dark:text-brand-400">{{ row.name }}</Link>
             <template v-else>{{ row.name }}</template>
         </template>
         <template #cell-slug="{ row }">
             <span dir="ltr">{{ row.slug }}</span>
         </template>
         <template #cell-configuration="{ row }">
-            <Link v-if="can('Attribute Update')" :href="`${route('attributes.edit', row.id)}#values`" class="text-brand-600 hover:underline dark:text-brand-400">{{ t('Configure Attribute') }}</Link>
+            <Link v-if="!row.editable && can('Finish View List')" :href="route('finishes.index')" class="text-brand-600 hover:underline dark:text-brand-400">{{ t('Manage in the colours list') }}</Link>
+            <Link v-else-if="row.editable && can('Attribute Update')" :href="`${route('attributes.edit', row.id)}#values`" class="text-brand-600 hover:underline dark:text-brand-400">{{ t('Configure Attribute') }}</Link>
         </template>
         <template #cell-locales="{ row }">
             <span class="text-muted uppercase">{{ row.locales.join(', ') }}</span>

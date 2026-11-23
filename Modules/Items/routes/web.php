@@ -6,6 +6,7 @@ use Modules\Items\Http\Controllers\Admin\AddonController;
 use Modules\Items\Http\Controllers\Admin\AttributeController;
 use Modules\Items\Http\Controllers\Admin\BrandController;
 use Modules\Items\Http\Controllers\Admin\CategoryController;
+use Modules\Items\Http\Controllers\Admin\FinishController;
 use Modules\Items\Http\Controllers\Admin\ItemTypeProfileController;
 use Modules\Items\Http\Controllers\Admin\LabelController;
 use Modules\Items\Http\Controllers\Admin\ManufacturerController;
@@ -97,6 +98,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::get('/{manufacturer}/info', 'info')->whereNumber('manufacturer')->name('info')->can('Manufacturer View List');
                     Route::put('/{manufacturer}', 'update')->whereNumber('manufacturer')->name('update')->can('Manufacturer Update');
                     Route::delete('/{manufacturer}', 'destroy')->whereNumber('manufacturer')->name('destroy')->can('Manufacturer Delete');
+                });
+
+                Route::prefix('finishes')->name('finishes.')->controller(FinishController::class)->group(function () {
+                    Route::get('/', 'index')->name('index')->can('Finish View List');
+                    Route::post('/', 'store')->name('store')->can('Finish Create');
+                    Route::delete('/', 'destroyMany')->name('destroy-many')->can('Finish Delete');
+                    Route::post('/reorder', 'reorder')->name('reorder')->can('Finish Update');
+                    Route::get('/{finish}/info', 'info')->whereNumber('finish')->name('info')->can('Finish View List');
+                    Route::put('/{finish}', 'update')->whereNumber('finish')->name('update')->can('Finish Update');
+                    Route::delete('/{finish}', 'destroy')->whereNumber('finish')->name('destroy')->can('Finish Delete');
                 });
 
                 Route::prefix('units')->name('units.')->controller(UnitController::class)->group(function () {

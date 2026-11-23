@@ -34,6 +34,7 @@ class SidebarServiceProvider extends ServiceProvider
                 ->add(new SidebarItem('Add Product' , 'solar-box-bold-duotone', ['Product Create'] , 'products.add'))
                 ->add(new SidebarItem('Categories List' , 'solar-box-bold-duotone', ['Category View List'] , 'categories.index'))
                 ->add(new SidebarItem('Categories Tree' , 'solar-box-bold-duotone', ['Category View List'] , 'categories.tree'))
+                ->add(new SidebarItem('Colours List' , 'solar-box-bold-duotone', ['Finish View List'] , 'finishes.index'))
                 ->add(new SidebarItem('Attributes List' , 'solar-box-bold-duotone', ['Attribute View List'] , 'attributes.index'))
                 ->add(new SidebarItem('Tags List' , 'solar-box-bold-duotone', ['Tag View List'] , 'tags.index'))
                 ->add(new SidebarItem('Labels List' , 'solar-box-bold-duotone', ['Label View List'] , 'labels.index'))
