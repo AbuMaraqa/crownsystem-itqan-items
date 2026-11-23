@@ -38,6 +38,15 @@ export const toneText: Record<Tone, string> = {
     ...stockText,
 };
 
+/**
+ * Background of a whole table row whose item is at or below a minimum limit, in that limit's color from the
+ * settings (stock balances, stock follow-up). Other tones leave the row as it is.
+ */
+export const toneRow: Partial<Record<Tone, string>> = {
+    'stock-min-1': 'bg-stock-min-1/10 hover:bg-stock-min-1/15 dark:bg-stock-min-1/15 dark:hover:bg-stock-min-1/20',
+    'stock-min-2': 'bg-stock-min-2/10 hover:bg-stock-min-2/15 dark:bg-stock-min-2/15 dark:hover:bg-stock-min-2/20',
+};
+
 /** A stock quantity at or below a minimum limit, or out of stock: the tones that color the quantity itself. */
 export function isLowStockTone(tone: Tone | null | undefined): tone is 'stock-min-1' | 'stock-min-2' | 'danger' {
     return tone === 'stock-min-1' || tone === 'stock-min-2' || tone === 'danger';

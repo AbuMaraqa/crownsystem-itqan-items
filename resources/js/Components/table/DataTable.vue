@@ -43,6 +43,8 @@ const props = withDefaults(
          * checkboxes and the selection bar a Delete button. Server: `DeletesManyRecords`.
          */
         bulkDeleteUrl?: string;
+        /** Extra classes of a row, e.g. its background (`toneRow` for a stock limit); replaces the default hover. */
+        rowClass?: (row: Row) => string | undefined;
     }>(),
     { searchable: true, selectable: false, only: () => ['table', 'flash'] },
 );
@@ -231,7 +233,7 @@ defineExpose({ clearSelection: () => (selected.value = []) });
                     </tr>
                 </thead>
                 <tbody ref="body">
-                    <tr v-for="row in rows" :key="row.id" class="border-b border-line transition-colors last:border-b-0 hover:bg-gray-50/70 dark:hover:bg-white/[0.02]" :class="{ 'bg-brand-50/40 dark:bg-brand-500/10': selected.includes(row.id) }">
+                    <tr v-for="row in rows" :key="row.id" class="border-b border-line transition-colors last:border-b-0" :class="selected.includes(row.id) ? 'bg-brand-50/40 dark:bg-brand-500/10' : rowClass?.(row) || 'hover:bg-gray-50/70 dark:hover:bg-white/[0.02]'">
                         <td v-if="draggable" class="w-10 px-2 py-3 text-center">
                             <button type="button" data-row-handle class="inline-flex size-7 cursor-grab items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-ink active:cursor-grabbing dark:hover:bg-white/5" :title="t('Drag to reorder')" :aria-label="t('Drag to reorder')">
                                 <GripVertical class="size-4" />

@@ -9,6 +9,7 @@ import PageHeader from '@/Components/ui/PageHeader.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { t } from '@/lib/i18n';
 import { CircleCheck } from '@/lib/icons';
+import { toneRow } from '@/lib/tones';
 
 import { useReportFilters } from '../../Report/parts/useReportFilters';
 import type { StatusBadge } from '../parts/types';
@@ -122,7 +123,7 @@ function openItem(id: number): void {
                                 <span class="ms-2 text-xs font-normal text-muted">({{ group.rows.length }})</span>
                             </td>
                         </tr>
-                        <tr v-for="row in group.rows" :key="row.alert_id" class="cursor-pointer border-b border-line transition hover:bg-brand-50/60 dark:hover:bg-brand-500/[0.06]" @click="openItem(row.id)">
+                        <tr v-for="row in group.rows" :key="row.alert_id" class="cursor-pointer border-b border-line transition" :class="(row.level && toneRow[row.level.tone]) || 'hover:bg-brand-50/60 dark:hover:bg-brand-500/[0.06]'" @click="openItem(row.id)">
                             <td class="px-4 py-2.5">
                                 <div class="font-medium text-gray-900 dark:text-white">{{ row.name }}</div>
                                 <div class="text-xs text-muted"><bdi dir="ltr">{{ row.code }}</bdi></div>

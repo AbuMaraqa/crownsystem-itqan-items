@@ -14,7 +14,7 @@ import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { can, t } from '@/lib/i18n';
 import { CheckRead, Eye, Printer, QrCode } from '@/lib/icons';
 import { route } from '@/lib/route';
-import { toneText } from '@/lib/tones';
+import { toneRow, toneText } from '@/lib/tones';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
 
 import type { Option, StatusBadge } from '../parts/types';
@@ -129,7 +129,7 @@ function labelsUrl(ids: (number | string)[]): string {
         </div>
     </Card>
 
-    <DataTable :key="String(mainProduct?.value ?? '')" :table="table" :columns="columns" :filters="filters" :selectable="can('Shelf Label Print')" :empty-title="t('No items found')">
+    <DataTable :key="String(mainProduct?.value ?? '')" :table="table" :columns="columns" :filters="filters" :selectable="can('Shelf Label Print')" :row-class="(row) => toneRow[row.status.tone]" :empty-title="t('No items found')">
         <template #bulk="{ selected }">
             <Button size="sm" external new-tab :href="labelsUrl(selected)"><QrCode />{{ t('Print Shelf Labels') }}</Button>
         </template>
