@@ -12,7 +12,8 @@ use Illuminate\Notifications\Notification;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
-use NotificationChannels\Fcm\FcmChannel;
+use Modules\Core\Notifications\Channels\LiveBroadcastChannel;
+use Modules\Core\Notifications\Channels\PushChannel;
 use NotificationChannels\Fcm\FcmMessage;
 use NotificationChannels\Fcm\Resources\Notification as FcmNotification;
 
@@ -46,7 +47,8 @@ class GeneralNotification extends Notification implements ShouldBroadcastNow
     public function via($notifiable): array
     {
 
-        return ['broadcast', 'database' , FcmChannel::class];
+        // المخزّن اولاً، والبث الحي واشعار الجوال اضافة لا يمنع فشلهما حفظه ولا العملية.
+        return ['database', LiveBroadcastChannel::class, PushChannel::class];
     }
 
     public function toArray($notifiable): array

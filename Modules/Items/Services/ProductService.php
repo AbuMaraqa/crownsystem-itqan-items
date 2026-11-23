@@ -21,6 +21,7 @@ use Modules\Items\Entities\Tag;
 use Modules\Items\Enums\ItemType;
 use Modules\Items\Enums\ProductActive;
 use Modules\Items\Events\ProductUpdated;
+use Modules\Core\Support\LiveUpdate;
 use Modules\Items\Repositories\Contracts\ProductRepositoryInterface;
 use Modules\Items\Support\ItemCardRules;
 
@@ -107,7 +108,7 @@ class ProductService
             return $product;
         });
 
-        event(new ProductUpdated);
+        LiveUpdate::send(new ProductUpdated);
 
         return $product;
     }

@@ -76,6 +76,8 @@ Display format `d/m/Y` (datetime `d/m/Y H:i`). Store as `date`/`datetime` casts.
 
 `Modules\Core\Services\NotificationService::send()` for any notification; `resolve($event, $subject)` marks the open notifications of one record as handled («تمت المعالجة», read, never deleted) — shown in the bell and notifications page from `present()['resolved_at']`.
 
+A live update is never part of the action: broadcast a `ShouldBroadcastNow` event only through `Modules\Core\Support\LiveUpdate::send($event)`, and notifications go `database` first, then `Modules\Core\Notifications\Channels\LiveBroadcastChannel` (Reverb) and `PushChannel` (Firebase, only for a user with a device). A stopped Reverb or missing Firebase settings is reported and the save still succeeds — never call `event()` / `broadcast()` for a live update directly, never list `broadcast` or `FcmChannel` in `via()`.
+
 ## 8. Feedback
 
 The server flashes `back()->with('success'|'warning'|'error', __('...'))` (warning = partly done); `resources/js/Components/ui/Toasts.vue` shows it. Confirm with `confirm()` from `@/lib/confirm`. Never `alert()` / `window.confirm()`.
