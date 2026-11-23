@@ -92,6 +92,7 @@
     "Item added.": "تمت إضافة الصنف",
     "This item was already added.": "تمت إضافة هذا الصنف مسبقاً",
     "This item was already added to another consolidated purchase order.": "أُضيف هذا الصنف إلى طلبية شراء تجميعية أخرى.",
+    "This line is in a consolidated purchase order; it cannot be removed or reduced below what was taken.": "هذا البند مسحوب في طلبية شراء تجميعية؛ لا يمكن حذفه أو إنقاص كميته عن المسحوب منه.",
     "A cancelled consolidated purchase order cannot be reopened; create a new one.": "لا يمكن إعادة فتح طلبية شراء تجميعية ملغاة؛ أنشئ طلبية جديدة.",
     "Are you sure you want to delete this consolidated purchase order?": "هل أنت متأكد من حذف طلبية الشراء التجميعية هذه؟",
     "Consolidated purchase order created successfully": "تم إنشاء طلبية الشراء التجميعية بنجاح",

@@ -5,6 +5,7 @@ namespace Modules\Accounting\Support;
 use DomainException;
 use Illuminate\Support\Collection;
 use Modules\Accounting\Entities\ConsolidatedPurchaseOrderItem;
+use Modules\Accounting\Entities\PurchaseOrder;
 use Modules\Accounting\Entities\PurchaseOrderItem;
 use Modules\Accounting\Enums\ConsolidatedPurchaseOrderStatus;
 
@@ -342,6 +343,67 @@ final class PurchaseOrderConsumption
         if (array_diff($requested, $this->availablePieceIds($source, $consumed)) !== []) {
             throw new DomainException(__('This item was already added to another consolidated purchase order.'));
         }
+    }
+
+    /**
+     * طلبية الشراء لا تفقد ما سحبته منها طلبية تجميعية نشطة: البند المسحوب لا يُحذف ولا يتغير
+     * صنفه، وكميته لا تنزل عن المسحوب، وقطعه المسحوبة باقية كما هي (الصنف والعدد والطول).
+     * ما فوق المسحوب يُعدّل بحرية، والطلبية التجميعية الملغاة لا تحجز شيئاً.
+     *
+     * يُقفل بنود الطلبية حتى لا تسحب صفحة اضافة تجميعية منها اثناء الحفظ.
+     *
+     * @param  array<int, array<string, mixed>>  $items  البنود بعد التطبيع؛ فارغة عند حذف الطلبية
+     */
+    public function assertSourceKeepsTaken(PurchaseOrder $order, array $items): void
+    {
+        $existing = $order->items()->lockForUpdate()->with('pieces')->get()->keyBy('id');
+        $consumed = $this->consumed($existing->keys()->map(fn ($id): int => (int) $id)->all());
+        $incoming = collect($items)->filter(fn (array $item): bool => filled($item['id'] ?? null))->keyBy(fn (array $item): int => (int) $item['id']);
+
+        foreach ($consumed as $itemId => $taken) {
+            $row = $incoming->get($itemId);
+
+            if ($row === null || ! $this->keepsTaken($existing->get($itemId), $row, $taken)) {
+                throw new DomainException(__('This line is in a consolidated purchase order; it cannot be removed or reduced below what was taken.'));
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @param  array{quantity: float, total_weight: float, piece_ids: array<int, int>, whole_line: bool}  $taken
+     */
+    private function keepsTaken(PurchaseOrderItem $source, array $row, array $taken): bool
+    {
+        if ((int) ($row['product_id'] ?? 0) !== (int) $source->product_id
+            || (int) ($row['category_finish_id'] ?? 0) !== (int) $source->category_finish_id) {
+            return false;
+        }
+
+        if (! self::isWeightPriced($source)) {
+            return Number::normalizeQuantity((float) ($row['quantity'] ?? 0)) >= Number::normalizeQuantity($taken['quantity']);
+        }
+
+        if ($source->pieces->isEmpty()) {
+            return Number::normalizeQuantity((float) ($row['total_weight'] ?? 0)) >= Number::normalizeQuantity($taken['total_weight']);
+        }
+
+        $takenIds = $taken['whole_line'] ? $source->pieces->pluck('id')->map(fn ($id): int => (int) $id)->all() : $taken['piece_ids'];
+        $after = collect($row['pieces'] ?? [])->keyBy(fn (array $piece): int => (int) ($piece['id'] ?? 0));
+
+        foreach ($takenIds as $pieceId) {
+            $before = $source->pieces->firstWhere('id', $pieceId);
+            $piece = $after->get($pieceId);
+
+            if ($before === null || $piece === null
+                || (int) $piece['product_id'] !== (int) $before->product_id
+                || round((float) $piece['piece_count'], 4) !== round((float) $before->piece_count, 4)
+                || round((float) $piece['piece_length'], 4) !== round((float) $before->piece_length, 4)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

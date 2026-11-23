@@ -13,6 +13,7 @@ use Modules\Accounting\Enums\PurchaseOrderDeliveryType;
 use Modules\Accounting\Enums\PurchaseOrderStatus;
 use Modules\Accounting\Support\ItemsGrid;
 use Modules\Accounting\Support\ItemsGridState;
+use Modules\Accounting\Support\PurchaseOrderConsumption;
 use Modules\Accounting\Support\GridLine;
 use Modules\Accounting\Support\WeightPieces;
 use Modules\Core\Services\ReferenceNumberService;
@@ -240,6 +241,7 @@ class PurchaseOrderService
         }
 
         DB::transaction(function () use ($order) {
+            PurchaseOrderConsumption::for()->assertSourceKeepsTaken($order, []);
             $order->items()->delete();
             $order->delete();
         });
@@ -378,6 +380,8 @@ class PurchaseOrderService
 
     private function syncItems(PurchaseOrder $order, array $items): void
     {
+        PurchaseOrderConsumption::for()->assertSourceKeepsTaken($order, $items);
+
         $incomingIds = collect($items)->pluck('id')->filter()->values();
 
         $removedItems = $order->items()
