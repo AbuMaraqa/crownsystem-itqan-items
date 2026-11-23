@@ -163,6 +163,22 @@ class LedgerReportsTest extends TestCase
         $this->assertSame(PeriodClosingVoucherStatus::POSTED, PeriodClosingVoucher::query()->sole()->status);
     }
 
+    public function test_the_trial_balance_balances_while_last_year_is_still_open(): void
+    {
+        // ربح 2025 (600) لم يُقفل بعد.
+        $this->postEntry('2025-05-01', '1110', '4100', 900);
+        $this->postEntry('2025-06-01', '5410', '1110', 300);
+        $this->postEntry('2026-01-10', '1110', '4100', 50);
+
+        $reports = app(AccountingReportService::class);
+        $rows = $reports->trialBalance('2026-01-01', '2026-01-31');
+
+        // ربح السنة السابقة غير المقفل يظهر في الارباح المحتجزة الافتتاحية، فيتوازن الميزان.
+        $this->assertSame(-600.0, $rows->firstWhere('code', '3200')['opening_base']);
+        $this->assertNull($rows->firstWhere('code', '5410'));
+        $this->assertTrue($reports->trialBalanceIsBalanced($reports->trialBalanceTotals($rows)));
+    }
+
     public function test_balance_sheet_balances_with_the_unclosed_profit(): void
     {
         $this->postEntry('2026-02-01', '1110', '3100', 1000);   // رأس مال

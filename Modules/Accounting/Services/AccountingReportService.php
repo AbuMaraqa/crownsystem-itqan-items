@@ -454,12 +454,29 @@ class AccountingReportService
         $sinceYearStart = $yearStart < $from ? $this->sums($yearStart, $before) : collect();
         $profitAndLoss = Account::query()->whereIn('type', [AccountType::REVENUE->value(), AccountType::EXPENSE->value()])->pluck('id')->flip();
 
-        return $all->keys()->merge($sinceYearStart->keys())->unique()->mapWithKeys(function ($accountId) use ($all, $sinceYearStart, $profitAndLoss) {
+        $opening = $all->keys()->merge($sinceYearStart->keys())->unique()->mapWithKeys(function ($accountId) use ($all, $sinceYearStart, $profitAndLoss) {
             $source = $profitAndLoss->has($accountId) ? $sinceYearStart : $all;
             $sum = $source->get($accountId);
 
             return [$accountId => round((float) ($sum->debit_base ?? 0) - (float) ($sum->credit_base ?? 0), 4)];
         });
+
+        // ربح السنوات السابقة الذي لم يُقفل بعد (ارصدة الايرادات والمصروفات قبل اول السنة) يدخل
+        // الارباح المحتجزة الافتتاحية، كما تفعل الميزانية، فيبقى الميزان متوازناً قبل الاقفال.
+        $unclosed = round($profitAndLoss->keys()->sum(function ($accountId) use ($all, $sinceYearStart) {
+            $total = $all->get($accountId);
+            $current = $sinceYearStart->get($accountId);
+
+            return ((float) ($total->debit_base ?? 0) - (float) ($total->credit_base ?? 0))
+                - ((float) ($current->debit_base ?? 0) - (float) ($current->credit_base ?? 0));
+        }), 4);
+
+        if (abs($unclosed) > self::EPSILON) {
+            $retained = app(LedgerAccounts::class)->mapped(LedgerAccounts::RETAINED_EARNINGS_KEY);
+            $opening->put($retained, round((float) ($opening->get($retained) ?? 0) + $unclosed, 4));
+        }
+
+        return $opening;
     }
 
     private function postedLines(): Builder
