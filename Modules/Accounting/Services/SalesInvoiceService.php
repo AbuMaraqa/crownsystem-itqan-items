@@ -301,10 +301,11 @@ class SalesInvoiceService
             $allocations = app(PaymentAllocationService::class);
             $allocations->assertInvoiceHasNoAllocations($invoice);
 
-            $date = now()->toDateString();
+            // تاريخ واحد لعكس الايراد والتكلفة والمخزون: تاريخ المستند ان كان شهره مفتوحاً، والا اليوم.
+            $date = app(JournalEntryService::class)->postableDate($invoice->invoice_date->toDateString());
 
             if ($invoice->journalEntry && $invoice->journalEntry->status === JournalEntryStatus::POSTED) {
-                app(JournalEntryService::class)->void($invoice->journalEntry, __('Cancellation of').' '.$invoice->reference_no);
+                app(JournalEntryService::class)->void($invoice->journalEntry, __('Cancellation of').' '.$invoice->reference_no, $date);
             }
 
             // سند التسليم التلقائي يُلغى، وبضاعة الفاتورة بلا طلبية تعود الى المخزن مع عكس قيد تكلفتها.

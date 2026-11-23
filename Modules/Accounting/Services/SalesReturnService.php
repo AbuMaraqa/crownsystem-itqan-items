@@ -169,7 +169,8 @@ class SalesReturnService
                 throw new DomainException(__('Only posted sales returns can be cancelled.'));
             }
 
-            $date = now()->toDateString();
+            // تاريخ واحد لعكس الايراد والتكلفة والمخزون: تاريخ المستند ان كان شهره مفتوحاً، والا اليوم.
+            $date = app(JournalEntryService::class)->postableDate($return->return_date->toDateString());
             $description = __('Cancellation of').' '.$return->reference_no;
 
             app(PaymentAllocationService::class)->deallocateAll($return);
@@ -184,7 +185,7 @@ class SalesReturnService
                 ->each(fn (JournalEntry $entry) => app(JournalEntryService::class)->void($entry, $description, $date));
 
             if ($return->journalEntry && $return->journalEntry->status === JournalEntryStatus::POSTED) {
-                app(JournalEntryService::class)->void($return->journalEntry, $description);
+                app(JournalEntryService::class)->void($return->journalEntry, $description, $date);
             }
 
             $return->update([

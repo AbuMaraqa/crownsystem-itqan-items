@@ -11,6 +11,7 @@ use Modules\Accounting\Entities\Account;
 use Modules\Accounting\Entities\AccountingPeriod;
 use Modules\Accounting\Entities\CurrencyExchangeRate;
 use Modules\Accounting\Entities\FiscalYear;
+use Modules\Accounting\Entities\JournalEntry;
 use Modules\Accounting\Entities\GoodsReceipt;
 use Modules\Accounting\Entities\JournalLine;
 use Modules\Accounting\Entities\PaymentVoucher;
@@ -27,6 +28,7 @@ use Modules\Accounting\Enums\PurchaseInvoiceStatus;
 use Modules\Accounting\Enums\PurchaseOrderStatus;
 use Modules\Accounting\Enums\PurchaseReturnStatus;
 use Modules\Accounting\Enums\StockMovementType;
+use Modules\Accounting\Services\FiscalYearService;
 use Modules\Accounting\Services\GoodsReceiptService;
 use Modules\Accounting\Services\InventoryAccounts;
 use Modules\Accounting\Services\PaymentAllocationService;
@@ -182,6 +184,39 @@ class PurchaseLedgerCycleTest extends TestCase
         // سُدِّد بسعر اعلى: خسارة فرق عملة 10 ورصيد المورد صفر.
         $this->assertSame(0.0, $this->balance($this->supplierAccount()));
         $this->assertSame(10.0, $this->balance($this->account('5520')));
+    }
+
+    public function test_documents_of_a_closed_month_are_still_settled_with_the_exchange_difference_dated_today(): void
+    {
+        // فاتورة وسند بالدولار في الشهر السابق، ثم أُقفل الشهر قبل التسوية.
+        $lastMonth = AccountingPeriod::create([
+            'fiscal_year_id' => FiscalYear::query()->value('id'),
+            'name' => 'last month',
+            'starts_at' => now()->subMonthNoOverflow()->startOfMonth()->toDateString(),
+            'ends_at' => now()->subMonthNoOverflow()->endOfMonth()->toDateString(),
+            'status' => AccountingPeriodStatus::OPEN->value(),
+        ]);
+        FiscalYear::query()->update(['starts_at' => $lastMonth->starts_at]);
+        $usd = Currency::create(['code' => 'USD', 'symbol' => '$', 'symbol_position' => 'before', 'decimal_places' => 2, 'exchange_rate' => 3.5, 'is_active' => true, 'is_default' => false]);
+        $invoiceDate = $lastMonth->starts_at->toDateString();
+        $paymentDate = $lastMonth->starts_at->copy()->addDay()->toDateString();
+        CurrencyExchangeRate::create(['base_currency_id' => $this->currency->id, 'currency_id' => $usd->id, 'rate_date' => $invoiceDate, 'exchange_rate' => 3.5, 'is_active' => true]);
+        CurrencyExchangeRate::create(['base_currency_id' => $this->currency->id, 'currency_id' => $usd->id, 'rate_date' => $paymentDate, 'exchange_rate' => 3.6, 'is_active' => true]);
+
+        $invoice = $this->postInvoiceWithoutOrder([['product_id' => $this->product('مستورد', 'P9')->id, 'quantity' => 10, 'unit_price' => 10]], [
+            'currency_id' => $usd->id,
+            'invoice_date' => $invoiceDate,
+        ]);
+        $voucher = $this->postVoucher(100, ['currency_id' => $usd->id, 'voucher_date' => $paymentDate]);
+        app(FiscalYearService::class)->closePeriod($lastMonth);
+
+        app(PaymentAllocationService::class)->allocate($voucher, $invoice, 100);
+
+        $this->assertSame(0.0, (float) $invoice->refresh()->outstanding_amount);
+        $this->assertSame(0.0, $this->balance($this->supplierAccount()));
+        $this->assertSame(10.0, $this->balance($this->account('5520')));
+        $entry = JournalEntry::query()->where('source_type', 'ExchangeDifference')->sole();
+        $this->assertSame(now()->toDateString(), $entry->entry_date->toDateString());
     }
 
     public function test_payment_voucher_with_a_pending_cheque_cannot_be_cancelled_from_the_voucher(): void

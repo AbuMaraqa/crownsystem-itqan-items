@@ -211,10 +211,12 @@ class PurchaseReturnService
             }
 
             app(PaymentAllocationService::class)->deallocateAll($return);
-            app(StockLedgerService::class)->reverse($return, now()->toDateString());
+            // تاريخ واحد لعكس الايراد والتكلفة والمخزون: تاريخ المستند ان كان شهره مفتوحاً، والا اليوم.
+            $date = app(JournalEntryService::class)->postableDate($return->return_date->toDateString());
+            app(StockLedgerService::class)->reverse($return, $date);
 
             if ($return->journalEntry && $return->journalEntry->status === JournalEntryStatus::POSTED) {
-                app(JournalEntryService::class)->void($return->journalEntry, __('Cancellation of').' '.$return->reference_no);
+                app(JournalEntryService::class)->void($return->journalEntry, __('Cancellation of').' '.$return->reference_no, $date);
             }
 
             $return->update([

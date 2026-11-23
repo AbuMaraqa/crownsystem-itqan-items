@@ -200,14 +200,22 @@ class JournalEntryService
 
     private function reversalDate(JournalEntry $entry): string
     {
-        $original = $entry->entry_date->toDateString();
-        $period = AccountingPeriod::query()->with('fiscalYear')->containsDate($original)->first();
+        return $this->postableDate($entry->entry_date->toDateString());
+    }
+
+    /**
+     * تاريخ قيد يتبع عملية سابقة (عكس، فرق عملة ...): تاريخها نفسه ان كانت فترته مفتوحة، والا
+     * اليوم، فلا تتعطل العملية لأن شهرها أُقفل.
+     */
+    public function postableDate(string $date): string
+    {
+        $period = AccountingPeriod::query()->with('fiscalYear')->containsDate($date)->first();
 
         $isOpen = $period
             && $period->status !== AccountingPeriodStatus::CLOSED
             && $period->fiscalYear?->status !== AccountingPeriodStatus::CLOSED;
 
-        return $isOpen ? $original : now()->toDateString();
+        return $isOpen ? $date : now()->toDateString();
     }
 
     public function assertBalanced(JournalEntry $entry): void

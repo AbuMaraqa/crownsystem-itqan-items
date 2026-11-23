@@ -303,13 +303,16 @@ class PurchaseInvoiceService
             $allocations = app(PaymentAllocationService::class);
             $allocations->assertInvoiceHasNoAllocations($invoice);
 
+            // تاريخ واحد لعكس الايراد والتكلفة والمخزون: تاريخ المستند ان كان شهره مفتوحاً، والا اليوم.
+            $date = app(JournalEntryService::class)->postableDate($invoice->invoice_date->toDateString());
+
             if ($invoice->journalEntry && $invoice->journalEntry->status === JournalEntryStatus::POSTED) {
-                app(JournalEntryService::class)->void($invoice->journalEntry, __('Cancellation of').' '.$invoice->reference_no);
+                app(JournalEntryService::class)->void($invoice->journalEntry, __('Cancellation of').' '.$invoice->reference_no, $date);
             }
 
             // حركة المخزون التي احدثها الترحيل تُعكس: سند الاستلام التلقائي، او دخول اصناف
             // الفاتورة بلا طلبية (يُمنع ان كانت البضاعة قد صُرفت).
-            app(InvoiceStockService::class)->cancelPurchaseInvoice($invoice, now()->toDateString());
+            app(InvoiceStockService::class)->cancelPurchaseInvoice($invoice, $date);
 
             $invoice->update([
                 'status' => PurchaseInvoiceStatus::CANCELLED->value(),

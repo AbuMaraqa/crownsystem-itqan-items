@@ -13,6 +13,7 @@ use Modules\Accounting\Entities\Cheque;
 use Modules\Accounting\Entities\DeliveryNote;
 use Modules\Accounting\Entities\FiscalYear;
 use Modules\Accounting\Entities\JournalEntry;
+use Modules\Accounting\Entities\StockMovement;
 use Modules\Accounting\Entities\JournalLine;
 use Modules\Accounting\Entities\PaymentVoucher;
 use Modules\Accounting\Entities\PurchaseInvoice;
@@ -176,6 +177,26 @@ class SalesSettlementCycleTest extends TestCase
         $this->assertSame(SalesOrderStatus::PREPARING, $order->refresh()->status);
         $again = app(SalesInvoiceService::class)->createFromOrder($order);
         $this->assertSame(SalesInvoiceStatus::DRAFT, $again->status);
+    }
+
+    public function test_a_cancelled_invoice_reverses_revenue_and_cost_on_the_same_date(): void
+    {
+        $this->travelTo(now()->startOfMonth()->addDays(9));
+        $product = $this->stockedProduct(10, 12);
+        $invoiceDate = now()->startOfMonth()->toDateString();
+        $invoice = app(SalesInvoiceService::class)->post(app(SalesInvoiceService::class)->create(array_replace(
+            $this->invoiceData([['product_id' => $product->id, 'quantity' => 2, 'unit_price' => 20]]),
+            ['invoice_date' => $invoiceDate]
+        )));
+
+        app(SalesInvoiceService::class)->cancel($invoice, 'test');
+
+        // الشهر مفتوح: عكس الايراد وعكس التكلفة وحركة المخزون كلها بتاريخ الفاتورة، فلا يتوزع
+        // هامش الفاتورة على شهرين.
+        $reversals = JournalEntry::query()->where('source_type', 'Reversal')->pluck('entry_date')->map->toDateString()->unique()->values()->all();
+        $this->assertSame([$invoiceDate], $reversals);
+        $this->assertSame([$invoiceDate], StockMovement::query()->where('sourceable_type', $invoice->getMorphClass())->where('quantity', '>', 0)->pluck('movement_date')->map(fn ($date) => substr((string) $date, 0, 10))->unique()->values()->all());
+        $this->travelBack();
     }
 
     public function test_cancelling_a_sales_invoice_is_blocked_by_allocations_and_posted_returns(): void

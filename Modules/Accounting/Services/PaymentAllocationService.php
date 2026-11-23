@@ -318,7 +318,8 @@ class PaymentAllocationService
 
         $service = app(JournalEntryService::class);
         $entry = $service->createDraft([
-            'entry_date' => $allocation->allocation_date->toDateString(),
+            // تاريخ التسوية، او اليوم ان كان شهرها مقفلاً.
+            'entry_date' => $service->postableDate($allocation->allocation_date->toDateString()),
             'reference_no' => $invoice->reference_no,
             'source_module' => 'Accounting',
             'source_type' => 'ExchangeDifference',
