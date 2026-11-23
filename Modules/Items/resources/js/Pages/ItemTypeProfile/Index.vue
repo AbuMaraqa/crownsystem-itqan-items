@@ -85,12 +85,6 @@ async function remove(row: ItemTypeProfileRow): Promise<void> {
         router.delete(route('item-type-profiles.destroy', row.id), { preserveScroll: true });
     }
 }
-
-async function removeMany(ids: (number | string)[]): Promise<void> {
-    if (await confirm({ title: t('Delete :count items?', { count: ids.length }), description: t('Item types used by items are not deleted.') })) {
-        router.delete(route('item-type-profiles.destroy-many'), { data: { ids }, preserveScroll: true });
-    }
-}
 </script>
 
 <template>
@@ -100,7 +94,7 @@ async function removeMany(ids: (number | string)[]): Promise<void> {
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Item Type Profile Delete')" :reorder-url="can('Item Type Profile Update') ? route('item-type-profiles.reorder') : undefined" :empty-title="t('No item types found')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :bulk-delete-url="can('Item Type Profile Delete') ? route('item-type-profiles.destroy-many') : undefined" :reorder-url="can('Item Type Profile Update') ? route('item-type-profiles.reorder') : undefined" :empty-title="t('No item types found')">
         <template #cell-code="{ row }">
             <bdi>{{ row.code }}</bdi>
         </template>
@@ -134,9 +128,6 @@ async function removeMany(ids: (number | string)[]): Promise<void> {
                 @edit="openForm(row)"
                 @delete="remove(row)"
             />
-        </template>
-        <template #bulk="{ selected }">
-            <Button variant="danger" size="sm" @click="removeMany(selected)">{{ t('Delete') }}</Button>
         </template>
     </DataTable>
 

@@ -51,16 +51,4 @@ class CurrencyService
     {
         return SafeDelete::attempt(fn () => $this->currencies->delete($currency));
     }
-
-    /**
-     * كلها او لا شيء: عملة مرتبطة واحدة تلغي حذف الباقي.
-     *
-     * @param  list<int>  $ids
-     */
-    public function deleteMany(array $ids): bool
-    {
-        return SafeDelete::attempt(fn () => DB::transaction(fn () => $this->currencies->query()->whereKey($ids)->get()->each(
-            fn (Currency $currency) => $this->currencies->delete($currency)
-        )));
-    }
 }

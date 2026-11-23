@@ -111,7 +111,7 @@ async function remove(row: QuotationRow): Promise<void> {
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :empty-title="t('No purchase quotations yet')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :bulk-delete-url="can('Purchase Quotation Delete') ? route('accounting.purchase-quotations.destroy-many') : undefined" :empty-title="t('No purchase quotations yet')">
         <template #cell-reference_no="{ row }">
             <Link v-if="canOpen(row)" :href="route('accounting.purchase-quotations.edit', row.id)" class="font-medium text-brand-600 hover:underline dark:text-brand-400" dir="ltr">{{ row.reference_no }}</Link>
             <span v-else dir="ltr" class="text-muted line-through">{{ row.reference_no }}</span>

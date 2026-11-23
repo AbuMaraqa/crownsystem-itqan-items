@@ -4,6 +4,8 @@ namespace Modules\Accounting\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use DomainException;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -12,6 +14,7 @@ use Inertia\Response;
 use Modules\Accounting\Entities\SalesInvoice;
 use Modules\Accounting\Entities\SalesReturn;
 use Modules\Accounting\Enums\SalesReturnStatus;
+use Modules\Accounting\Http\Controllers\Admin\Concerns\DeletesManyDocuments;
 use Modules\Accounting\Http\Controllers\Admin\Concerns\SalesDocumentPage;
 use Modules\Accounting\Http\Requests\Admin\SalesReturnRequest;
 use Modules\Accounting\Repositories\Contracts\SalesReturnRepositoryInterface;
@@ -34,6 +37,7 @@ use Spatie\QueryBuilder\AllowedFilter;
  */
 class SalesReturnController extends Controller
 {
+    use DeletesManyDocuments;
     use SalesDocumentPage;
 
     public function __construct(
@@ -217,6 +221,22 @@ class SalesReturnController extends Controller
         }
 
         return to_route('accounting.sales-returns.index')->with('success', __('Sales return deleted successfully'));
+    }
+
+    /**
+     * The list's rows, deleted ones included (its «deleted» filter shows them; they are refused).
+     */
+    protected function bulkDeleteQuery(): Builder
+    {
+        return $this->returns->tableQuery()->withTrashed();
+    }
+
+    /**
+     * @param  SalesReturn  $document
+     */
+    protected function deleteDocument(Model $document): void
+    {
+        $this->service->delete($document);
     }
 
     public function info(int $salesReturn): JsonResponse

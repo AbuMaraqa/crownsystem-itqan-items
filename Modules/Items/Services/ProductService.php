@@ -150,29 +150,31 @@ class ProductService
      */
     public function delete(Product $product): void
     {
-        if ($reason = $product->deletionBlocker()) {
-            throw new DomainException($reason);
-        }
+        $this->ensureDeletable($product);
 
         $product->forceDelete();
     }
 
     /**
-     * حذف التحديد من القائمة: ما يمنعه deletionBlocker يبقى.
+     * حذف التحديد من القائمة حذف ناعم، وما يمنعه deletionBlocker يبقى.
      *
-     * @param  list<int>  $ids
-     * @return int عدد الاصناف التي لم تُحذف
+     * @throws DomainException بسبب المنع
      */
-    public function deleteMany(array $ids): int
+    public function softDelete(Product $product): void
     {
-        return DB::transaction(function () use ($ids): int {
-            [$blocked, $deletable] = $this->products->query()->whereKey($ids)->get()
-                ->partition(fn (Product $product): bool => $product->deletionBlocker() !== null);
+        $this->ensureDeletable($product);
 
-            $deletable->each->delete();
+        $product->delete();
+    }
 
-            return $blocked->count();
-        });
+    /**
+     * @throws DomainException بسبب المنع
+     */
+    private function ensureDeletable(Product $product): void
+    {
+        if ($reason = $product->deletionBlocker()) {
+            throw new DomainException($reason);
+        }
     }
 
     /**

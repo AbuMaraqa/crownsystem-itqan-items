@@ -77,7 +77,7 @@ const hasMore = (row: Row): boolean =>
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :empty-title="t('No journal entries found')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :bulk-delete-url="can('Journal Entry Delete') ? route('accounting.journal-entries.destroy-many') : undefined" :empty-title="t('No journal entries found')">
         <template #cell-entry_number="{ row }">
             <Link v-if="can('Journal Entry View')" :href="route('accounting.journal-entries.show', row.id)" class="font-medium text-brand-600 hover:underline dark:text-brand-400" dir="ltr">{{ row.entry_number }}</Link>
             <bdi v-else dir="ltr">{{ row.entry_number }}</bdi>

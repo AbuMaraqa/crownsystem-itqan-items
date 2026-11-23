@@ -53,10 +53,10 @@ const columns = computed<TableColumn[]>(() => [
     { key: 'image', label: t('Image'), toggleable: true, hidden: true },
     { key: 'sku', label: t('Item Number'), sort: 'sku', toggleable: true },
     { key: 'barcode', label: t('Barcode'), toggleable: true, hidden: true },
-    { key: 'name', label: t('Name'), sort: 'name' },
+    { key: 'name', label: t('Name'), sort: 'name', class: 'min-w-44' },
     { key: 'colours', label: t('Colours'), class: 'min-w-44', toggleable: true },
-    { key: 'slug', label: t('Slug'), sort: 'slug', toggleable: true },
-    { key: 'categories', label: t('Category'), toggleable: true },
+    { key: 'slug', label: t('Slug'), sort: 'slug', toggleable: true, hidden: true },
+    { key: 'categories', label: t('Category'), class: 'min-w-44', toggleable: true },
     { key: 'is_active', label: t('Active'), sort: 'is_active' },
     { key: 'base_price', label: t('Base Price'), sort: 'base_price', class: 'tabular', toggleable: true },
     { key: 'locales', label: t('Locale'), toggleable: true },
@@ -99,7 +99,7 @@ function openBarcodes(row: Row): void {
     barcodeOpen.value = true;
 }
 
-const { remove, removeMany } = useRecordDelete('products');
+const { remove } = useRecordDelete('products');
 </script>
 
 <template>
@@ -114,7 +114,7 @@ const { remove, removeMany } = useRecordDelete('products');
         :columns="columns"
         :filters="filters"
         :heading="t('Products')"
-        :selectable="can('Product Delete')"
+        :bulk-delete-url="can('Product Delete') ? route('products.destroy-many') : undefined"
         :empty-title="t('No products found')"
         :empty-text="t('Create a new product by clicking the button below')"
     >
@@ -177,9 +177,6 @@ const { remove, removeMany } = useRecordDelete('products');
                 <DropdownItem v-if="can('Product Branch Pricings')" :href="route('products.branch-pricings', row.id)"><DollarSign />{{ t('Branch Pricings') }}</DropdownItem>
                 <DropdownItem v-if="can('Product Units And Prices')" :href="route('products.units-and-prices', row.id)"><Tag />{{ t('Units, Barcodes and Prices') }}</DropdownItem>
             </RecordActions>
-        </template>
-        <template #bulk="{ selected }">
-            <Button variant="danger" size="sm" @click="removeMany(selected)">{{ t('Delete') }}</Button>
         </template>
     </DataTable>
 

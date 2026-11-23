@@ -5,10 +5,12 @@ namespace Modules\Core\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use DomainException;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\Core\Http\Controllers\Concerns\DeletesManyRecords;
 use Modules\Core\Http\Requests\Admin\RoleRequest;
 use Modules\Core\Repositories\Contracts\RoleRepositoryInterface;
 use Modules\Core\Services\RoleService;
@@ -22,6 +24,8 @@ use Spatie\QueryBuilder\AllowedFilter;
 
 class RoleController extends Controller
 {
+    use DeletesManyRecords;
+
     public function __construct(
         private readonly RoleRepositoryInterface $roles,
         private readonly RoleService $roleService,
@@ -93,6 +97,23 @@ class RoleController extends Controller
         }
 
         return back()->with('success', __('Role deleted successfully.'));
+    }
+
+    protected function bulkDeleteQuery(): Builder
+    {
+        return $this->roles->tableQuery();
+    }
+
+    /**
+     * Same rules as destroy(): a system role or a role given to users throws a DomainException and stays.
+     *
+     * @param  Role  $record
+     */
+    protected function deleteRecord(Model $record): bool
+    {
+        $this->roleService->delete($record);
+
+        return true;
     }
 
     public function info(int $role): JsonResponse

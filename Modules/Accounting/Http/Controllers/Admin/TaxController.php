@@ -3,6 +3,8 @@
 namespace Modules\Accounting\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -12,6 +14,7 @@ use Modules\Accounting\Entities\Tax;
 use Modules\Accounting\Http\Requests\Admin\TaxRequest;
 use Modules\Accounting\Repositories\Contracts\TaxRepositoryInterface;
 use Modules\Accounting\Services\TaxService;
+use Modules\Core\Http\Controllers\Concerns\DeletesManyRecords;
 use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
@@ -23,6 +26,7 @@ use Modules\Core\Support\RecordInfo;
  */
 class TaxController extends Controller
 {
+    use DeletesManyRecords;
     use ReordersRecords;
 
     public function __construct(
@@ -94,6 +98,21 @@ class TaxController extends Controller
         }
 
         return back()->with('success', __('Tax deleted successfully'));
+    }
+
+    protected function bulkDeleteQuery(): Builder
+    {
+        return $this->taxes->tableQuery();
+    }
+
+    /**
+     * Same rules as destroy(): false (linked records) keeps the row.
+     *
+     * @param  Tax  $record
+     */
+    protected function deleteRecord(Model $record): bool
+    {
+        return $this->taxService->delete($record);
     }
 
     public function info(int $tax): JsonResponse

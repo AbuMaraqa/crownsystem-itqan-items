@@ -50,11 +50,14 @@ Every route has `->can(...)`; the Vue page hides what `can('...')` (from `@/lib/
 
 Server: `Modules\Core\Support\AdminTable::for($repo->tableQuery())->search([...])->filters(...)->sorts(...)->rows(fn)`,
 filters from `Modules\Core\Support\AdminFilter` (exact, boolean, text, relation, dateRange, numberRange).
-Every table has the same row actions (`RecordActions`: Info · View · Edit · Delete + a `<routes>.info` route), the shared
+Every table has the same row actions in one ⋮ menu (`RecordActions`: Activity Log · View · Edit · extras · Delete + a `<routes>.info` route), the shared
 «Created By» column (`->withCreator()` + `createdByColumn()`) when the model has `createdBy()`, and setup tables
 (lookups, not documents) are drag-and-drop ordered (`->reorderable()` + `:reorder-url`) — see `global-components` §9.
+Every table the user may delete from has bulk delete (`DeletesManyRecords` + `destroy-many` route + `:bulk-delete-url`),
+and wrong link input never breaks a list: `AdminTable` falls back to the default and the table shows why (`warnings`).
 Client: `<DataTable :table :columns :filters>` from `@/Components/table`, with a non-empty `filters` list,
-`#cell-<key>`, `#actions` (`RowMenu` + `DropdownItem`), `#bulk`.
+`#cell-<key>`, `#actions` (`RecordActions`), `:bulk-delete-url`, `#bulk` only for other bulk actions (e.g. mark as read).
+Success / partial / failure of an action: `back()->with('success'|'warning'|'error', ...)`.
 
 ## 4. Forms
 

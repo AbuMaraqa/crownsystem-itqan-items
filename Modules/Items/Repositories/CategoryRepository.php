@@ -87,10 +87,11 @@ class CategoryRepository extends BaseEloquentRepository implements CategoryRepos
 
     public function treeNodes(?int $parentId, bool $showInactive): array
     {
-        return $this->treeQuery($showInactive)
-            ->where('parent_id', $parentId)
-            ->get()
-            ->map(fn (Category $category): array => $this->treeNode($category, []))
+        $categories = $this->treeQuery($showInactive)->where('parent_id', $parentId)->get();
+        $counts = $this->productCounts($categories->modelKeys());
+
+        return $categories
+            ->map(fn (Category $category): array => $this->treeNode($category, [], $counts))
             ->values()
             ->all();
     }
@@ -101,6 +102,7 @@ class CategoryRepository extends BaseEloquentRepository implements CategoryRepos
     public function searchTree(string $search, bool $showInactive): array
     {
         $categories = $this->treeQuery($showInactive)->get();
+        $counts = $this->productCounts($categories->modelKeys());
         $needle = mb_strtolower(trim($search));
         $parents = $categories->pluck('parent_id', 'id');
         $keep = [];
@@ -121,11 +123,11 @@ class CategoryRepository extends BaseEloquentRepository implements CategoryRepos
             }
         }
 
-        $branch = function (?int $parentId) use (&$branch, $categories, $keep): array {
+        $branch = function (?int $parentId) use (&$branch, $categories, $keep, $counts): array {
             return $categories
                 ->where('parent_id', $parentId)
                 ->filter(fn (Category $category): bool => isset($keep[$category->id]))
-                ->map(fn (Category $category): array => $this->treeNode($category, $branch((int) $category->id)))
+                ->map(fn (Category $category): array => $this->treeNode($category, $branch((int) $category->id), $counts))
                 ->values()
                 ->all();
         };
@@ -170,17 +172,45 @@ class CategoryRepository extends BaseEloquentRepository implements CategoryRepos
     {
         return $this->query()
             ->with(['translations', 'media'])
-            // allChildren_count يكفي لمعرفة وجود فروع دون جلبها.
-            ->withCount(['products', 'allChildren'])
+            // allChildren_count يكفي لمعرفة وجود فروع دون جلبها. عدد الأصناف من productCounts().
+            ->withCount('allChildren')
             ->when(! $showInactive, fn (Builder $query) => $query->where('status', CategoryStatus::ACTIVE))
             ->orderBy('sort_order');
     }
 
     /**
+     * عدد الأصناف غير المحذوفة في كل تصنيف: كل روابط التصنيف ناقص روابطه بأصناف محذوفة.
+     * يُقرأ من جدول الربط وحده (فهرس category_id, product_id) بدل ربط كل صف بجدول الأصناف لمعرفة
+     * أنه غير محذوف، وهو ما كان يستغرق ثوانيَ مع مئات آلاف الأصناف؛ الأصناف المحذوفة قليلة.
+     *
+     * @param  list<int>  $categoryIds
+     * @return array<int, int>
+     */
+    private function productCounts(array $categoryIds): array
+    {
+        if ($categoryIds === []) {
+            return [];
+        }
+
+        $products = DB::getTablePrefix().config('items.table_prefix').'products';
+
+        // One query: the deleted-products list is not correlated, so it is read once (a join per link row
+        // is what made this slow). CASE, not a boolean sum, so PostgreSQL accepts it too.
+        return DB::table(config('items.table_prefix').'products_categories')
+            ->whereIn('category_id', $categoryIds)
+            ->groupBy('category_id')
+            ->selectRaw("category_id, count(*) - sum(case when product_id in (select id from {$products} where deleted_at is not null) then 1 else 0 end) as aggregate")
+            ->pluck('aggregate', 'category_id')
+            ->map(fn ($count): int => (int) $count)
+            ->all();
+    }
+
+    /**
      * @param  list<array<string, mixed>>  $children
+     * @param  array<int, int>  $counts  productCounts()
      * @return array<string, mixed>
      */
-    private function treeNode(Category $category, array $children): array
+    private function treeNode(Category $category, array $children, array $counts): array
     {
         return [
             'id' => (int) $category->id,
@@ -188,7 +218,7 @@ class CategoryRepository extends BaseEloquentRepository implements CategoryRepos
             'slug' => $category->slug,
             'image' => $category->getFirstMediaUrl('category') ?: null,
             'is_active' => $category->status === CategoryStatus::ACTIVE,
-            'products_count' => (int) $category->products_count,
+            'products_count' => $counts[$category->id] ?? 0,
             'has_children' => $category->all_children_count > 0,
             'children' => $children,
         ];

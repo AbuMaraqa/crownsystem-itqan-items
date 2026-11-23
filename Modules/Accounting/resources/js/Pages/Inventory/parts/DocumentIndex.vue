@@ -95,7 +95,7 @@ async function remove(row: Row): Promise<void> {
         <template #actions><slot name="actions" /></template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="allColumns" :filters="allFilters" :empty-title="t('No documents yet')">
+    <DataTable :table="table" :columns="allColumns" :filters="allFilters" :bulk-delete-url="can(`${entity} Delete`) ? route(`${routes}.destroy-many`) : undefined" :empty-title="t('No documents yet')">
         <template #cell-reference_no="{ row }">
             <Link :href="route(`${routes}.edit`, row.id)" class="font-medium text-brand-600 hover:underline dark:text-brand-400" dir="ltr">{{ row.reference_no }}</Link>
         </template>

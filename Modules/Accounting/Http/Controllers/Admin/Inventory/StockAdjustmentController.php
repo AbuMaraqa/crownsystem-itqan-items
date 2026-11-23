@@ -4,6 +4,7 @@ namespace Modules\Accounting\Http\Controllers\Admin\Inventory;
 
 use App\Http\Controllers\Controller;
 use DomainException;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -16,6 +17,7 @@ use Modules\Accounting\Entities\StockAdjustment;
 use Modules\Accounting\Entities\StockAdjustmentItem;
 use Modules\Accounting\Entities\Warehouse;
 use Modules\Accounting\Enums\StockAdjustmentType;
+use Modules\Accounting\Http\Controllers\Admin\Concerns\DeletesManyDocuments;
 use Modules\Accounting\Http\Controllers\Admin\Inventory\Concerns\InventoryDocumentPages;
 use Modules\Accounting\Http\Requests\Admin\Inventory\StockAdjustmentRequest;
 use Modules\Accounting\Repositories\Contracts\StockAdjustmentRepositoryInterface;
@@ -35,6 +37,7 @@ use Modules\Core\Support\RecordInfo;
  */
 class StockAdjustmentController extends Controller
 {
+    use DeletesManyDocuments;
     use InventoryDocumentPages;
 
     public function __construct(
@@ -183,6 +186,19 @@ class StockAdjustmentController extends Controller
             __('Deleted successfully'),
             fn () => to_route('accounting.inventory.adjustments.index'),
         );
+    }
+
+    protected function bulkDeleteQuery(): Builder
+    {
+        return $this->adjustments->tableQuery();
+    }
+
+    /**
+     * @param  StockAdjustment  $document
+     */
+    protected function deleteDocument(Model $document): void
+    {
+        $this->service->delete($document);
     }
 
     public function pdf(int $stockAdjustment, InventoryPdfService $pdf): mixed

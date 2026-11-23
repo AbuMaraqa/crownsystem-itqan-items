@@ -51,12 +51,6 @@ async function remove(row: PriceListRow): Promise<void> {
         router.delete(route('price-lists.destroy', row.id), { preserveScroll: true });
     }
 }
-
-async function removeMany(ids: (number | string)[]): Promise<void> {
-    if (await confirm({ title: t('Delete :count items?', { count: ids.length }), description: t('Price lists with prices are not deleted.') })) {
-        router.delete(route('price-lists.destroy-many'), { data: { ids }, preserveScroll: true });
-    }
-}
 </script>
 
 <template>
@@ -66,7 +60,7 @@ async function removeMany(ids: (number | string)[]): Promise<void> {
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Price List Delete')" :reorder-url="can('Price List Update') ? route('price-lists.reorder') : undefined" :empty-title="t('No price lists found')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :bulk-delete-url="can('Price List Delete') ? route('price-lists.destroy-many') : undefined" :reorder-url="can('Price List Update') ? route('price-lists.reorder') : undefined" :empty-title="t('No price lists found')">
         <template #cell-name="{ row }">
             <button v-if="can('Price List Update')" type="button" class="font-medium text-brand-600 hover:underline dark:text-brand-400" @click="openForm(row)">{{ row.name }}</button>
             <span v-else class="font-medium">{{ row.name }}</span>
@@ -96,9 +90,6 @@ async function removeMany(ids: (number | string)[]): Promise<void> {
                 @edit="openForm(row)"
                 @delete="remove(row)"
             />
-        </template>
-        <template #bulk="{ selected }">
-            <Button variant="danger" size="sm" @click="removeMany(selected)">{{ t('Delete') }}</Button>
         </template>
     </DataTable>
 

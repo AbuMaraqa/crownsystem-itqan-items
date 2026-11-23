@@ -138,6 +138,13 @@ class MasterDataPagesTest extends TestCase
 
         $this->delete(route('cities.destroy', $city->id))->assertSessionHas('error');
         $this->assertNotNull($city->fresh());
+
+        // الحذف الجماعي يُبقي المدينة المستخدمة ويحذف غيرها.
+        $free = City::create(['name' => 'يطا', 'governorate_id' => $city->governorate_id, 'latitude' => 31.4, 'longitude' => 35.1, 'population' => 1000, 'type' => 1]);
+
+        $this->delete(route('cities.destroy-many'), ['ids' => [$free->id, $city->id]])->assertSessionHas('warning');
+        $this->assertNull($free->fresh());
+        $this->assertNotNull($city->fresh());
     }
 
     public function test_a_branch_is_added_with_its_working_hours(): void

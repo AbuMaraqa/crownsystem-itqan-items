@@ -5,6 +5,7 @@ namespace Modules\Accounting\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use DomainException;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -13,6 +14,7 @@ use Modules\Accounting\Entities\SalesQuotation;
 use Modules\Accounting\Entities\Tax;
 use Modules\Accounting\Entities\Warehouse;
 use Modules\Accounting\Enums\SalesQuotationStatus;
+use Modules\Accounting\Http\Controllers\Admin\Concerns\DeletesManyDocuments;
 use Modules\Accounting\Http\Requests\Admin\SalesQuotationRequest;
 use Modules\Accounting\Repositories\Contracts\SalesQuotationRepositoryInterface;
 use Modules\Accounting\Services\AccountingPdfService;
@@ -37,6 +39,8 @@ use Spatie\QueryBuilder\AllowedFilter;
  */
 class SalesQuotationController extends Controller
 {
+    use DeletesManyDocuments;
+
     public function __construct(
         private readonly SalesQuotationRepositoryInterface $quotations,
         private readonly SalesQuotationService $service,
@@ -233,6 +237,22 @@ class SalesQuotationController extends Controller
         }
 
         return to_route('accounting.sales-quotations.index')->with('success', __('Sales quotation deleted successfully'));
+    }
+
+    /**
+     * The list's rows, deleted ones included (its «deleted» filter shows them; they are refused).
+     */
+    protected function bulkDeleteQuery(): Builder
+    {
+        return $this->quotations->tableQuery()->withTrashed();
+    }
+
+    /**
+     * @param  SalesQuotation  $document
+     */
+    protected function deleteDocument(Model $document): void
+    {
+        $this->service->delete($document);
     }
 
     public function info(int $salesQuotation): JsonResponse

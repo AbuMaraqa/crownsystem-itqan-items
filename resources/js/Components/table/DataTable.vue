@@ -3,7 +3,10 @@ import { router } from '@inertiajs/vue3';
 import type Sortable from 'sortablejs';
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, toRef, watch } from 'vue';
 
-import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical, Search } from '@/lib/icons';
+import Alert from '@/Components/ui/Alert.vue';
+import Button from '@/Components/ui/Button.vue';
+import { confirm } from '@/lib/confirm';
+import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical, Search, Trash2 } from '@/lib/icons';
 
 import { t } from '@/lib/i18n';
 import { useDataTable } from '@/lib/useDataTable';
@@ -21,7 +24,7 @@ const props = withDefaults(
     defineProps<{
         table: TablePayload<Row>;
         columns: TableColumn[];
-        /** Every admin table declares its filters (see tests/Unit/Architecture/TableFiltersTest). */
+        /** Every admin table declares its filters (the prop is required). */
         filters: TableFilter[];
         heading?: string;
         searchable?: boolean;
@@ -35,6 +38,11 @@ const props = withDefaults(
          * Rows get a drag handle while the table is sorted by its order column.
          */
         reorderUrl?: string;
+        /**
+         * The `<routes>.destroy-many` URL when the user may delete (`can('<Entity> Delete')`): rows get
+         * checkboxes and the selection bar a Delete button. Server: `DeletesManyRecords`.
+         */
+        bulkDeleteUrl?: string;
     }>(),
     { searchable: true, selectable: false, only: () => ['table', 'flash'] },
 );
@@ -43,6 +51,56 @@ const state = useDataTable(toRef(props, 'table'), toRef(props, 'filters'), toRef
 const { loading, values, search, visibleColumns, toggleableColumns, hidden, chips, visit, setFilter, removeFilter, resetFilters, toggleSort, toggleColumn } = state;
 
 const selected = ref<(number | string)[]>([]);
+const canSelect = computed(() => props.selectable || !!props.bulkDeleteUrl);
+
+/** What an action on the rows (bulk delete, reorder) was refused for; cleared by the next one. */
+const actionErrors = ref<string[]>([]);
+const showErrors = (errors: Record<string, string>): void => {
+    actionErrors.value = Object.values(errors);
+};
+
+async function deleteSelected(): Promise<void> {
+    const ids = [...selected.value];
+
+    if (!props.bulkDeleteUrl || !(await confirm({ title: t('Delete :count items?', { count: ids.length }), description: t('This cannot be undone.') }))) return;
+
+    actionErrors.value = [];
+    router.delete(props.bulkDeleteUrl, {
+        data: { ids },
+        preserveScroll: true,
+        onSuccess: () => (selected.value = []),
+        onError: showErrors,
+    });
+}
+
+/** The URL input the server could not use (`AdminTable` `warnings`), named the way the user sees it. */
+const warnings = computed(() =>
+    Object.entries(props.table.warnings ?? {}).map(([key, message]) => {
+        const label = inputLabel(key);
+
+        return label ? `«${label}»: ${message}` : message;
+    }),
+);
+
+function inputLabel(key: string): string | null {
+    if (key === 'sort') return t('Sort');
+    if (key === 'perPage') return t('Rows per page');
+    if (key === 'page') return t('Page');
+
+    const name = key.replace(/^filter\./, '');
+
+    if (name === 'search') return t('Search');
+
+    for (const filter of props.filters) {
+        if (filter.key === name) return filter.label;
+        if (filter.type === 'date-range' || filter.type === 'number-range') {
+            if (name === `${filter.key}_from`) return `${filter.label} (${t('From')})`;
+            if (name === `${filter.key}_to`) return `${filter.label} (${t('To')})`;
+        }
+    }
+
+    return null;
+}
 
 // The rows as shown: a drop reorders them at once, the server's answer replaces them.
 const rows = shallowRef<Row[]>([...props.table.data]);
@@ -76,7 +134,8 @@ async function bindSortable(): Promise<void> {
             ordered.splice(newIndex, 0, ...ordered.splice(oldIndex, 1));
             rows.value = ordered;
 
-            router.post(props.reorderUrl!, { ids: ordered.map((row) => row.id) }, { preserveScroll: true, preserveState: true, only: props.only });
+            actionErrors.value = [];
+            router.post(props.reorderUrl!, { ids: ordered.map((row) => row.id) }, { preserveScroll: true, preserveState: true, only: props.only, onError: showErrors });
         },
     });
 }
@@ -121,9 +180,10 @@ defineExpose({ clearSelection: () => (selected.value = []) });
         <div class="flex min-h-14 flex-wrap items-center gap-2.5 border-b border-line px-5 py-2.5">
             <h2 v-if="heading" class="me-auto text-base font-semibold text-gray-900 dark:text-white">{{ heading }} <span class="tabular font-normal text-muted">({{ table.meta.total.toLocaleString('en') }})</span></h2>
 
-            <div v-if="selectable && selected.length" class="flex items-center gap-2 text-sm" :class="{ 'me-auto': !heading }">
+            <div v-if="canSelect && selected.length" class="flex items-center gap-2 text-sm" :class="{ 'me-auto': !heading }">
                 <span class="text-muted">{{ t(':count selected', { count: selected.length }) }}</span>
                 <slot name="bulk" :selected="selected" />
+                <Button v-if="bulkDeleteUrl" variant="danger" size="sm" @click="deleteSelected"><Trash2 class="size-4" />{{ t('Delete') }}</Button>
             </div>
 
             <label v-if="searchable" class="relative min-w-44 flex-1 sm:max-w-64" :class="{ 'ms-auto': !heading && !selected.length }">
@@ -136,6 +196,18 @@ defineExpose({ clearSelection: () => (selected.value = []) });
             <TableColumnsMenu v-if="toggleableColumns.length" :columns="toggleableColumns" :hidden="hidden" @toggle="toggleColumn" />
         </div>
 
+        <div v-if="warnings.length || actionErrors.length" class="space-y-2 border-b border-line px-5 py-3">
+            <Alert v-if="actionErrors.length" tone="danger">
+                <p v-for="error in actionErrors" :key="error">{{ error }}</p>
+            </Alert>
+            <Alert v-if="warnings.length" tone="warning">
+                <p class="font-medium">{{ t('Some of the link input could not be used, so its default is shown:') }}</p>
+                <ul class="mt-1 list-disc ps-5">
+                    <li v-for="warning in warnings" :key="warning">{{ warning }}</li>
+                </ul>
+            </Alert>
+        </div>
+
         <TableFilterChips :chips="chips" @remove="removeFilter" @reset="resetFilters" />
 
         <div class="overflow-x-auto transition-opacity" :class="{ 'opacity-50': loading }" :aria-busy="loading">
@@ -143,7 +215,7 @@ defineExpose({ clearSelection: () => (selected.value = []) });
                 <thead class="bg-gray-100/40 dark:bg-white/[0.02]">
                     <tr class="border-b border-line text-[13px] text-gray-600 dark:text-gray-400">
                         <th v-if="draggable" class="w-10 px-2 py-3"><span class="sr-only">{{ t('Row order') }}</span></th>
-                        <th v-if="selectable" class="w-12 px-5 py-3 text-start">
+                        <th v-if="canSelect" class="w-12 px-5 py-3 text-start">
                             <input type="checkbox" :checked="allSelected" :aria-label="t('Select all')" class="size-4 rounded accent-brand-500" @change="toggleAll" />
                         </th>
                         <th v-for="column in visibleColumns" :key="column.key" class="px-5 py-2.5 text-start font-normal whitespace-nowrap" :class="column.class" :aria-sort="ariaSort(column)">
@@ -165,7 +237,7 @@ defineExpose({ clearSelection: () => (selected.value = []) });
                                 <GripVertical class="size-4" />
                             </button>
                         </td>
-                        <td v-if="selectable" class="px-5 py-3">
+                        <td v-if="canSelect" class="px-5 py-3">
                             <input type="checkbox" :checked="selected.includes(row.id)" :aria-label="t('Select row')" class="size-4 rounded accent-brand-500" @change="toggleRow(row.id)" />
                         </td>
                         <td v-for="column in visibleColumns" :key="column.key" class="px-5 py-3 text-gray-800 dark:text-gray-200" :class="column.class">

@@ -66,6 +66,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 Route::prefix('roles')->name('roles.')->controller(RoleController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Roles And Permissions View List');
                     Route::post('/', 'store')->name('store')->can('Roles And Permissions Create');
+                    Route::delete('/', 'destroyMany')->name('destroy-many')->can('Roles And Permissions Delete');
                     Route::get('/{role}/info', 'info')->whereNumber('role')->name('info')->can('Roles And Permissions View List');
                     Route::put('/{role}', 'update')->whereNumber('role')->name('update')->can('Roles And Permissions Update');
                     Route::delete('/{role}', 'destroy')->whereNumber('role')->name('destroy')->can('Roles And Permissions Delete');
@@ -75,6 +76,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::get('/', 'index')->name('index')->can('User View List');
                     Route::get('/add', 'add')->name('add')->can('User Create');
                     Route::post('/', 'store')->name('store')->can('User Create');
+                    Route::delete('/', 'destroyMany')->name('destroy-many')->can('User Delete');
                     Route::get('/{user}/info', 'info')->whereNumber('user')->name('info')->can('User View List');
                     Route::get('/{user}/edit', 'edit')->whereNumber('user')->name('edit')->can('User Update');
                     Route::put('/{user}', 'update')->whereNumber('user')->name('update')->can('User Update');

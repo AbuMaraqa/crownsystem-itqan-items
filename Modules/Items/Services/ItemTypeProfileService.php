@@ -2,7 +2,6 @@
 
 namespace Modules\Items\Services;
 
-use DomainException;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Support\SafeDelete;
 use Modules\Core\Support\Translations;
@@ -56,25 +55,5 @@ class ItemTypeProfileService
     public function delete(ItemTypeProfile $profile): bool
     {
         return SafeDelete::attempt(fn () => $this->profiles->delete($profile));
-    }
-
-    /**
-     * يحذف الانواع غير المستخدمة ويترك الباقي، ويعيد عدد ما بقي.
-     *
-     * @param  list<int>  $ids
-     */
-    public function deleteMany(array $ids): int
-    {
-        $kept = 0;
-
-        $this->profiles->query()->whereKey($ids)->get()->each(function (ItemTypeProfile $profile) use (&$kept): void {
-            try {
-                $kept += $this->delete($profile) ? 0 : 1;
-            } catch (DomainException) {
-                $kept++;
-            }
-        });
-
-        return $kept;
     }
 }

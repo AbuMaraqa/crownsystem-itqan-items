@@ -85,16 +85,24 @@ class AdminTable
 
     /**
      * A free text search on the given translated column (and plain columns), case-insensitive.
+     * A column on a related model is written `relation.column` (e.g. `user.name` for the customer).
      *
      * @param  list<string>  $columns
      */
     public function search(array $columns = [], ?string $translated = 'name'): self
     {
-        $this->filters[] = AllowedFilter::callback('search', function (Builder $query, mixed $value) use ($columns, $translated): void {
+        $this->filters[] = AdminFilter::typed(AllowedFilter::callback('search', function (Builder $query, mixed $value) use ($columns, $translated): void {
             $term = '%'.addcslashes(trim((string) $value), '%_\\').'%';
 
             $query->where(function (Builder $query) use ($columns, $translated, $term): void {
                 foreach ($columns as $column) {
+                    if (str_contains($column, '.')) {
+                        [$relation, $field] = [substr($column, 0, strrpos($column, '.')), substr($column, strrpos($column, '.') + 1)];
+                        $query->orWhereHas($relation, fn (Builder $query) => $query->whereLike($query->qualifyColumn($field), $term));
+
+                        continue;
+                    }
+
                     $query->orWhereLike($column, $term);
                 }
 
@@ -102,21 +110,21 @@ class AdminTable
                     $query->orWhereHas('translations', fn (Builder $query) => $query->whereLike($translated, $term));
                 }
             });
-        });
+        }), AdminFilter::TEXT);
 
         return $this;
     }
 
     /**
      * @param  Closure(mixed): array<string, mixed>  $row
-     * @return array{data: list<array<string, mixed>>, meta: array<string, int|null>, query: array<string, mixed>}
+     * Wrong input in the link (an unknown filter, a bad date, a sort or page size the table does not have)
+     * never breaks the page: it falls back to the default and its message goes out in `warnings`.
+     *
+     * @return array{data: list<array<string, mixed>>, meta: array<string, int|null>, query: array<string, mixed>, warnings: object, reorder: string|null}
      */
     public function rows(Closure $row, ?Request $request = null): array
     {
         $request ??= request();
-
-        $perPage = (int) $request->integer('perPage', self::PAGE_SIZES[1]);
-        $perPage = in_array($perPage, self::PAGE_SIZES, true) ? $perPage : self::PAGE_SIZES[1];
 
         $sorts = $this->sorts;
 
@@ -124,7 +132,10 @@ class AdminTable
             $sorts[] = $this->reorderColumn;
         }
 
-        $builder = QueryBuilder::for($this->query, $request)
+        $sortNames = array_map(fn (AllowedSort|string $sort): string => $sort instanceof AllowedSort ? $sort->getName() : ltrim($sort, '-'), $sorts);
+        $input = TableInput::read($request, $this->filters, $sortNames, $this->defaultSort, self::PAGE_SIZES);
+
+        $builder = QueryBuilder::for($this->query, $input->request($request))
             ->allowedFilters(...$this->filters)
             ->allowedSorts(...$sorts)
             ->defaultSort($this->defaultSort);
@@ -134,7 +145,12 @@ class AdminTable
             $builder->orderBy($this->query->getModel()->getQualifiedKeyName());
         }
 
-        $paginator = $builder->paginate($perPage)->withQueryString();
+        $paginator = $builder->paginate($input->perPage, ['*'], 'page', $input->page);
+
+        // Past the last page (often after deleting its last rows): show the last page instead of nothing.
+        if ($paginator->isEmpty() && $input->page > 1 && $paginator->total() > 0) {
+            $paginator = $builder->paginate($input->perPage, ['*'], 'page', $paginator->lastPage());
+        }
 
         $map = $this->creator === null ? $row : fn (mixed $model): array => [
             ...$row($model),
@@ -153,9 +169,10 @@ class AdminTable
                 'to' => $paginator->lastItem(),
             ],
             'query' => [
-                'filter' => (object) array_filter((array) $request->input('filter', []), fn ($value) => $value !== null && $value !== ''),
-                'sort' => $request->input('sort', $this->defaultSort),
+                'filter' => (object) $input->filter,
+                'sort' => $input->sort,
             ],
+            'warnings' => (object) $input->warnings,
         ];
     }
 }

@@ -78,12 +78,10 @@ class OrderService
 
     /**
      * الحذف الجماعي حذف ناعم، كما كان في الصفحة القديمة.
-     *
-     * @param  list<int>  $ids
      */
-    public function deleteMany(array $ids): int
+    public function softDelete(Order $order): void
     {
-        return Order::query()->whereKey($ids)->get()->each->delete()->count();
+        $order->delete();
     }
 
     /**

@@ -51,7 +51,7 @@ function editRow(row: Row): void {
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :reorder-url="can('Attachment Category Update') ? route('accounting.attachment-categories.reorder') : undefined" :empty-title="t('No data available')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :bulk-delete-url="can('Attachment Category Delete') ? route('accounting.attachment-categories.destroy-many') : undefined" :reorder-url="can('Attachment Category Update') ? route('accounting.attachment-categories.reorder') : undefined" :empty-title="t('No data available')">
         <template #cell-name="{ row }">
             <button v-if="can('Attachment Category Update')" type="button" class="font-medium text-brand-600 hover:underline dark:text-brand-400" @click="editRow(row)">{{ row.name }}</button>
             <span v-else class="font-medium">{{ row.name }}</span>

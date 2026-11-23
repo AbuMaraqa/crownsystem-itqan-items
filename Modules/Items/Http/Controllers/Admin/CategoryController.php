@@ -4,11 +4,13 @@ namespace Modules\Items\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use DomainException;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\Core\Http\Controllers\Concerns\DeletesManyRecords;
 use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
@@ -32,6 +34,7 @@ use Spatie\QueryBuilder\AllowedSort;
  */
 class CategoryController extends Controller
 {
+    use DeletesManyRecords;
     use ReordersRecords;
 
     private const TRANSLATED = ['name', 'description'];
@@ -184,15 +187,19 @@ class CategoryController extends Controller
         return back()->with('success', __('Category deleted successfully'));
     }
 
-    public function destroyMany(Request $request): RedirectResponse
+    protected function bulkDeleteQuery(): Builder
     {
-        $ids = $request->validate(['ids' => ['required', 'array'], 'ids.*' => ['integer']])['ids'];
+        return $this->categories->tableQuery();
+    }
 
-        if ($this->categoryService->deleteMany($ids) > 0) {
-            return back()->with('error', __('Some categories were not deleted because they still have subcategories or items.'));
-        }
+    /**
+     * @param  Category  $record
+     */
+    protected function deleteRecord(Model $record): bool
+    {
+        $this->categoryService->delete($record);
 
-        return back()->with('success', __('Categories deleted successfully'));
+        return true;
     }
 
     protected function sortableModel(): string

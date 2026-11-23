@@ -66,16 +66,4 @@ class ManufacturerService
     {
         return SafeDelete::attempt(fn () => $this->manufacturers->delete($manufacturer));
     }
-
-    /**
-     * كلها او لا شيء: شركة مرتبطة واحدة تلغي حذف الباقي.
-     *
-     * @param  list<int>  $ids
-     */
-    public function deleteMany(array $ids): bool
-    {
-        return SafeDelete::attempt(fn () => DB::transaction(fn () => $this->manufacturers->query()->whereKey($ids)->get()->each(
-            fn (Manufacturer $manufacturer) => $this->manufacturers->delete($manufacturer)
-        )));
-    }
 }

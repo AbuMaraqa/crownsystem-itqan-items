@@ -5,6 +5,7 @@ namespace Modules\Accounting\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use DomainException;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,6 +19,7 @@ use Modules\Accounting\Entities\ConsolidatedPurchaseOrder;
 use Modules\Accounting\Entities\ReappraisalElement;
 use Modules\Accounting\Entities\Warehouse;
 use Modules\Accounting\Enums\ConsolidatedPurchaseOrderStatus;
+use Modules\Accounting\Http\Controllers\Admin\Concerns\DeletesManyDocuments;
 use Modules\Accounting\Http\Requests\Admin\ConsolidatedPurchaseOrderHeaderRequest;
 use Modules\Accounting\Http\Requests\Admin\ConsolidatedPurchaseOrderRequest;
 use Modules\Accounting\Repositories\Contracts\ConsolidatedPurchaseOrderRepositoryInterface;
@@ -47,6 +49,8 @@ use Spatie\QueryBuilder\AllowedFilter;
  */
 class ConsolidatedPurchaseOrderController extends Controller
 {
+    use DeletesManyDocuments;
+
     /**
      * دور كل نوع طرف يُختار او يُنشأ من نماذج الصفحة.
      */
@@ -205,6 +209,22 @@ class ConsolidatedPurchaseOrderController extends Controller
         }
 
         return to_route('accounting.consolidated-purchase-orders.index')->with('success', __('Consolidated purchase order deleted successfully'));
+    }
+
+    /**
+     * The list's rows, deleted ones included (its «deleted» filter shows them; they are refused).
+     */
+    protected function bulkDeleteQuery(): Builder
+    {
+        return $this->orders->tableQuery()->withTrashed();
+    }
+
+    /**
+     * @param  ConsolidatedPurchaseOrder  $document
+     */
+    protected function deleteDocument(Model $document): void
+    {
+        $this->service->delete($document);
     }
 
     /**

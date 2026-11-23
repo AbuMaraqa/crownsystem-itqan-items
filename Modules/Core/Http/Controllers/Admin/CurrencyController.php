@@ -3,13 +3,15 @@
 namespace Modules\Core\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 use Modules\Core\Entities\Currency;
 use Modules\Core\Enums\SymbolPosition;
+use Modules\Core\Http\Controllers\Concerns\DeletesManyRecords;
 use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Http\Requests\Admin\CurrencyRequest;
 use Modules\Core\Repositories\Contracts\CurrencyRepositoryInterface;
@@ -21,6 +23,7 @@ use Modules\Core\Support\SafeDelete;
 
 class CurrencyController extends Controller
 {
+    use DeletesManyRecords;
     use ReordersRecords;
 
     public function __construct(
@@ -106,15 +109,17 @@ class CurrencyController extends Controller
         return back()->with('success', __('Currency deleted successfully'));
     }
 
-    public function destroyMany(Request $request): RedirectResponse
+    protected function bulkDeleteQuery(): Builder
     {
-        $ids = $request->validate(['ids' => ['required', 'array'], 'ids.*' => ['integer']])['ids'];
+        return $this->currencies->tableQuery();
+    }
 
-        if (! $this->currencyService->deleteMany($ids)) {
-            return back()->with('error', SafeDelete::message());
-        }
-
-        return back()->with('success', __('Currencies deleted successfully'));
+    /**
+     * @param  Currency  $record
+     */
+    protected function deleteRecord(Model $record): bool
+    {
+        return $this->currencyService->delete($record);
     }
 
     public function info(int $currency): JsonResponse

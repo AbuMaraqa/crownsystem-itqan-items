@@ -4,6 +4,7 @@ namespace Modules\Accounting\Http\Controllers\Admin\Inventory;
 
 use App\Http\Controllers\Controller;
 use DomainException;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -14,6 +15,7 @@ use Inertia\Response;
 use Modules\Accounting\Entities\StockTransfer;
 use Modules\Accounting\Entities\StockTransferItem;
 use Modules\Accounting\Entities\Warehouse;
+use Modules\Accounting\Http\Controllers\Admin\Concerns\DeletesManyDocuments;
 use Modules\Accounting\Http\Controllers\Admin\Inventory\Concerns\InventoryDocumentPages;
 use Modules\Accounting\Http\Requests\Admin\Inventory\StockTransferRequest;
 use Modules\Accounting\Repositories\Contracts\StockTransferRepositoryInterface;
@@ -31,6 +33,7 @@ use Modules\Core\Support\RecordInfo;
  */
 class StockTransferController extends Controller
 {
+    use DeletesManyDocuments;
     use InventoryDocumentPages;
 
     public function __construct(
@@ -174,6 +177,19 @@ class StockTransferController extends Controller
             __('Deleted successfully'),
             fn () => to_route('accounting.inventory.transfers.index'),
         );
+    }
+
+    protected function bulkDeleteQuery(): Builder
+    {
+        return $this->transfers->tableQuery();
+    }
+
+    /**
+     * @param  StockTransfer  $document
+     */
+    protected function deleteDocument(Model $document): void
+    {
+        $this->service->delete($document);
     }
 
     public function pdf(int $stockTransfer, InventoryPdfService $pdf): mixed

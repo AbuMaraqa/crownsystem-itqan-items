@@ -121,7 +121,7 @@ async function remove(row: Row): Promise<void> {
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :empty-title="t('No consolidated purchase orders found')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :bulk-delete-url="can('Consolidated Purchase Order Delete') ? route('accounting.consolidated-purchase-orders.destroy-many') : undefined" :empty-title="t('No consolidated purchase orders found')">
         <template #cell-reference_no="{ row }">
             <Link v-if="canEdit(row)" :href="route('accounting.consolidated-purchase-orders.edit', row.id)" class="font-medium text-brand-600 hover:underline dark:text-brand-400" dir="ltr">{{ row.reference_no }}</Link>
             <span v-else dir="ltr" :class="{ 'text-muted line-through': row.deleted }">{{ row.reference_no }}</span>

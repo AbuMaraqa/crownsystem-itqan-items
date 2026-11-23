@@ -4,6 +4,8 @@ namespace Modules\Accounting\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use DomainException;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -14,6 +16,7 @@ use Modules\Accounting\Repositories\Contracts\CurrencyExchangeRateRepositoryInte
 use Modules\Accounting\Services\CurrencyExchangeRateService;
 use Modules\Accounting\Support\SelectOptions;
 use Modules\Core\Entities\Currency;
+use Modules\Core\Http\Controllers\Concerns\DeletesManyRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
 use Modules\Core\Support\SafeDelete;
@@ -26,6 +29,8 @@ use Spatie\QueryBuilder\AllowedSort;
  */
 class CurrencyExchangeRateController extends Controller
 {
+    use DeletesManyRecords;
+
     public function __construct(
         private readonly CurrencyExchangeRateRepositoryInterface $rates,
         private readonly CurrencyExchangeRateService $rateService,
@@ -100,6 +105,21 @@ class CurrencyExchangeRateController extends Controller
         }
 
         return back()->with('success', __('Exchange rate deleted successfully'));
+    }
+
+    protected function bulkDeleteQuery(): Builder
+    {
+        return $this->rates->tableQuery();
+    }
+
+    /**
+     * Same rules as destroy(): false (linked records) keeps the row.
+     *
+     * @param  CurrencyExchangeRate  $record
+     */
+    protected function deleteRecord(Model $record): bool
+    {
+        return $this->rateService->delete($record);
     }
 
     public function info(int $rate): JsonResponse

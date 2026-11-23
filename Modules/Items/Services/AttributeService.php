@@ -74,20 +74,6 @@ class AttributeService
     }
 
     /**
-     * All or nothing: one linked attribute cancels the whole delete.
-     *
-     * @param  list<int>  $ids
-     */
-    public function deleteMany(array $ids): bool
-    {
-        $this->attributes->query()->whereKey($ids)->get()->each(fn (Attribute $attribute) => $this->ensureNotSystem($attribute));
-
-        return SafeDelete::attempt(fn () => DB::transaction(fn () => $this->attributes->query()->whereKey($ids)->get()->each(
-            fn (Attribute $attribute) => $this->attributes->delete($attribute)
-        )));
-    }
-
-    /**
      * @throws DomainException سمة «اللون» النظامية (Attribute::isSystem)
      */
     private function ensureNotSystem(Attribute $attribute): void

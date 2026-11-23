@@ -4,6 +4,7 @@ namespace Modules\Accounting\Http\Controllers\Admin\Inventory;
 
 use App\Http\Controllers\Controller;
 use DomainException;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -14,6 +15,7 @@ use Inertia\Response;
 use Modules\Accounting\Entities\GoodsReceipt;
 use Modules\Accounting\Entities\PurchaseOrder;
 use Modules\Accounting\Entities\Warehouse;
+use Modules\Accounting\Http\Controllers\Admin\Concerns\DeletesManyDocuments;
 use Modules\Accounting\Http\Controllers\Admin\Inventory\Concerns\InventoryDocumentPages;
 use Modules\Accounting\Http\Requests\Admin\Inventory\GoodsReceiptRequest;
 use Modules\Accounting\Repositories\Contracts\GoodsReceiptRepositoryInterface;
@@ -33,6 +35,7 @@ use Modules\Core\Support\RecordInfo;
  */
 class GoodsReceiptController extends Controller
 {
+    use DeletesManyDocuments;
     use InventoryDocumentPages;
 
     public function __construct(
@@ -184,6 +187,19 @@ class GoodsReceiptController extends Controller
             __('Deleted successfully'),
             fn () => to_route('accounting.inventory.goods-receipts.index'),
         );
+    }
+
+    protected function bulkDeleteQuery(): Builder
+    {
+        return $this->receipts->tableQuery();
+    }
+
+    /**
+     * @param  GoodsReceipt  $document
+     */
+    protected function deleteDocument(Model $document): void
+    {
+        $this->service->delete($document);
     }
 
     public function pdf(int $goodsReceipt, InventoryPdfService $pdf): mixed

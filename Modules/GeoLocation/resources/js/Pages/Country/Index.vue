@@ -51,7 +51,7 @@ const filters = computed<TableFilter[]>(() => [
     { type: 'date-range', key: 'created_at', label: t('Created at') },
 ]);
 
-const { remove, removeMany } = useRecordDelete('countries');
+const { remove } = useRecordDelete('countries');
 </script>
 
 <template>
@@ -61,7 +61,7 @@ const { remove, removeMany } = useRecordDelete('countries');
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Country Delete')" :reorder-url="can('Country Update') ? route('countries.reorder') : undefined" :empty-title="t('No countries found')" :empty-text="t('Create a new country by clicking the button below')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :bulk-delete-url="can('Country Delete') ? route('countries.destroy-many') : undefined" :reorder-url="can('Country Update') ? route('countries.reorder') : undefined" :empty-title="t('No countries found')" :empty-text="t('Create a new country by clicking the button below')">
         <template #cell-name="{ row }">
             <Link v-if="can('Country Update')" :href="route('countries.edit', row.id)" class="font-medium text-brand-600 dark:text-brand-400 hover:underline">{{ row.name }}</Link>
             <template v-else>{{ row.name }}</template>
@@ -84,9 +84,6 @@ const { remove, removeMany } = useRecordDelete('countries');
                 :edit-href="route('countries.edit', row.id)"
                 @delete="remove(row.id, row.name)"
             />
-        </template>
-        <template #bulk="{ selected }">
-            <Button variant="danger" size="sm" @click="removeMany(selected)">{{ t('Delete') }}</Button>
         </template>
     </DataTable>
 </template>

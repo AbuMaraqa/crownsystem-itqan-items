@@ -3,6 +3,8 @@
 namespace Modules\Items\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -10,6 +12,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Modules\Accounting\Support\SelectOptions;
 use Modules\Accounting\Support\StatusBadge;
+use Modules\Core\Http\Controllers\Concerns\DeletesManyRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
 use Modules\Core\Support\UserCellData;
@@ -30,6 +33,8 @@ use Spatie\QueryBuilder\AllowedFilter;
  */
 class OrderController extends Controller
 {
+    use DeletesManyRecords;
+
     public function __construct(
         private readonly OrderRepositoryInterface $orders,
         private readonly OrderService $orderService,
@@ -39,6 +44,7 @@ class OrderController extends Controller
     {
         return Inertia::render('Items/Order/Index', [
             'table' => AdminTable::for($this->orders->tableQuery())
+                ->search(['order_number', 'user.name', 'user.email'], null)
                 ->filters(
                     AdminFilter::text('order_number'),
                     AdminFilter::exact('payment_status'),
@@ -142,12 +148,19 @@ class OrderController extends Controller
         return back()->with('success', __('Order deleted successfully'));
     }
 
-    public function destroyMany(Request $request): RedirectResponse
+    protected function bulkDeleteQuery(): Builder
     {
-        $ids = $request->validate(['ids' => ['required', 'array'], 'ids.*' => ['integer']])['ids'];
-        $this->orderService->deleteMany($ids);
+        return $this->orders->tableQuery();
+    }
 
-        return back()->with('success', __('Deleted successfully'));
+    /**
+     * @param  Order  $record
+     */
+    protected function deleteRecord(Model $record): bool
+    {
+        $this->orderService->softDelete($record);
+
+        return true;
     }
 
     public function info(int $order): JsonResponse

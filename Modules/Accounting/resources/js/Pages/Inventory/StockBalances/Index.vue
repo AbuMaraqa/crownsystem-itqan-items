@@ -4,10 +4,11 @@ import { computed, ref } from 'vue';
 
 import RemoteSelect from '@/Components/form/RemoteSelect.vue';
 import DataTable from '@/Components/table/DataTable.vue';
-import ActionButton from '@/Components/table/ActionButton.vue';
+import RowMenu from '@/Components/table/RowMenu.vue';
 import Badge from '@/Components/ui/Badge.vue';
 import Button from '@/Components/ui/Button.vue';
 import Card from '@/Components/ui/Card.vue';
+import DropdownItem from '@/Components/ui/DropdownItem.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { can, t } from '@/lib/i18n';
@@ -165,8 +166,10 @@ function labelsUrl(ids: (number | string)[]): string {
         <template #cell-average_cost="{ row }"><span class="tabular-nums" dir="ltr">{{ row.average_cost ?? '-' }}</span></template>
         <template #cell-stock_value="{ row }"><span class="tabular-nums" dir="ltr">{{ row.stock_value ?? '-' }}</span></template>
         <template #actions="{ row }">
-            <!-- A balance row is a sum of movements, not a record: no info, edit or delete; View opens the item card. -->
-            <ActionButton v-if="can('Stock Item Card View')" :label="t('Item Card')" tone="view" :href="cardUrl(row)"><Eye /></ActionButton>
+            <!-- A balance row is a sum of movements, not a record: no activity log, edit or delete; View opens the item card. -->
+            <RowMenu v-if="can('Stock Item Card View')">
+                <DropdownItem :href="cardUrl(row)"><Eye />{{ t('Item Card') }}</DropdownItem>
+            </RowMenu>
         </template>
     </DataTable>
 </template>

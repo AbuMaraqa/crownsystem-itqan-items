@@ -44,7 +44,7 @@ const filters = computed<TableFilter[]>(() => [
     { type: 'date-range', key: 'created_at', label: t('Created at') },
 ]);
 
-const { remove, removeMany } = useRecordDelete('addons');
+const { remove } = useRecordDelete('addons');
 </script>
 
 <template>
@@ -54,7 +54,7 @@ const { remove, removeMany } = useRecordDelete('addons');
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Addon Delete')" :reorder-url="can('Addon Update') ? route('addons.reorder') : undefined" :empty-title="t('No addons found')" :empty-text="t('Create a new addon by clicking the button below')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :bulk-delete-url="can('Addon Delete') ? route('addons.destroy-many') : undefined" :reorder-url="can('Addon Update') ? route('addons.reorder') : undefined" :empty-title="t('No addons found')" :empty-text="t('Create a new addon by clicking the button below')">
         <template #cell-image="{ row }">
             <img v-if="row.image" :src="row.image" alt="" class="size-12 rounded-control object-cover" />
         </template>
@@ -84,9 +84,6 @@ const { remove, removeMany } = useRecordDelete('addons');
                 ]"
                 @delete="remove(row.id, row.name)"
             />
-        </template>
-        <template #bulk="{ selected }">
-            <Button variant="danger" size="sm" @click="removeMany(selected)">{{ t('Delete') }}</Button>
         </template>
     </DataTable>
 </template>

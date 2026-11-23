@@ -46,18 +46,6 @@ class CityService
     }
 
     /**
-     * Deletes all of them or, when one is in use, none.
-     *
-     * @param  list<int>  $ids
-     */
-    public function deleteMany(array $ids): void
-    {
-        DB::transaction(fn () => $this->cities->query()->whereKey($ids)->get()->each(
-            fn (City $city) => $this->remove($city)
-        ));
-    }
-
-    /**
      * @param  array<string, mixed>  $data
      */
     private function save(City $city, array $data, string $locale): City

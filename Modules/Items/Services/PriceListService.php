@@ -2,7 +2,6 @@
 
 namespace Modules\Items\Services;
 
-use DomainException;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Support\SafeDelete;
 use Modules\Core\Support\Translations;
@@ -57,25 +56,5 @@ class PriceListService
     public function delete(PriceList $list): bool
     {
         return SafeDelete::attempt(fn () => $this->lists->delete($list));
-    }
-
-    /**
-     * يحذف القوائم غير المستخدمة ويترك الباقي، ويعيد عدد ما بقي.
-     *
-     * @param  list<int>  $ids
-     */
-    public function deleteMany(array $ids): int
-    {
-        $kept = 0;
-
-        $this->lists->query()->whereKey($ids)->get()->each(function (PriceList $list) use (&$kept): void {
-            try {
-                $kept += $this->delete($list) ? 0 : 1;
-            } catch (DomainException) {
-                $kept++;
-            }
-        });
-
-        return $kept;
     }
 }

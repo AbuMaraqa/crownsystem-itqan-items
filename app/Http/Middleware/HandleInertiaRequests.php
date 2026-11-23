@@ -39,6 +39,7 @@ class HandleInertiaRequests extends Middleware
             'flash' => fn () => [
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),
+                'warning' => $request->session()->get('warning'),
             ],
             'translations' => Inertia::once(fn () => app('translator')->getLoader()->load(app()->getLocale(), '*', '*')),
             'ziggy' => Inertia::once(fn () => (new Ziggy)->toArray()),

@@ -4,9 +4,10 @@ namespace Modules\Branch\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Support\Locales;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 use Modules\Branch\Entities\Branch;
@@ -16,6 +17,7 @@ use Modules\Branch\Enums\WeekDay;
 use Modules\Branch\Http\Requests\Admin\BranchRequest;
 use Modules\Branch\Repositories\Contracts\BranchRepositoryInterface;
 use Modules\Branch\Services\BranchService;
+use Modules\Core\Http\Controllers\Concerns\DeletesManyRecords;
 use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
@@ -26,6 +28,7 @@ use Modules\GeoLocation\Support\GeoFilters;
 
 class BranchController extends Controller
 {
+    use DeletesManyRecords;
     use ReordersRecords;
 
     public function __construct(
@@ -144,13 +147,19 @@ class BranchController extends Controller
         return back()->with('success', __('Branch deleted successfully'));
     }
 
-    public function destroyMany(Request $request): RedirectResponse
+    protected function bulkDeleteQuery(): Builder
     {
-        $ids = $request->validate(['ids' => ['required', 'array'], 'ids.*' => ['integer']])['ids'];
+        return $this->branches->tableQuery();
+    }
 
-        $this->branchService->deleteMany($ids);
+    /**
+     * @param  Branch  $record
+     */
+    protected function deleteRecord(Model $record): bool
+    {
+        $this->branchService->delete($record);
 
-        return back()->with('success', __('Branches deleted successfully'));
+        return true;
     }
 
     public function info(int $branch): JsonResponse

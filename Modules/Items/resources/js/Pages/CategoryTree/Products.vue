@@ -58,7 +58,7 @@ const { remove } = useRecordDelete('products');
         ]"
     />
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :empty-title="t('No items linked to this category')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :bulk-delete-url="can('Product Delete') ? route('products.destroy-many') : undefined" :empty-title="t('No items linked to this category')">
         <template #cell-image="{ row }">
             <img v-if="row.image" :src="row.image" alt="" class="size-12 rounded-control object-cover" />
         </template>

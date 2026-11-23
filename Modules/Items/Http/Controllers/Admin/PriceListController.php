@@ -4,11 +4,13 @@ namespace Modules\Items\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use DomainException;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\Core\Http\Controllers\Concerns\DeletesManyRecords;
 use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
@@ -25,6 +27,7 @@ use Modules\Core\Support\RecordInfo;
  */
 class PriceListController extends Controller
 {
+    use DeletesManyRecords;
     use ReordersRecords;
 
     public function __construct(
@@ -90,6 +93,19 @@ class PriceListController extends Controller
         return back()->with('success', __('Price list deleted successfully'));
     }
 
+    protected function bulkDeleteQuery(): Builder
+    {
+        return $this->lists->tableQuery();
+    }
+
+    /**
+     * @param  PriceList  $record
+     */
+    protected function deleteRecord(Model $record): bool
+    {
+        return $this->priceListService->delete($record);
+    }
+
     protected function sortableModel(): string
     {
         return PriceList::class;
@@ -98,16 +114,5 @@ class PriceListController extends Controller
     public function info(int $priceList): JsonResponse
     {
         return response()->json(RecordInfo::of($this->lists->findOrFail($priceList)));
-    }
-
-    public function destroyMany(Request $request): RedirectResponse
-    {
-        $ids = $request->validate(['ids' => ['required', 'array'], 'ids.*' => ['integer']])['ids'];
-
-        if ($this->priceListService->deleteMany($ids) > 0) {
-            return back()->with('error', __('Price lists with prices were not deleted.'));
-        }
-
-        return back()->with('success', __('Price lists deleted successfully'));
     }
 }

@@ -149,31 +149,4 @@ class CategoryService
     {
         $this->tree->removeCategory($category);
     }
-
-    /**
-     * يحذف ما يجوز حذفه ويترك الباقي، ويعيد عدد ما بقي. يُعاد المرور ما دام شيء يُحذف،
-     * فتصنيف اب اختير مع كل فروعه يُحذف بعدها.
-     *
-     * @param  list<int>  $ids
-     */
-    public function deleteMany(array $ids): int
-    {
-        $pending = $this->categories->query()->whereKey($ids)->get();
-
-        do {
-            $before = $pending->count();
-
-            $pending = $pending->reject(function (Category $category): bool {
-                try {
-                    $this->tree->removeCategory($category);
-
-                    return true;
-                } catch (DomainException) {
-                    return false;
-                }
-            });
-        } while ($pending->isNotEmpty() && $pending->count() < $before);
-
-        return $pending->count();
-    }
 }

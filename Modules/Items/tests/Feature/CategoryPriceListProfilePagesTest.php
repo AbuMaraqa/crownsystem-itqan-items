@@ -242,7 +242,9 @@ class CategoryPriceListProfilePagesTest extends TestCase
         // الاب يُحذف بعد فرعه ولو جاء قبله، والمستخدم يبقى.
         $this->from(route('categories.index'))
             ->delete(route('categories.destroy-many'), ['ids' => [$root->id, $child->id, $kept->id]])
-            ->assertSessionHas('error');
+            ->assertSessionHas('warning', __(':deleted deleted, :skipped not deleted. :reason', [
+                'deleted' => 2, 'skipped' => 1, 'reason' => __('This category still has products linked to it.'),
+            ]));
 
         $this->assertSoftDeleted($root);
         $this->assertSoftDeleted($child);
@@ -340,7 +342,9 @@ class CategoryPriceListProfilePagesTest extends TestCase
         $this->assertNotNull($used->fresh());
 
         $this->from(route('price-lists.index'))->delete(route('price-lists.destroy-many'), ['ids' => [$used->id, $free->id]])
-            ->assertSessionHas('error', __('Price lists with prices were not deleted.'));
+            ->assertSessionHas('warning', __(':deleted deleted, :skipped not deleted. :reason', [
+                'deleted' => 1, 'skipped' => 1, 'reason' => __('This price list has prices and cannot be deleted.'),
+            ]));
         $this->assertNotNull($used->fresh());
         $this->assertNull($free->fresh());
     }
@@ -459,7 +463,9 @@ class CategoryPriceListProfilePagesTest extends TestCase
         $this->assertSame($used->id, $product->refresh()->item_type_profile_id);
 
         $this->from(route('item-type-profiles.index'))->delete(route('item-type-profiles.destroy-many'), ['ids' => [$used->id, $free->id]])
-            ->assertSessionHas('error', __('Item types used by items were not deleted.'));
+            ->assertSessionHas('warning', __(':deleted deleted, :skipped not deleted. :reason', [
+                'deleted' => 1, 'skipped' => 1, 'reason' => __('This item type is used by items and cannot be deleted.'),
+            ]));
         $this->assertNotNull($used->fresh());
         $this->assertNull($free->fresh());
     }

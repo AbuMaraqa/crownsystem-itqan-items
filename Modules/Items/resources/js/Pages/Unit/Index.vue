@@ -44,7 +44,7 @@ const filters = computed<TableFilter[]>(() => [
 const blank = (): UnitForm => ({ name: '', slug: '', description: '' });
 
 const { open, editingId, form, add, edit, submit } = useRecordModal<UnitForm>('units', blank);
-const { remove, removeMany } = useRecordDelete('units');
+const { remove } = useRecordDelete('units');
 
 function editRow(row: Row): void {
     edit(row.id, { ...blank(), ...row.form, slug: row.slug });
@@ -58,7 +58,7 @@ function editRow(row: Row): void {
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Unit Delete')" :reorder-url="can('Unit Update') ? route('units.reorder') : undefined" :empty-title="t('No units found')" :empty-text="t('Create a new unit by clicking the button below')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :bulk-delete-url="can('Unit Delete') ? route('units.destroy-many') : undefined" :reorder-url="can('Unit Update') ? route('units.reorder') : undefined" :empty-title="t('No units found')" :empty-text="t('Create a new unit by clicking the button below')">
         <template #cell-name="{ row }">
             <button v-if="can('Unit Update')" type="button" class="font-medium text-brand-600 dark:text-brand-400 hover:underline" @click="editRow(row)">{{ row.name }}</button>
             <template v-else>{{ row.name }}</template>
@@ -83,9 +83,6 @@ function editRow(row: Row): void {
                 @edit="editRow(row)"
                 @delete="remove(row.id, row.name)"
             />
-        </template>
-        <template #bulk="{ selected }">
-            <Button variant="danger" size="sm" @click="removeMany(selected)">{{ t('Delete') }}</Button>
         </template>
     </DataTable>
 

@@ -48,7 +48,7 @@ const filters = computed<TableFilter[]>(() => [
 const blank = (): BrandForm => ({ name: '', slug: '', description: '', image: null, removed_image: [] });
 
 const { open, editingId, form, add: addManufacturer, edit, submit } = useRecordModal<BrandForm>('manufacturers', blank, true);
-const { remove, removeMany } = useRecordDelete('manufacturers');
+const { remove } = useRecordDelete('manufacturers');
 
 const images = ref<ExistingImage[]>([]);
 
@@ -70,7 +70,7 @@ function editRow(row: Row): void {
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Manufacturer Delete')" :reorder-url="can('Manufacturer Update') ? route('manufacturers.reorder') : undefined" :empty-title="t('No manufacturers found')" :empty-text="t('Create a new manufacturer by clicking the button below')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :bulk-delete-url="can('Manufacturer Delete') ? route('manufacturers.destroy-many') : undefined" :reorder-url="can('Manufacturer Update') ? route('manufacturers.reorder') : undefined" :empty-title="t('No manufacturers found')" :empty-text="t('Create a new manufacturer by clicking the button below')">
         <template #cell-image="{ row }">
             <img v-if="row.image" :src="row.image" alt="" class="size-12 rounded-control object-cover" />
         </template>
@@ -98,9 +98,6 @@ function editRow(row: Row): void {
                 @edit="editRow(row)"
                 @delete="remove(row.id, row.name)"
             />
-        </template>
-        <template #bulk="{ selected }">
-            <Button variant="danger" size="sm" @click="removeMany(selected)">{{ t('Delete') }}</Button>
         </template>
     </DataTable>
 

@@ -55,7 +55,7 @@ const { open, editingId, form, add, edit, submit } = useRecordModal<BadgeForm>('
     background_color: '#000000',
 }));
 
-const { remove, removeMany } = useRecordDelete('labels');
+const { remove } = useRecordDelete('labels');
 
 function editRow(row: Row): void {
     edit(row.id, { ...row.form, slug: row.slug, text_color: row.text_color, background_color: row.background_color });
@@ -69,7 +69,7 @@ function editRow(row: Row): void {
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Label Delete')" :reorder-url="can('Label Update') ? route('labels.reorder') : undefined" :empty-title="t('No labels found')" :empty-text="t('Create a new label by clicking the button below')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :bulk-delete-url="can('Label Delete') ? route('labels.destroy-many') : undefined" :reorder-url="can('Label Update') ? route('labels.reorder') : undefined" :empty-title="t('No labels found')" :empty-text="t('Create a new label by clicking the button below')">
         <template #cell-name="{ row }">
             <button v-if="can('Label Update')" type="button" class="font-medium text-brand-600 dark:text-brand-400 hover:underline" @click="editRow(row)">{{ row.name }}</button>
             <template v-else>{{ row.name }}</template>
@@ -97,9 +97,6 @@ function editRow(row: Row): void {
                 @edit="editRow(row)"
                 @delete="remove(row.id, row.name)"
             />
-        </template>
-        <template #bulk="{ selected }">
-            <Button variant="danger" size="sm" @click="removeMany(selected)">{{ t('Delete') }}</Button>
         </template>
     </DataTable>
 

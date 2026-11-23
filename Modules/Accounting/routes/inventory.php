@@ -55,6 +55,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
                 Route::controller(GoodsReceiptController::class)->prefix('goods-receipts')->as('goods-receipts.')->group(function () {
                     Route::get('/', 'index')->name('index')->can('Goods Receipt View List');
+                    Route::delete('/', 'destroyMany')->name('destroy-many')->can('Goods Receipt Delete');
                     Route::get('/add', 'add')->name('add')->can('Goods Receipt Create');
                     Route::post('/', 'store')->name('store')->can('Goods Receipt Create');
                     Route::get('/orders', 'orders')->name('orders')->can('Goods Receipt Create');
@@ -72,6 +73,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
                 Route::controller(DeliveryNoteController::class)->prefix('delivery-notes')->as('delivery-notes.')->group(function () {
                     Route::get('/', 'index')->name('index')->can('Delivery Note View List');
+                    Route::delete('/', 'destroyMany')->name('destroy-many')->can('Delivery Note Delete');
                     Route::get('/add', 'add')->name('add')->can('Delivery Note Create');
                     Route::post('/', 'store')->name('store')->can('Delivery Note Create');
                     Route::get('/orders', 'orders')->name('orders')->can('Delivery Note Create');
@@ -89,6 +91,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
                 Route::controller(StockTransferController::class)->prefix('transfers')->as('transfers.')->group(function () {
                     Route::get('/', 'index')->name('index')->can('Stock Transfer View List');
+                    Route::delete('/', 'destroyMany')->name('destroy-many')->can('Stock Transfer Delete');
                     Route::get('/add', 'add')->name('add')->can('Stock Transfer Create');
                     Route::post('/', 'store')->name('store')->can('Stock Transfer Create');
                     Route::get('/warehouse', 'warehouse')->name('warehouse')->can('Stock Transfer View List');
@@ -105,6 +108,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
                 Route::controller(StockAdjustmentController::class)->prefix('adjustments')->as('adjustments.')->group(function () {
                     Route::get('/', 'index')->name('index')->can('Stock Adjustment View List');
+                    Route::delete('/', 'destroyMany')->name('destroy-many')->can('Stock Adjustment Delete');
                     Route::get('/add', 'add')->name('add')->can('Stock Adjustment Create');
                     Route::post('/', 'store')->name('store')->can('Stock Adjustment Create');
                     Route::get('/warehouse', 'warehouse')->name('warehouse')->can('Stock Adjustment View List');

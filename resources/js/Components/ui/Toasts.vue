@@ -7,7 +7,7 @@ import { t } from '@/lib/i18n';
 
 interface Toast {
     id: number;
-    kind: 'success' | 'error';
+    kind: 'success' | 'warning' | 'error';
     text: string;
 }
 
@@ -29,9 +29,10 @@ function push(kind: Toast['kind'], text: string): void {
 }
 
 watch(
-    () => page.props.flash as { success?: string | null; error?: string | null } | undefined,
+    () => page.props.flash as { success?: string | null; warning?: string | null; error?: string | null } | undefined,
     (flash) => {
         if (flash?.success) push('success', flash.success);
+        if (flash?.warning) push('warning', flash.warning);
         if (flash?.error) push('error', flash.error);
     },
     { immediate: true },
@@ -44,10 +45,10 @@ watch(
             v-for="toast in toasts"
             :key="toast.id"
             class="flex animate-pop-in items-start gap-2.5 rounded-xl border bg-card p-3.5 text-sm shadow-theme-lg"
-            :class="toast.kind === 'success' ? 'border-success/30' : 'border-danger/40'"
+            :class="{ 'border-success/30': toast.kind === 'success', 'border-warning-500/40': toast.kind === 'warning', 'border-danger/40': toast.kind === 'error' }"
         >
             <CircleCheck v-if="toast.kind === 'success'" class="mt-0.5 size-4 shrink-0 text-success" />
-            <CircleAlert v-else class="mt-0.5 size-4 shrink-0 text-danger" />
+            <CircleAlert v-else class="mt-0.5 size-4 shrink-0" :class="toast.kind === 'warning' ? 'text-warning-500' : 'text-danger'" />
             <p class="flex-1">{{ toast.text }}</p>
             <button class="text-muted hover:text-ink" :aria-label="t('Close')" @click="dismiss(toast.id)"><X class="size-4" /></button>
         </div>

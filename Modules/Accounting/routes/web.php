@@ -62,6 +62,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
                 Route::prefix('journal-entries')->as('journal-entries.')->controller(JournalEntryController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Journal Entry View List');
+                    Route::delete('/', 'destroyMany')->name('destroy-many')->can('Journal Entry Delete');
                     Route::get('/add', 'add')->name('add')->can('Journal Entry Create');
                     Route::post('/', 'store')->name('store')->can('Journal Entry Create');
                     Route::get('/{journalEntry}', 'show')->whereNumber('journalEntry')->name('show')->can('Journal Entry View');
@@ -97,6 +98,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
                 Route::prefix('receipt-vouchers')->as('receipt-vouchers.')->controller(ReceiptVoucherController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Receipt Voucher View List');
+                    Route::delete('/', 'destroyMany')->name('destroy-many')->can('Receipt Voucher Delete');
                     Route::get('/add', 'add')->name('add')->can('Receipt Voucher Create');
                     Route::post('/', 'store')->name('store')->can('Receipt Voucher Create');
                     Route::get('/parties', 'parties')->name('parties')->can('Receipt Voucher View List');
@@ -112,6 +114,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
                 Route::prefix('payment-vouchers')->as('payment-vouchers.')->controller(PaymentVoucherController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Payment Voucher View List');
+                    Route::delete('/', 'destroyMany')->name('destroy-many')->can('Payment Voucher Delete');
                     Route::get('/add', 'add')->name('add')->can('Payment Voucher Create');
                     Route::post('/', 'store')->name('store')->can('Payment Voucher Create');
                     Route::get('/parties', 'parties')->name('parties')->can('Payment Voucher View List');
@@ -170,6 +173,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::get('/', 'index')->name('index')->can('Customer Group View List');
                     Route::get('/customers', 'customers')->name('customers')->can('Customer Group View List');
                     Route::post('/', 'store')->name('store')->can('Customer Group Create');
+                    Route::delete('/', 'destroyMany')->name('destroy-many')->can('Customer Group Delete');
                     Route::post('/reorder', 'reorder')->name('reorder')->can('Customer Group Update');
                     Route::get('/{group}/info', 'info')->whereNumber('group')->name('info')->can('Customer Group View List');
                     Route::put('/{group}', 'update')->whereNumber('group')->name('update')->can('Customer Group Update');
@@ -180,6 +184,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 Route::prefix('taxes')->as('taxes.')->controller(TaxController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Tax View List');
                     Route::post('/', 'store')->name('store')->can('Tax Create');
+                    Route::delete('/', 'destroyMany')->name('destroy-many')->can('Tax Delete');
                     Route::post('/reorder', 'reorder')->name('reorder')->can('Tax Update');
                     Route::put('/{tax}', 'update')->whereNumber('tax')->name('update')->can('Tax Update');
                     Route::put('/{tax}/active', 'active')->whereNumber('tax')->name('active')->can('Tax Update');
@@ -190,6 +195,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 Route::prefix('attachment-categories')->as('attachment-categories.')->controller(AttachmentCategoryController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Attachment Category View List');
                     Route::post('/', 'store')->name('store')->can('Attachment Category Create');
+                    Route::delete('/', 'destroyMany')->name('destroy-many')->can('Attachment Category Delete');
                     Route::post('/reorder', 'reorder')->name('reorder')->can('Attachment Category Update');
                     Route::get('/{category}/info', 'info')->whereNumber('category')->name('info')->can('Attachment Category View List');
                     Route::put('/{category}', 'update')->whereNumber('category')->name('update')->can('Attachment Category Update');
@@ -199,6 +205,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 Route::prefix('clearance-attachment-types')->as('clearance-attachment-types.')->controller(ClearanceAttachmentTypeController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Clearance Attachment Type View List');
                     Route::post('/', 'store')->name('store')->can('Clearance Attachment Type Create');
+                    Route::delete('/', 'destroyMany')->name('destroy-many')->can('Clearance Attachment Type Delete');
                     Route::post('/reorder', 'reorder')->name('reorder')->can('Clearance Attachment Type Update');
                     Route::get('/{type}/info', 'info')->whereNumber('type')->name('info')->can('Clearance Attachment Type View List');
                     Route::put('/{type}', 'update')->whereNumber('type')->name('update')->can('Clearance Attachment Type Update');
@@ -208,6 +215,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 Route::prefix('delivery-cost-elements')->as('delivery-cost-elements.')->controller(DeliveryCostElementController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Delivery Cost Element View List');
                     Route::post('/', 'store')->name('store')->can('Delivery Cost Element Create');
+                    Route::delete('/', 'destroyMany')->name('destroy-many')->can('Delivery Cost Element Delete');
                     Route::post('/reorder', 'reorder')->name('reorder')->can('Delivery Cost Element Update');
                     Route::get('/{element}/info', 'info')->whereNumber('element')->name('info')->can('Delivery Cost Element View List');
                     Route::put('/{element}', 'update')->whereNumber('element')->name('update')->can('Delivery Cost Element Update');
@@ -217,6 +225,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 Route::prefix('additional-cost-types')->as('additional-cost-types.')->controller(AdditionalCostTypeController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Additional Cost Type View List');
                     Route::post('/', 'store')->name('store')->can('Additional Cost Type Create');
+                    Route::delete('/', 'destroyMany')->name('destroy-many')->can('Additional Cost Type Delete');
                     Route::post('/reorder', 'reorder')->name('reorder')->can('Additional Cost Type Update');
                     Route::get('/{type}/info', 'info')->whereNumber('type')->name('info')->can('Additional Cost Type View List');
                     Route::put('/{type}', 'update')->whereNumber('type')->name('update')->can('Additional Cost Type Update');
@@ -227,6 +236,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 Route::prefix('reappraisal-elements')->as('reappraisal-elements.')->controller(ReappraisalElementController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Reappraisal Element View List');
                     Route::post('/', 'store')->name('store')->can('Reappraisal Element Create');
+                    Route::delete('/', 'destroyMany')->name('destroy-many')->can('Reappraisal Element Delete');
                     Route::post('/reorder', 'reorder')->name('reorder')->can('Reappraisal Element Update');
                     Route::get('/{element}/info', 'info')->whereNumber('element')->name('info')->can('Reappraisal Element View List');
                     Route::put('/{element}', 'update')->whereNumber('element')->name('update')->can('Reappraisal Element Update');
@@ -237,6 +247,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 Route::prefix('currency-exchange-rates')->as('currency-exchange-rates.')->controller(CurrencyExchangeRateController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Currency Exchange Rate View List');
                     Route::post('/', 'store')->name('store')->can('Currency Exchange Rate Create');
+                    Route::delete('/', 'destroyMany')->name('destroy-many')->can('Currency Exchange Rate Delete');
                     Route::put('/{rate}', 'update')->whereNumber('rate')->name('update')->can('Currency Exchange Rate Update');
                     Route::delete('/{rate}', 'destroy')->whereNumber('rate')->name('destroy')->can('Currency Exchange Rate Delete');
                     Route::get('/{rate}/info', 'info')->whereNumber('rate')->name('info')->can('Currency Exchange Rate View List');
@@ -248,6 +259,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
                 Route::prefix('purchase-quotations')->as('purchase-quotations.')->controller(PurchaseQuotationController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Purchase Quotation View List');
+                    Route::delete('/', 'destroyMany')->name('destroy-many')->can('Purchase Quotation Delete');
                     Route::get('/add', 'add')->name('add')->can('Purchase Quotation Create');
                     Route::post('/', 'store')->name('store')->can('Purchase Quotation Create');
                     Route::get('/orders', 'orders')->name('orders')->can('Purchase Quotation Create');
@@ -263,6 +275,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
                 Route::prefix('purchase-orders')->as('purchase-orders.')->controller(PurchaseOrderController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Purchase Order View List');
+                    Route::delete('/', 'destroyMany')->name('destroy-many')->can('Purchase Order Delete');
                     Route::get('/add', 'add')->name('add')->can('Purchase Order Create');
                     Route::post('/', 'store')->name('store')->can('Purchase Order Create');
                     Route::get('/customers', 'customers')->name('customers')->can('Purchase Order View List');
@@ -281,6 +294,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
                 Route::prefix('purchase-invoices')->as('purchase-invoices.')->controller(PurchaseInvoiceController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Purchase Invoice View List');
+                    Route::delete('/', 'destroyMany')->name('destroy-many')->can('Purchase Invoice Delete');
                     Route::get('/add', 'add')->name('add')->can('Purchase Invoice Create');
                     Route::post('/', 'store')->name('store')->can('Purchase Invoice Create');
                     Route::get('/orders', 'orders')->name('orders')->can('Purchase Invoice Create');
@@ -296,6 +310,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
                 Route::prefix('purchase-returns')->as('purchase-returns.')->controller(PurchaseReturnController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Purchase Return View List');
+                    Route::delete('/', 'destroyMany')->name('destroy-many')->can('Purchase Return Delete');
                     Route::get('/add', 'add')->name('add')->can('Purchase Return Create');
                     Route::post('/', 'store')->name('store')->can('Purchase Return Create');
                     Route::get('/invoices', 'invoices')->name('invoices')->can('Purchase Return Create');
@@ -313,6 +328,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 Route::prefix('consolidated-purchase-orders')->as('consolidated-purchase-orders.')->group(function () {
                     Route::controller(ConsolidatedPurchaseOrderController::class)->group(function () {
                         Route::get('/', 'index')->name('index')->can('Consolidated Purchase Order View List');
+                        Route::delete('/', 'destroyMany')->name('destroy-many')->can('Consolidated Purchase Order Delete');
                         Route::get('/add', 'add')->name('add')->can('Consolidated Purchase Order Create');
                         Route::post('/', 'store')->name('store')->can('Consolidated Purchase Order Create');
                         Route::middleware(AuthorizeAnyPermission::class.':Consolidated Purchase Order Create,Consolidated Purchase Order Update')->group(function () {
@@ -372,6 +388,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
                 Route::prefix('sales-quotations')->as('sales-quotations.')->controller(SalesQuotationController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Sales Quotation View List');
+                    Route::delete('/', 'destroyMany')->name('destroy-many')->can('Sales Quotation Delete');
                     Route::get('/add', 'add')->name('add')->can('Sales Quotation Create');
                     Route::post('/', 'store')->name('store')->can('Sales Quotation Create');
                     Route::get('/{salesQuotation}/edit', 'edit')->whereNumber('salesQuotation')->name('edit')->can('Sales Quotation Update');
@@ -387,6 +404,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
                 Route::prefix('production-orders')->as('production-orders.')->controller(ProductionOrderController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Production Order View List');
+                    Route::delete('/', 'destroyMany')->name('destroy-many')->can('Production Order Delete');
                     Route::get('/add', 'add')->name('add')->can('Production Order Create');
                     Route::post('/', 'store')->name('store')->can('Production Order Create');
                     Route::middleware(AuthorizeAnyPermission::class.':Production Order Create,Production Order Update')->group(function () {
@@ -413,6 +431,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
                 Route::prefix('sales-orders')->as('sales-orders.')->controller(SalesOrderController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Sales Order View List');
+                    Route::delete('/', 'destroyMany')->name('destroy-many')->can('Sales Order Delete');
                     Route::get('/add', 'add')->name('add')->can('Sales Order Create');
                     Route::post('/', 'store')->name('store')->can('Sales Order Create');
                     Route::get('/suppliers', 'suppliers')->name('suppliers')->can('Sales Order View List');
@@ -431,6 +450,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
                 Route::prefix('sales-invoices')->as('sales-invoices.')->controller(SalesInvoiceController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Sales Invoice View List');
+                    Route::delete('/', 'destroyMany')->name('destroy-many')->can('Sales Invoice Delete');
                     Route::get('/add', 'add')->name('add')->can('Sales Invoice Create');
                     Route::post('/', 'store')->name('store')->can('Sales Invoice Create');
                     Route::get('/orders', 'orders')->name('orders')->can('Sales Invoice Create');
@@ -446,6 +466,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
                 Route::prefix('sales-returns')->as('sales-returns.')->controller(SalesReturnController::class)->group(function () {
                     Route::get('/', 'index')->name('index')->can('Sales Return View List');
+                    Route::delete('/', 'destroyMany')->name('destroy-many')->can('Sales Return Delete');
                     Route::get('/add', 'add')->name('add')->can('Sales Return Create');
                     Route::post('/', 'store')->name('store')->can('Sales Return Create');
                     Route::get('/invoices', 'invoices')->name('invoices')->can('Sales Return Create');

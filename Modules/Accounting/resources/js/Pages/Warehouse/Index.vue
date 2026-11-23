@@ -60,7 +60,7 @@ const filters = computed<TableFilter[]>(() => [
     { type: 'date-range', key: 'created_at', label: t('Created at') },
 ]);
 
-const { remove, removeMany } = useRecordDelete(routes);
+const { remove } = useRecordDelete(routes);
 </script>
 
 <template>
@@ -70,7 +70,7 @@ const { remove, removeMany } = useRecordDelete(routes);
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Warehouse Delete')" :reorder-url="can('Warehouse Update') ? route('accounting.warehouses.reorder') : undefined" :empty-title="t('No warehouses found')" :empty-text="t('Create a new warehouse by clicking the button below')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :bulk-delete-url="can('Warehouse Delete') ? route('accounting.warehouses.destroy-many') : undefined" :reorder-url="can('Warehouse Update') ? route('accounting.warehouses.reorder') : undefined" :empty-title="t('No warehouses found')" :empty-text="t('Create a new warehouse by clicking the button below')">
         <template #cell-name="{ row }">
             <Link v-if="can('Warehouse Update')" :href="route('accounting.warehouses.edit', row.id)" class="font-medium text-brand-600 hover:underline dark:text-brand-400">{{ row.name }}</Link>
             <template v-else>{{ row.name }}</template>
@@ -125,9 +125,6 @@ const { remove, removeMany } = useRecordDelete(routes);
                     <DropdownItem v-if="can('Stock View List')" :href="row.stock_url"><Boxes />{{ t('Stock Balances') }}</DropdownItem>
                 </template>
             </RecordActions>
-        </template>
-        <template #bulk="{ selected }">
-            <Button variant="danger" size="sm" @click="removeMany(selected)">{{ t('Delete') }}</Button>
         </template>
     </DataTable>
 </template>

@@ -137,7 +137,7 @@ async function remove(row: InvoiceRow): Promise<void> {
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :empty-title="t('No sales invoices found')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :bulk-delete-url="can('Sales Invoice Delete') ? route('accounting.sales-invoices.destroy-many') : undefined" :empty-title="t('No sales invoices found')">
         <template #cell-reference_no="{ row }">
             <Link v-if="canOpen(row)" :href="route('accounting.sales-invoices.edit', row.id)" class="font-medium text-brand-600 hover:underline dark:text-brand-400" dir="ltr">{{ row.reference_no }}</Link>
             <span v-else dir="ltr" :class="{ 'text-muted line-through': row.deleted }">{{ row.reference_no }}</span>

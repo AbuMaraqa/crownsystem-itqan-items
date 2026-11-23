@@ -3,6 +3,8 @@
 namespace Modules\Accounting\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -11,6 +13,7 @@ use Modules\Accounting\Entities\AttachmentCategory;
 use Modules\Accounting\Http\Requests\Admin\AttachmentCategoryRequest;
 use Modules\Accounting\Repositories\Contracts\AttachmentCategoryRepositoryInterface;
 use Modules\Accounting\Services\AttachmentCategoryService;
+use Modules\Core\Http\Controllers\Concerns\DeletesManyRecords;
 use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
@@ -22,6 +25,7 @@ use Modules\Core\Support\SafeDelete;
  */
 class AttachmentCategoryController extends Controller
 {
+    use DeletesManyRecords;
     use ReordersRecords;
 
     public function __construct(
@@ -72,6 +76,21 @@ class AttachmentCategoryController extends Controller
         }
 
         return back()->with('success', __('Attachment category deleted successfully'));
+    }
+
+    protected function bulkDeleteQuery(): Builder
+    {
+        return $this->records->tableQuery();
+    }
+
+    /**
+     * Same rules as destroy(): false (linked records) keeps the row.
+     *
+     * @param  AttachmentCategory  $record
+     */
+    protected function deleteRecord(Model $record): bool
+    {
+        return $this->service->delete($record);
     }
 
     protected function sortableModel(): string

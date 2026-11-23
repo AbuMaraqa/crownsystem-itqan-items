@@ -5,12 +5,14 @@ namespace Modules\Items\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use DomainException;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\Core\Http\Controllers\Concerns\DeletesManyRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
 use Modules\Items\Entities\Addon;
@@ -39,6 +41,8 @@ use Spatie\QueryBuilder\AllowedSort;
  */
 class ProductController extends Controller
 {
+    use DeletesManyRecords;
+
     /** الألوان الظاهرة في صف الصنف، والباقي يُختصر بعدد. */
     private const VISIBLE_COLOURS = 6;
 
@@ -183,15 +187,19 @@ class ProductController extends Controller
         return back()->with('success', __('Product deleted successfully'));
     }
 
-    public function destroyMany(Request $request): RedirectResponse
+    protected function bulkDeleteQuery(): Builder
     {
-        $ids = $request->validate(['ids' => ['required', 'array'], 'ids.*' => ['integer']])['ids'];
+        return $this->products->tableQuery();
+    }
 
-        if ($this->productService->deleteMany(array_map('intval', $ids)) > 0) {
-            return back()->with('error', __('Some items were not deleted because they have sub-items or are used in documents.'));
-        }
+    /**
+     * @param  Product  $record
+     */
+    protected function deleteRecord(Model $record): bool
+    {
+        $this->productService->softDelete($record);
 
-        return back()->with('success', __('Products deleted successfully'));
+        return true;
     }
 
     public function info(int $product): JsonResponse

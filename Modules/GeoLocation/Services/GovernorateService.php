@@ -42,18 +42,6 @@ class GovernorateService
     }
 
     /**
-     * Deletes all of them or, when one is in use, none.
-     *
-     * @param  list<int>  $ids
-     */
-    public function deleteMany(array $ids): void
-    {
-        DB::transaction(fn () => $this->governorates->query()->whereKey($ids)->get()->each(
-            fn (Governorate $governorate) => $this->remove($governorate)
-        ));
-    }
-
-    /**
      * @param  array<string, mixed>  $data
      */
     private function save(Governorate $governorate, array $data, string $locale): Governorate

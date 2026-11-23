@@ -63,12 +63,6 @@ async function remove(row: Row): Promise<void> {
         router.delete(route('categories.destroy', row.id), { preserveScroll: true });
     }
 }
-
-async function removeMany(ids: (number | string)[]): Promise<void> {
-    if (await confirm({ title: t('Delete :count items?', { count: ids.length }), description: t('A category that still has subcategories or items is not deleted.') })) {
-        router.delete(route('categories.destroy-many'), { data: { ids }, preserveScroll: true });
-    }
-}
 </script>
 
 <template>
@@ -78,7 +72,7 @@ async function removeMany(ids: (number | string)[]): Promise<void> {
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Category Delete')" :reorder-url="can('Category Update') ? route('categories.reorder') : undefined" :empty-title="t('No categories found')" :empty-text="t('Add the categories your items belong to.')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :bulk-delete-url="can('Category Delete') ? route('categories.destroy-many') : undefined" :reorder-url="can('Category Update') ? route('categories.reorder') : undefined" :empty-title="t('No categories found')" :empty-text="t('Add the categories your items belong to.')">
         <template #cell-image="{ row }">
             <img v-if="row.image" :src="row.image" alt="" class="size-12 rounded-control object-cover" />
         </template>
@@ -122,9 +116,6 @@ async function removeMany(ids: (number | string)[]): Promise<void> {
                 ]"
                 @delete="remove(row)"
             />
-        </template>
-        <template #bulk="{ selected }">
-            <Button variant="danger" size="sm" @click="removeMany(selected)">{{ t('Delete') }}</Button>
         </template>
     </DataTable>
 </template>

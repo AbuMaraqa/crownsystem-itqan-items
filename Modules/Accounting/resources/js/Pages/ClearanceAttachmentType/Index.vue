@@ -50,7 +50,7 @@ function editRow(row: Row): void {
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :reorder-url="can('Clearance Attachment Type Update') ? route('accounting.clearance-attachment-types.reorder') : undefined" :empty-title="t('No data available')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :bulk-delete-url="can('Clearance Attachment Type Delete') ? route('accounting.clearance-attachment-types.destroy-many') : undefined" :reorder-url="can('Clearance Attachment Type Update') ? route('accounting.clearance-attachment-types.reorder') : undefined" :empty-title="t('No data available')">
         <template #cell-name="{ row }">
             <button v-if="can('Clearance Attachment Type Update')" type="button" class="font-medium text-brand-600 hover:underline dark:text-brand-400" @click="editRow(row)">{{ row.name }}</button>
             <span v-else class="font-medium">{{ row.name }}</span>

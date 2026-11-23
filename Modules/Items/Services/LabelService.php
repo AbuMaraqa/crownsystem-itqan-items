@@ -58,16 +58,4 @@ class LabelService
     {
         return SafeDelete::attempt(fn () => $this->labels->delete($label));
     }
-
-    /**
-     * كلها او لا شيء.
-     *
-     * @param  list<int>  $ids
-     */
-    public function deleteMany(array $ids): bool
-    {
-        return SafeDelete::attempt(fn () => DB::transaction(fn () => $this->labels->query()->whereKey($ids)->get()->each(
-            fn (Label $label) => $this->labels->delete($label)
-        )));
-    }
 }

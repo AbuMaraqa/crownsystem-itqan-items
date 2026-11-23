@@ -14,6 +14,7 @@ use Inertia\Response;
 use Modules\Accounting\Entities\PaymentVoucher;
 use Modules\Accounting\Entities\ReceiptVoucher;
 use Modules\Accounting\Enums\AccountingPaymentMethod;
+use Modules\Accounting\Http\Controllers\Admin\Concerns\DeletesManyDocuments;
 use Modules\Accounting\Http\Requests\Admin\VoucherRequest;
 use Modules\Accounting\Repositories\Contracts\VoucherRepositoryInterface;
 use Modules\Accounting\Services\CurrencyExchangeRateService;
@@ -37,6 +38,8 @@ use Spatie\QueryBuilder\AllowedFilter;
  */
 abstract class VoucherController extends Controller
 {
+    use DeletesManyDocuments;
+
     public function __construct(
         protected readonly VoucherRepositoryInterface $vouchers,
         protected readonly CurrencyExchangeRateService $rates,
@@ -235,6 +238,22 @@ abstract class VoucherController extends Controller
         }
 
         return back()->with('success', $this->messages()['deleted']);
+    }
+
+    /**
+     * The list's rows, deleted ones included (its «deleted» filter shows them; they are refused).
+     */
+    protected function bulkDeleteQuery(): Builder
+    {
+        return $this->vouchers->tableQuery()->withTrashed();
+    }
+
+    /**
+     * @param  PaymentVoucher|ReceiptVoucher  $document
+     */
+    protected function deleteDocument(Model $document): void
+    {
+        $this->service()->delete($document);
     }
 
     public function info(int $voucher): JsonResponse

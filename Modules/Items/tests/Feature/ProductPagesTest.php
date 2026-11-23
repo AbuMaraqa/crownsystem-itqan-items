@@ -227,11 +227,18 @@ class ProductPagesTest extends TestCase
         $this->delete(route('products.destroy', $free->id))->assertSessionHas('success');
         $this->assertNull(Product::withTrashed()->find($free->id));
 
-        // حذف التحديد يترك الممنوع ويخبر به.
-        $this->delete(route('products.destroy-many'), ['ids' => [$main->id, $piece->id]])
-            ->assertSessionHas('error', __('Some items were not deleted because they have sub-items or are used in documents.'));
+        // حذف التحديد يترك الممنوع ويخبر به، ويحذف الباقي حذفاً ناعماً.
+        $other = $this->product('آخر');
+        $this->delete(route('products.destroy-many'), ['ids' => [$main->id, $other->id]])
+            ->assertSessionHas('warning', __(':deleted deleted, :skipped not deleted. :reason', [
+                'deleted' => 1, 'skipped' => 1, 'reason' => __('Remove the sub-items of this main item first.'),
+            ]));
         $this->assertNotNull(Product::query()->find($main->id));
-        $this->assertNull(Product::query()->find($piece->id));
+        $this->assertSoftDeleted($other);
+
+        // المقطع القديم صف عادي في الجدول.
+        $this->delete(route('products.destroy-many'), ['ids' => [$piece->id]])->assertSessionHas('success');
+        $this->assertSoftDeleted($piece);
     }
 
     public function test_the_barcode_dialog_lists_the_item_and_its_variations(): void

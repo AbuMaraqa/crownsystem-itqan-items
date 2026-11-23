@@ -1537,6 +1537,7 @@
     "Price offer item discount must be between 0 and 100.": "يجب أن يكون خصم الصنف في عرض السعر بين 0 و100.",
     "Only draft documents can be updated.": "يمكن تعديل المستندات المسودة فقط.",
     "Only draft documents can be deleted.": "يمكن حذف المستندات المسودة فقط.",
+    "This document has already been deleted.": "هذا المستند محذوف مسبقاً.",
     "Only draft documents can be posted.": "يمكن ترحيل المستندات المسودة فقط.",
     "The document must have at least one item.": "يجب أن يحتوي المستند على صنف واحد على الأقل.",
     "Only posted documents can be cancelled.": "يمكن إلغاء المستندات المرحلة فقط.",
@@ -1686,7 +1687,6 @@
     "kg": "كغم",
     "pcs": "قطعة",
     "Cost": "التكلفة",
-
     "Mapped": "مربوط",
     "Deleted records": "السجلات المحذوفة",
     "With deleted records": "مع السجلات المحذوفة",
@@ -1703,17 +1703,13 @@
     "No closing vouchers found": "لا توجد سندات إقفال",
     "No cheques found": "لا توجد شيكات",
     "Search by name, phone or email": "ابحث بالاسم أو الهاتف أو البريد الإلكتروني",
-
     "Export to Excel": "تصدير إلى Excel",
-
     "Approve this sales quotation?": "اعتماد عرض السعر هذا؟",
     "Create a sales order from this quotation?": "إنشاء طلبية بيع من عرض السعر هذا؟",
     "Cancel this sales quotation?": "إلغاء عرض السعر هذا؟",
     "Cancel Quotation": "إلغاء العرض",
     "No sales quotations found": "لا توجد عروض أسعار بيع",
-
     "All items": "جميع الأصناف",
-
     "No purchase invoices found": "لا توجد فواتير شراء",
     "Select a supplier first": "اختر المورد أولاً",
     "Cancel this purchase order?": "هل تريد إلغاء طلبية الشراء هذه؟",
@@ -1723,13 +1719,11 @@
     "Everything still returnable from the invoice is taken; set the returned quantities on the return page.": "يُؤخذ كل ما بقي قابلاً للإرجاع من الفاتورة، وتُحدَّد الكميات المرتجعة في صفحة المرتجع.",
     "Invoice Totals": "إجماليات الفاتورة",
     "No purchase returns found": "لا توجد مرتجعات شراء",
-
     "No consolidated purchase orders found": "لا توجد طلبيات تجميعية",
     "No production orders found": "لا توجد أوامر إنتاج",
     "Production Costs": "تكاليف الإنتاج",
     "No wages added yet.": "لم تُضف أجور بعد.",
     "No services added yet.": "لم تُضف خدمات بعد.",
-
     "Confirm this sales order?": "هل تريد تأكيد طلبية البيع هذه؟",
     "Send this sales order to preparation?": "هل تريد إرسال طلبية البيع هذه إلى التجهيز؟",
     "Create a sales invoice from this order?": "هل تريد إنشاء فاتورة بيع من هذه الطلبية؟",

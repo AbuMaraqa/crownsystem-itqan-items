@@ -14,6 +14,11 @@ export interface TablePayload<Row> {
     query: { filter: Record<string, string>; sort: string };
     /** The column rows are dragged by (`AdminTable::reorderable()`), or null. */
     reorder?: string | null;
+    /**
+     * URL input the server could not use and replaced with its default, by input name
+     * (`sort`, `perPage`, `page`, `filter.<key>`): shown above the table (`Modules\Core\Support\TableInput`).
+     */
+    warnings?: Record<string, string>;
 }
 
 export interface TableColumn {

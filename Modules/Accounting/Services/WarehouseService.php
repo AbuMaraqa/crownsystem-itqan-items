@@ -52,16 +52,6 @@ class WarehouseService
     }
 
     /**
-     * @param  list<int>  $ids
-     */
-    public function deleteMany(array $ids): bool
-    {
-        return SafeDelete::attempt(fn () => DB::transaction(fn () => $this->warehouses->query()->whereKey($ids)->get()->each(
-            fn (Warehouse $warehouse) => $this->warehouses->delete($warehouse)
-        )));
-    }
-
-    /**
      * @param  array<string, mixed>  $data
      */
     private function save(Warehouse $warehouse, array $data, string $locale): Warehouse

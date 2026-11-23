@@ -122,7 +122,7 @@ function viewFields(row: Row): { label: string; value: string | number | null }[
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :reorder-url="can('Customer Group Update') ? route('accounting.customer-groups.reorder') : undefined" :empty-title="t('No data available')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :bulk-delete-url="can('Customer Group Delete') ? route('accounting.customer-groups.destroy-many') : undefined" :reorder-url="can('Customer Group Update') ? route('accounting.customer-groups.reorder') : undefined" :empty-title="t('No data available')">
         <template #cell-name="{ row }">
             <button v-if="can('Customer Group Update')" type="button" class="font-medium text-brand-600 hover:underline dark:text-brand-400" @click="editRow(row)">{{ row.name }}</button>
             <span v-else class="font-medium">{{ row.name }}</span>

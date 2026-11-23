@@ -45,6 +45,7 @@ export { default as DollarSign } from '~icons/solar/dollar-minimalistic-linear';
 export { default as Printer } from '~icons/solar/printer-linear';
 export { default as QrCode } from '~icons/solar/qr-code-linear';
 export { default as Info } from '~icons/solar/info-circle-linear';
+export { default as History } from '~icons/solar/history-linear';
 export { default as Layers } from '~icons/solar/layers-linear';
 export { default as Italic } from '~icons/solar/text-italic-linear';
 export { default as Link2 } from '~icons/solar/link-linear';

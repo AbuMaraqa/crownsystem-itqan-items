@@ -114,7 +114,7 @@ async function remove(row: ReturnRow): Promise<void> {
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :empty-title="t('No sales returns found')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :bulk-delete-url="can('Sales Return Delete') ? route('accounting.sales-returns.destroy-many') : undefined" :empty-title="t('No sales returns found')">
         <template #cell-reference_no="{ row }">
             <Link v-if="canOpen(row)" :href="route('accounting.sales-returns.edit', row.id)" class="font-medium text-brand-600 hover:underline dark:text-brand-400" dir="ltr">{{ row.reference_no }}</Link>
             <span v-else dir="ltr" :class="{ 'text-muted line-through': row.deleted }">{{ row.reference_no }}</span>

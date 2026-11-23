@@ -4,6 +4,8 @@ namespace Modules\Accounting\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use DomainException;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -13,6 +15,7 @@ use Modules\Accounting\Entities\GoodsReceipt;
 use Modules\Accounting\Entities\PurchaseOrder;
 use Modules\Accounting\Enums\PurchaseOrderDeliveryType;
 use Modules\Accounting\Enums\PurchaseOrderStatus;
+use Modules\Accounting\Http\Controllers\Admin\Concerns\DeletesManyDocuments;
 use Modules\Accounting\Http\Controllers\Admin\Concerns\PurchaseDocumentPage;
 use Modules\Accounting\Http\Requests\Admin\PurchaseOrderRequest;
 use Modules\Accounting\Repositories\Contracts\PurchaseOrderRepositoryInterface;
@@ -39,6 +42,7 @@ use Spatie\QueryBuilder\AllowedFilter;
  */
 class PurchaseOrderController extends Controller
 {
+    use DeletesManyDocuments;
     use PurchaseDocumentPage;
 
     public function __construct(
@@ -259,6 +263,22 @@ class PurchaseOrderController extends Controller
         }
 
         return to_route('accounting.purchase-orders.index')->with('success', __('Purchase order deleted successfully'));
+    }
+
+    /**
+     * The list's rows, deleted ones included (its «deleted» filter shows them; they are refused).
+     */
+    protected function bulkDeleteQuery(): Builder
+    {
+        return $this->orders->tableQuery()->withTrashed();
+    }
+
+    /**
+     * @param  PurchaseOrder  $document
+     */
+    protected function deleteDocument(Model $document): void
+    {
+        $this->service->delete($document);
     }
 
     public function info(int $purchaseOrder): JsonResponse

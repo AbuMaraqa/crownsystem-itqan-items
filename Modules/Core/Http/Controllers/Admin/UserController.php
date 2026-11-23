@@ -4,6 +4,8 @@ namespace Modules\Core\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use DomainException;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -13,6 +15,7 @@ use Modules\Accounting\Entities\CustomerGroup;
 use Modules\Branch\Entities\Branch;
 use Modules\Core\Entities\User;
 use Modules\Core\Enums\UserRole;
+use Modules\Core\Http\Controllers\Concerns\DeletesManyRecords;
 use Modules\Core\Http\Requests\Admin\UserRequest;
 use Modules\Core\Repositories\Contracts\RoleRepositoryInterface;
 use Modules\Core\Repositories\Contracts\UserRepositoryInterface;
@@ -26,6 +29,8 @@ use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
 {
+    use DeletesManyRecords;
+
     public function __construct(
         private readonly UserRepositoryInterface $users,
         private readonly RoleRepositoryInterface $roles,
@@ -126,6 +131,31 @@ class UserController extends Controller
         }
 
         return back()->with('success', __('User deleted successfully.'));
+    }
+
+    protected function bulkDeleteQuery(): Builder
+    {
+        return $this->users->tableQuery();
+    }
+
+    /**
+     * Same rules as destroy(): a Super Admin (unless the actor is one), the signed-in user and the last
+     * Super Admin throw a DomainException and stay.
+     *
+     * @param  User  $record
+     */
+    protected function deleteRecord(Model $record): bool
+    {
+        /** @var User $actor */
+        $actor = request()->user();
+
+        if (! $this->userService->canManage($actor, $record)) {
+            throw new DomainException(__('Only a Super Admin can delete a Super Admin.'));
+        }
+
+        $this->userService->delete($record, $actor);
+
+        return true;
     }
 
     public function info(int $user): JsonResponse

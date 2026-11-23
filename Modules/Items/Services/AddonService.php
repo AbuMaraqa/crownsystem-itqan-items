@@ -64,16 +64,6 @@ class AddonService
     }
 
     /**
-     * @param  list<int>  $ids
-     */
-    public function deleteMany(array $ids): bool
-    {
-        return SafeDelete::attempt(fn () => DB::transaction(fn () => $this->addons->query()->whereKey($ids)->get()->each(
-            fn (Addon $addon) => $this->addons->delete($addon)
-        )));
-    }
-
-    /**
      * @param  array<int, array<string, mixed>>  $rows
      */
     private function syncOptions(Addon $addon, array $rows, string $locale): void

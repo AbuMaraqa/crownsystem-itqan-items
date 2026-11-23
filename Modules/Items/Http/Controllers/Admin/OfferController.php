@@ -4,12 +4,14 @@ namespace Modules\Items\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 use Modules\Branch\Entities\Branch;
+use Modules\Core\Http\Controllers\Concerns\DeletesManyRecords;
 use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
@@ -26,6 +28,7 @@ use Spatie\QueryBuilder\AllowedSort;
 
 class OfferController extends Controller
 {
+    use DeletesManyRecords;
     use ReordersRecords;
 
     public function __construct(
@@ -148,15 +151,17 @@ class OfferController extends Controller
         return back()->with('success', __('Offer deleted successfully'));
     }
 
-    public function destroyMany(Request $request): RedirectResponse
+    protected function bulkDeleteQuery(): Builder
     {
-        $ids = $request->validate(['ids' => ['required', 'array'], 'ids.*' => ['integer']])['ids'];
+        return $this->offers->tableQuery();
+    }
 
-        if (! $this->offerService->deleteMany($ids)) {
-            return back()->with('error', SafeDelete::message());
-        }
-
-        return back()->with('success', __('Offers deleted successfully'));
+    /**
+     * @param  Offer  $record
+     */
+    protected function deleteRecord(Model $record): bool
+    {
+        return $this->offerService->delete($record);
     }
 
     protected function sortableModel(): string

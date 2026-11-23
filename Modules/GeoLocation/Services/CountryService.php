@@ -46,18 +46,6 @@ class CountryService
     }
 
     /**
-     * Deletes all of them or, when one is in use, none.
-     *
-     * @param  list<int>  $ids
-     */
-    public function deleteMany(array $ids): void
-    {
-        DB::transaction(fn () => $this->countries->query()->whereKey($ids)->get()->each(
-            fn (Country $country) => $this->remove($country)
-        ));
-    }
-
-    /**
      * @param  array<string, mixed>  $data
      */
     private function save(Country $country, array $data, string $locale): Country

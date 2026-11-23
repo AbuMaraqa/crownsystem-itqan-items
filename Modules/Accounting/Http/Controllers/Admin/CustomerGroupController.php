@@ -3,6 +3,8 @@
 namespace Modules\Accounting\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,6 +16,7 @@ use Modules\Accounting\Repositories\Contracts\CustomerGroupRepositoryInterface;
 use Modules\Accounting\Services\CustomerGroupService;
 use Modules\Accounting\Support\SelectOptions;
 use Modules\Core\Entities\User;
+use Modules\Core\Http\Controllers\Concerns\DeletesManyRecords;
 use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
@@ -26,6 +29,7 @@ use Modules\Items\Entities\PriceList;
  */
 class CustomerGroupController extends Controller
 {
+    use DeletesManyRecords;
     use ReordersRecords;
 
     public function __construct(
@@ -106,6 +110,21 @@ class CustomerGroupController extends Controller
         }
 
         return back()->with('success', __('Customer group deleted successfully'));
+    }
+
+    protected function bulkDeleteQuery(): Builder
+    {
+        return $this->groups->tableQuery();
+    }
+
+    /**
+     * Same rules as destroy(): false (linked records) keeps the row.
+     *
+     * @param  CustomerGroup  $record
+     */
+    protected function deleteRecord(Model $record): bool
+    {
+        return $this->groupService->delete($record);
     }
 
     /**

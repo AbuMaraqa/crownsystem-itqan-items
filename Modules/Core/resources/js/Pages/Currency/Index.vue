@@ -45,7 +45,7 @@ const filters = computed<TableFilter[]>(() => [
     { type: 'date-range', key: 'created_at', label: t('Created at') },
 ]);
 
-const { remove, removeMany } = useRecordDelete('currencies');
+const { remove } = useRecordDelete('currencies');
 </script>
 
 <template>
@@ -55,7 +55,7 @@ const { remove, removeMany } = useRecordDelete('currencies');
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :selectable="can('Currency Delete')" :reorder-url="can('Currency Update') ? route('currencies.reorder') : undefined" :empty-title="t('No currencies found')" :empty-text="t('Add the currencies the system works with.')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :bulk-delete-url="can('Currency Delete') ? route('currencies.destroy-many') : undefined" :reorder-url="can('Currency Update') ? route('currencies.reorder') : undefined" :empty-title="t('No currencies found')" :empty-text="t('Add the currencies the system works with.')">
         <template #cell-name="{ row }">
             <Link v-if="can('Currency Update')" :href="route('currencies.edit', row.id)" class="font-medium text-brand-600 dark:text-brand-400 hover:underline">{{ row.name }}</Link>
             <template v-else>{{ row.name }}</template>
@@ -82,9 +82,6 @@ const { remove, removeMany } = useRecordDelete('currencies');
                 :edit-href="route('currencies.edit', row.id)"
                 @delete="remove(row.id, row.name)"
             />
-        </template>
-        <template #bulk="{ selected }">
-            <Button variant="danger" size="sm" @click="removeMany(selected)">{{ t('Delete') }}</Button>
         </template>
     </DataTable>
 </template>

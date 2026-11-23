@@ -110,7 +110,7 @@ async function remove(row: OrderRow): Promise<void> {
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :empty-title="t('No purchase orders found')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :bulk-delete-url="can('Purchase Order Delete') ? route('accounting.purchase-orders.destroy-many') : undefined" :empty-title="t('No purchase orders found')">
         <!-- Every order opens from its number: an invoiced one read only. -->
         <template #cell-reference_no="{ row }">
             <Link v-if="!row.deleted" :href="route('accounting.purchase-orders.edit', row.id)" class="font-medium text-brand-600 hover:underline dark:text-brand-400" dir="ltr">{{ row.reference_no }}</Link>

@@ -4,13 +4,15 @@ namespace Modules\GeoLocation\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Support\Locales;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 use Modules\Core\Entities\Currency;
 use Modules\Core\Repositories\Contracts\CurrencyRepositoryInterface;
+use Modules\Core\Http\Controllers\Concerns\DeletesManyRecords;
 use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
@@ -23,6 +25,7 @@ use Modules\GeoLocation\Support\GeoFilters;
 
 class CountryController extends Controller
 {
+    use DeletesManyRecords;
     use ReordersRecords;
 
     public function __construct(
@@ -113,13 +116,19 @@ class CountryController extends Controller
         return back()->with('success', __('Country deleted successfully'));
     }
 
-    public function destroyMany(Request $request): RedirectResponse
+    protected function bulkDeleteQuery(): Builder
     {
-        $ids = $request->validate(['ids' => ['required', 'array'], 'ids.*' => ['integer']])['ids'];
+        return $this->countries->tableQuery();
+    }
 
-        $this->countryService->deleteMany($ids);
+    /**
+     * @param  Country  $record
+     */
+    protected function deleteRecord(Model $record): bool
+    {
+        $this->countryService->delete($record);
 
-        return back()->with('success', __('Countries deleted successfully'));
+        return true;
     }
 
     public function info(int $country): JsonResponse

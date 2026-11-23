@@ -252,7 +252,8 @@ class PartiesAndVouchersPagesTest extends TestCase
         $third = Warehouse::create(['code' => 'A3', 'is_active' => true]);
 
         $this->delete(route('accounting.warehouses.destroy', $first->id))->assertSessionHas('success');
-        $this->delete(route('accounting.warehouses.destroy-many'), ['ids' => [$second->id, $third->id]])->assertSessionHas('success');
+        $this->delete(route('accounting.warehouses.destroy-many'), ['ids' => [$second->id, $third->id]])
+            ->assertSessionHas('success', __('The selected rows were deleted (:count).', ['count' => 2]));
 
         $this->assertSame(0, Warehouse::query()->whereIn('id', [$first->id, $second->id, $third->id])->count());
     }

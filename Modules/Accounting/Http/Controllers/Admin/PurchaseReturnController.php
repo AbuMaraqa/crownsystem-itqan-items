@@ -4,6 +4,8 @@ namespace Modules\Accounting\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use DomainException;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -11,6 +13,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Modules\Accounting\Entities\PurchaseReturn;
 use Modules\Accounting\Enums\PurchaseReturnStatus;
+use Modules\Accounting\Http\Controllers\Admin\Concerns\DeletesManyDocuments;
 use Modules\Accounting\Http\Controllers\Admin\Concerns\PurchaseDocumentPage;
 use Modules\Accounting\Http\Requests\Admin\PurchaseReturnRequest;
 use Modules\Accounting\Repositories\Contracts\PurchaseReturnRepositoryInterface;
@@ -35,6 +38,7 @@ use Spatie\QueryBuilder\AllowedFilter;
  */
 class PurchaseReturnController extends Controller
 {
+    use DeletesManyDocuments;
     use PurchaseDocumentPage;
 
     public function __construct(
@@ -227,6 +231,22 @@ class PurchaseReturnController extends Controller
         }
 
         return to_route('accounting.purchase-returns.index')->with('success', __('Purchase return deleted successfully'));
+    }
+
+    /**
+     * The list's rows, deleted ones included (its «deleted» filter shows them; they are refused).
+     */
+    protected function bulkDeleteQuery(): Builder
+    {
+        return $this->returns->tableQuery()->withTrashed();
+    }
+
+    /**
+     * @param  PurchaseReturn  $document
+     */
+    protected function deleteDocument(Model $document): void
+    {
+        $this->service->delete($document);
     }
 
     public function info(int $purchaseReturn): JsonResponse

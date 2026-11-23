@@ -145,10 +145,14 @@ class CurrencyPagesTest extends TestCase
         $this->delete(route('currencies.destroy', $linked->id))->assertSessionHas('error', SafeDelete::message());
         $this->assertNotNull($linked->fresh());
 
-        // كلها او لا شيء.
+        // الحذف الجماعي يحذف غير المرتبطة ويُبقي المرتبطة مع ذكر السبب.
         $free = $this->currency('EGP');
-        $this->delete(route('currencies.destroy-many'), ['ids' => [$free->id, $linked->id]])->assertSessionHas('error');
-        $this->assertNotNull($free->fresh());
+        $this->delete(route('currencies.destroy-many'), ['ids' => [$free->id, $linked->id]])->assertSessionHas('warning');
+        $this->assertNull($free->fresh());
+        $this->assertNotNull($linked->fresh());
+
+        $this->delete(route('currencies.destroy-many'), ['ids' => [$linked->id]])->assertSessionHas('error');
+        $this->assertNotNull($linked->fresh());
     }
 
     public function test_an_unlinked_currency_is_deleted(): void

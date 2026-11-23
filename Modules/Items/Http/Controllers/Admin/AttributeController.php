@@ -4,11 +4,13 @@ namespace Modules\Items\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use DomainException;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\Core\Http\Controllers\Concerns\DeletesManyRecords;
 use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
@@ -25,6 +27,7 @@ use Spatie\QueryBuilder\AllowedSort;
 
 class AttributeController extends Controller
 {
+    use DeletesManyRecords;
     use ReordersRecords;
 
     public function __construct(
@@ -129,19 +132,17 @@ class AttributeController extends Controller
         return back()->with('success', __('Attribute deleted successfully'));
     }
 
-    public function destroyMany(Request $request): RedirectResponse
+    protected function bulkDeleteQuery(): Builder
     {
-        $ids = $request->validate(['ids' => ['required', 'array'], 'ids.*' => ['integer']])['ids'];
+        return $this->attributes->tableQuery();
+    }
 
-        try {
-            if (! $this->attributeService->deleteMany($ids)) {
-                return back()->with('error', SafeDelete::message());
-            }
-        } catch (DomainException $exception) {
-            return back()->with('error', $exception->getMessage());
-        }
-
-        return back()->with('success', __('Attributes deleted successfully'));
+    /**
+     * @param  Attribute  $record
+     */
+    protected function deleteRecord(Model $record): bool
+    {
+        return $this->attributeService->delete($record);
     }
 
     protected function sortableModel(): string

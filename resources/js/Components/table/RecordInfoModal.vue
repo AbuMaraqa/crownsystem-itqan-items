@@ -100,7 +100,7 @@ const count = computed(() => info.value?.activities.length ?? 0);
 </script>
 
 <template>
-    <Modal v-model:open="open" :title="`${t('Information')} - ${title}`" width="max-w-3xl">
+    <Modal v-model:open="open" :title="`${t('Activity Log')} - ${title}`" width="max-w-3xl">
         <p v-if="failed" class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-400" role="alert">{{ t('Could not load this information.') }}</p>
 
         <div v-else-if="!info" class="space-y-3" aria-busy="true">

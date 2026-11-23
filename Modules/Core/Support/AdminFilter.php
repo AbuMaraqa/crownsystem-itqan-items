@@ -12,9 +12,41 @@ use Spatie\QueryBuilder\AllowedFilter;
  */
 final class AdminFilter
 {
+    /** What a filter's value must look like (`TableInput` checks it before the query runs). */
+    public const VALUE = 'value';
+
+    public const TEXT = 'text';
+
+    public const BOOLEAN = 'boolean';
+
+    public const ID = 'id';
+
+    public const DATE = 'date';
+
+    public const NUMBER = 'number';
+
+    /** @var \WeakMap<AllowedFilter, string>|null */
+    private static ?\WeakMap $types = null;
+
+    /**
+     * The kind of value a filter takes. A filter made outside this class is a plain value.
+     */
+    public static function typeOf(AllowedFilter $filter): string
+    {
+        return isset(self::$types[$filter]) ? self::$types[$filter] : self::VALUE;
+    }
+
+    public static function typed(AllowedFilter $filter, string $type): AllowedFilter
+    {
+        self::$types ??= new \WeakMap;
+        self::$types[$filter] = $type;
+
+        return $filter;
+    }
+
     public static function exact(string $name, ?string $column = null): AllowedFilter
     {
-        return AllowedFilter::exact($name, $column ?? $name);
+        return self::typed(AllowedFilter::exact($name, $column ?? $name), self::VALUE);
     }
 
     /**
@@ -22,9 +54,9 @@ final class AdminFilter
      */
     public static function boolean(string $name, ?string $column = null): AllowedFilter
     {
-        return AllowedFilter::callback($name, function (Builder $query, mixed $value) use ($name, $column): void {
+        return self::typed(AllowedFilter::callback($name, function (Builder $query, mixed $value) use ($name, $column): void {
             $query->where($column ?? $name, filter_var($value, FILTER_VALIDATE_BOOLEAN));
-        });
+        }), self::BOOLEAN);
     }
 
     /**
@@ -32,9 +64,9 @@ final class AdminFilter
      */
     public static function text(string $name, ?string $column = null): AllowedFilter
     {
-        return AllowedFilter::callback($name, function (Builder $query, mixed $value) use ($name, $column): void {
+        return self::typed(AllowedFilter::callback($name, function (Builder $query, mixed $value) use ($name, $column): void {
             $query->whereLike($column ?? $name, self::likeTerm($value));
-        });
+        }), self::TEXT);
     }
 
     /**
@@ -42,9 +74,9 @@ final class AdminFilter
      */
     public static function translated(string $name, ?string $column = null): AllowedFilter
     {
-        return AllowedFilter::callback($name, function (Builder $query, mixed $value) use ($name, $column): void {
+        return self::typed(AllowedFilter::callback($name, function (Builder $query, mixed $value) use ($name, $column): void {
             $query->whereHas('translations', fn (Builder $query) => $query->whereLike($column ?? $name, self::likeTerm($value)));
-        });
+        }), self::TEXT);
     }
 
     /**
@@ -52,9 +84,9 @@ final class AdminFilter
      */
     public static function relation(string $name, string $relation, string $column = 'id'): AllowedFilter
     {
-        return AllowedFilter::callback($name, function (Builder $query, mixed $value) use ($relation, $column): void {
+        return self::typed(AllowedFilter::callback($name, function (Builder $query, mixed $value) use ($relation, $column): void {
             $query->whereHas($relation, fn (Builder $query) => $query->where($query->qualifyColumn($column), (int) $value));
-        });
+        }), self::ID);
     }
 
     /**
@@ -65,16 +97,16 @@ final class AdminFilter
         $column ??= $name;
 
         return [
-            AllowedFilter::callback("{$name}_from", function (Builder $query, mixed $value) use ($column): void {
+            self::typed(AllowedFilter::callback("{$name}_from", function (Builder $query, mixed $value) use ($column): void {
                 if (($date = self::date($value)) !== null) {
                     $query->whereDate($column, '>=', $date);
                 }
-            }),
-            AllowedFilter::callback("{$name}_to", function (Builder $query, mixed $value) use ($column): void {
+            }), self::DATE),
+            self::typed(AllowedFilter::callback("{$name}_to", function (Builder $query, mixed $value) use ($column): void {
                 if (($date = self::date($value)) !== null) {
                     $query->whereDate($column, '<=', $date);
                 }
-            }),
+            }), self::DATE),
         ];
     }
 
@@ -86,23 +118,23 @@ final class AdminFilter
         $column ??= $name;
 
         return [
-            AllowedFilter::callback("{$name}_from", function (Builder $query, mixed $value) use ($column): void {
+            self::typed(AllowedFilter::callback("{$name}_from", function (Builder $query, mixed $value) use ($column): void {
                 if (is_numeric($value)) {
                     $query->where($column, '>=', $value);
                 }
-            }),
-            AllowedFilter::callback("{$name}_to", function (Builder $query, mixed $value) use ($column): void {
+            }), self::NUMBER),
+            self::typed(AllowedFilter::callback("{$name}_to", function (Builder $query, mixed $value) use ($column): void {
                 if (is_numeric($value)) {
                     $query->where($column, '<=', $value);
                 }
-            }),
+            }), self::NUMBER),
         ];
     }
 
     /**
      * A typed date, or null. PostgreSQL rejects a malformed date with an error, not an empty result.
      */
-    private static function date(mixed $value): ?string
+    public static function date(mixed $value): ?string
     {
         $date = \DateTimeImmutable::createFromFormat('!Y-m-d', (string) $value);
 

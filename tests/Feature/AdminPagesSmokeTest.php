@@ -77,6 +77,101 @@ class AdminPagesSmokeTest extends TestCase
     }
 
     /**
+     * إدخال خاطئ في رابط أي قائمة (فلتر غير موجود، تاريخ غير صالح، ترتيب أو حجم صفحة غير متاح، رقم صفحة
+     * عبثي، نص طويل جداً) لا يكسر الصفحة ولا يُرفض بخطأ 400: تُعرض القيم الافتراضية مع رسالة لكل مدخل.
+     */
+    public function test_every_admin_page_survives_wrong_link_input(): void
+    {
+        $this->withoutMiddleware([LocaleSessionRedirect::class, LaravelLocalizationRedirectFilter::class]);
+        app()->setLocale('ar');
+
+        $routes = $this->adminPageRoutes();
+        $this->signInWithAllPermissions($routes);
+
+        $junk = http_build_query([
+            'sort' => '-no_such_column',
+            'perPage' => '7',
+            'page' => 'abc',
+            'filter' => [
+                'no_such_filter' => '1',
+                'created_at_from' => 'not-a-date',
+                'search' => str_repeat('x', 300),
+            ],
+        ]);
+
+        $failures = [];
+        $tables = 0;
+        $redirector = app('redirect');
+
+        foreach ($routes as $route) {
+            $uri = '/'.ltrim($route->uri(), '/');
+            app()->instance('redirect', $redirector);
+
+            if (str_contains($uri, '{')) {
+                continue;
+            }
+
+            try {
+                $level = ob_get_level();
+                ob_start();
+                $response = $this->get($uri.'?'.$junk);
+                ob_end_clean();
+            } catch (Throwable $e) {
+                while (ob_get_level() > $level) {
+                    ob_end_clean();
+                }
+                if (! $e instanceof \Symfony\Component\HttpKernel\Exception\HttpException || $e->getStatusCode() === 400 || $e->getStatusCode() >= 500) {
+                    $failures[] = "{$uri} → ".$this->describe($e);
+                }
+
+                continue;
+            }
+
+            // 400 = the input was rejected; 5xx = it broke the page. (A page that needs a record answers
+            // 403/404 with or without this input, so that is not about the link.)
+            if ($response->getStatusCode() === 400 || $response->getStatusCode() >= 500) {
+                $error = $response->exception ? $this->describe($response->exception) : 'HTTP '.$response->getStatusCode();
+                $failures[] = "{$uri} → {$error}";
+
+                continue;
+            }
+
+            $table = $this->inertiaProps($response)['table'] ?? null;
+
+            if (! is_array($table) || ! array_key_exists('warnings', $table)) {
+                continue;
+            }
+
+            $tables++;
+
+            foreach (['sort', 'perPage', 'page', 'filter.no_such_filter'] as $key) {
+                if (! isset($table['warnings'][$key])) {
+                    $failures[] = "{$uri} → no warning for {$key}";
+                }
+            }
+
+            if (isset($table['query']['filter']['no_such_filter'])) {
+                $failures[] = "{$uri} → the unknown filter was kept";
+            }
+        }
+
+        $this->assertGreaterThan(20, $tables, 'Too few tables were checked.');
+        $this->assertSame([], $failures, implode("\n", $failures));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function inertiaProps(\Illuminate\Testing\TestResponse $response): array
+    {
+        $view = $response->baseResponse->getOriginalContent();
+        $page = $view instanceof \Illuminate\View\View ? ($view->getData()['page'] ?? null) : null;
+
+        // Props hold objects (an empty filter is `{}`): read them the way the browser does.
+        return is_array($page) ? json_decode(json_encode($page['props'] ?? []), true) : [];
+    }
+
+    /**
      * @return array<int, Route>
      */
     private function adminPageRoutes(): array

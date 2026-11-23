@@ -4,11 +4,13 @@ namespace Modules\Items\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use DomainException;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\Core\Http\Controllers\Concerns\DeletesManyRecords;
 use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
@@ -23,6 +25,7 @@ use Spatie\QueryBuilder\AllowedSort;
 
 class UnitController extends Controller
 {
+    use DeletesManyRecords;
     use ReordersRecords;
 
     public function __construct(
@@ -87,15 +90,17 @@ class UnitController extends Controller
         return back()->with('success', __('Unit deleted successfully'));
     }
 
-    public function destroyMany(Request $request): RedirectResponse
+    protected function bulkDeleteQuery(): Builder
     {
-        $ids = $request->validate(['ids' => ['required', 'array'], 'ids.*' => ['integer']])['ids'];
+        return $this->units->tableQuery();
+    }
 
-        if ($this->unitService->deleteMany($ids) > 0) {
-            return back()->with('error', __('Units used by items were not deleted.'));
-        }
-
-        return back()->with('success', __('Units deleted successfully'));
+    /**
+     * @param  Unit  $record
+     */
+    protected function deleteRecord(Model $record): bool
+    {
+        return $this->unitService->delete($record);
     }
 
     protected function sortableModel(): string

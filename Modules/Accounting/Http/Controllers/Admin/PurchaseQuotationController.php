@@ -4,6 +4,8 @@ namespace Modules\Accounting\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use DomainException;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -12,6 +14,7 @@ use Inertia\Response;
 use Modules\Accounting\Entities\PurchaseOrder;
 use Modules\Accounting\Entities\PurchaseQuotation;
 use Modules\Accounting\Enums\PurchaseQuotationStatus;
+use Modules\Accounting\Http\Controllers\Admin\Concerns\DeletesManyDocuments;
 use Modules\Accounting\Http\Controllers\Admin\Concerns\PurchaseDocumentPage;
 use Modules\Accounting\Http\Requests\Admin\PurchaseQuotationRequest;
 use Modules\Accounting\Repositories\Contracts\PurchaseQuotationRepositoryInterface;
@@ -36,6 +39,7 @@ use Spatie\QueryBuilder\AllowedFilter;
  */
 class PurchaseQuotationController extends Controller
 {
+    use DeletesManyDocuments;
     use PurchaseDocumentPage;
 
     public function __construct(
@@ -231,6 +235,22 @@ class PurchaseQuotationController extends Controller
         }
 
         return to_route('accounting.purchase-quotations.index')->with('success', __('Deleted successfully'));
+    }
+
+    /**
+     * The list's rows, deleted ones included (its «deleted» filter shows them; they are refused).
+     */
+    protected function bulkDeleteQuery(): Builder
+    {
+        return $this->quotations->tableQuery()->withTrashed();
+    }
+
+    /**
+     * @param  PurchaseQuotation  $document
+     */
+    protected function deleteDocument(Model $document): void
+    {
+        $this->service->delete($document);
     }
 
     public function info(int $purchaseQuotation): JsonResponse

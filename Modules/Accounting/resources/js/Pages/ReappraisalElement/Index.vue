@@ -59,7 +59,7 @@ function editRow(row: Row): void {
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :reorder-url="can('Reappraisal Element Update') ? route('accounting.reappraisal-elements.reorder') : undefined" :empty-title="t('No data available')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :bulk-delete-url="can('Reappraisal Element Delete') ? route('accounting.reappraisal-elements.destroy-many') : undefined" :reorder-url="can('Reappraisal Element Update') ? route('accounting.reappraisal-elements.reorder') : undefined" :empty-title="t('No data available')">
         <template #cell-name="{ row }">
             <button v-if="can('Reappraisal Element Update')" type="button" class="font-medium text-brand-600 hover:underline dark:text-brand-400" @click="editRow(row)">{{ row.name }}</button>
             <span v-else class="font-medium">{{ row.name }}</span>

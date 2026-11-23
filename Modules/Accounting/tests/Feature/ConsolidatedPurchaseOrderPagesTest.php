@@ -212,6 +212,66 @@ class ConsolidatedPurchaseOrderPagesTest extends TestCase
         $this->assertSame(ConsolidatedPurchaseOrderStatus::CANCELLED, $order->refresh()->status);
     }
 
+    public function test_a_purchase_order_keeps_what_a_consolidated_order_took_from_it(): void
+    {
+        $this->signIn();
+        $header = ['client_id' => User::factory()->create()->id, 'order_date' => now()->toDateString()];
+        $service = app(PurchaseOrderService::class);
+        $refused = function (callable $change): void {
+            try {
+                $change();
+                $this->fail('The change should have been refused.');
+            } catch (\DomainException $exception) {
+                $this->assertSame(__('This line is in a consolidated purchase order; it cannot be removed or reduced below what was taken.'), $exception->getMessage());
+            }
+        };
+
+        // 4 من 10 ابواب في طلبية تجميعية.
+        [$po, $door] = $this->purchaseOrder();
+        $rows = $this->postJson(route('accounting.consolidated-purchase-orders.picker.rows'), ['rows' => [], 'purchase_order_item_id' => $door->id, 'quantity' => 4])->json('rows');
+        $this->post(route('accounting.consolidated-purchase-orders.store'), ['order_date' => now()->toDateString(), 'items' => $rows])->assertSessionHas('success');
+        $doorLine = fn (float $quantity): array => ['id' => $door->id, 'product_id' => $door->product_id, 'description' => $door->description, 'quantity' => $quantity, 'unit_price' => 50];
+
+        $refused(fn () => $service->update($po, [...$header, 'items' => [$doorLine(3)]]));
+        $refused(fn () => $service->update($po, [...$header, 'items' => []]));
+        $refused(fn () => $service->delete($po));
+        $this->assertEquals(10, (float) $door->refresh()->quantity);
+
+        // ما فوق المسحوب يُعدّل.
+        $service->update($po, [...$header, 'items' => [$doorLine(4)]]);
+        $this->assertEquals(4, (float) $door->refresh()->quantity);
+
+        // سطر مجموعة: اللون المسحوب (W60) لا يُحذف ولا يتغير، وغيره يتغير.
+        ['white' => $white, 'whiteW45' => $w45, 'whiteW60' => $w60] = $this->alpineGroups();
+        $group = $service->create([...$header, 'items' => [$this->groupLine($white, [[$w45, 2], [$w60, 1]], 40, 5)]]);
+        $line = $group->items()->with('pieces')->sole();
+        $taken = $line->pieces->firstWhere('product_id', $w60->id);
+        $rows = $this->postJson(route('accounting.consolidated-purchase-orders.picker.rows'), ['rows' => [], 'keys' => ['piece-'.$taken->id]])->json('rows');
+        $this->post(route('accounting.consolidated-purchase-orders.store'), ['order_date' => now()->toDateString(), 'items' => $rows])->assertSessionHas('success');
+
+        $groupLine = function (array $pieces) use ($white, $line): array {
+            $payload = $this->groupLine($white, []);
+            $payload['id'] = $line->id;
+            $payload['pieces'] = array_map(fn (array $piece): array => ['id' => $piece[0]->id, 'product_id' => $piece[0]->product_id, 'piece_count' => $piece[1], 'piece_length' => 6.5, 'weight_per_meter' => (float) $piece[0]->weight_per_meter], $pieces);
+
+            return $payload;
+        };
+        $kept = $line->pieces->firstWhere('product_id', $w45->id);
+
+        $refused(fn () => $service->update($group, [...$header, 'items' => [$groupLine([[$kept, 2]])]]));
+        $refused(fn () => $service->update($group, [...$header, 'items' => [$groupLine([[$kept, 2], [$taken, 2]])]]));
+
+        $service->update($group, [...$header, 'items' => [$groupLine([[$kept, 3], [$taken, 1]])]]);
+        $this->assertEquals(3, (float) $kept->refresh()->piece_count);
+
+        // بعد الغاء الطلبية التجميعية يعود السطر حراً.
+        ConsolidatedPurchaseOrder::query()->get()->each(fn (ConsolidatedPurchaseOrder $order) => $this->post(route('accounting.consolidated-purchase-orders.status', $order->id), ['status' => ConsolidatedPurchaseOrderStatus::CANCELLED->value])->assertSessionHas('success'));
+        $service->update($po, [...$header, 'items' => [$doorLine(1)]]);
+        $this->assertEquals(1, (float) $door->refresh()->quantity);
+        $service->delete($po);
+        $this->assertNull(PurchaseOrder::query()->find($po->id));
+    }
+
     public function test_index_lists_changes_status_and_deletes(): void
     {
         $this->signIn();

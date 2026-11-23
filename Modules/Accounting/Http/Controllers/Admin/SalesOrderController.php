@@ -5,6 +5,7 @@ namespace Modules\Accounting\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use DomainException;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,6 +16,7 @@ use Modules\Accounting\Entities\SalesOrder;
 use Modules\Accounting\Entities\SalesQuotation;
 use Modules\Accounting\Enums\SalesOrderFulfillmentType;
 use Modules\Accounting\Enums\SalesOrderStatus;
+use Modules\Accounting\Http\Controllers\Admin\Concerns\DeletesManyDocuments;
 use Modules\Accounting\Http\Controllers\Admin\Concerns\SalesDocumentPage;
 use Modules\Accounting\Http\Requests\Admin\SalesOrderRequest;
 use Modules\Accounting\Repositories\Contracts\SalesOrderRepositoryInterface;
@@ -43,6 +45,7 @@ use Spatie\QueryBuilder\AllowedFilter;
  */
 class SalesOrderController extends Controller
 {
+    use DeletesManyDocuments;
     use SalesDocumentPage;
 
     public function __construct(
@@ -326,6 +329,22 @@ class SalesOrderController extends Controller
         }
 
         return to_route('accounting.sales-orders.index')->with('success', __('Sales order deleted successfully'));
+    }
+
+    /**
+     * The list's rows, deleted ones included (its «deleted» filter shows them; they are refused).
+     */
+    protected function bulkDeleteQuery(): Builder
+    {
+        return $this->orders->tableQuery()->withTrashed();
+    }
+
+    /**
+     * @param  SalesOrder  $document
+     */
+    protected function deleteDocument(Model $document): void
+    {
+        $this->service->delete($document);
     }
 
     public function info(int $salesOrder): JsonResponse

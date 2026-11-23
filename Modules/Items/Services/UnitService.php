@@ -61,24 +61,4 @@ class UnitService
 
         return SafeDelete::attempt(fn () => $this->units->delete($unit));
     }
-
-    /**
-     * يحذف غير المستخدم ويترك ما تستخدمه الاصناف.
-     *
-     * @param  list<int>  $ids
-     * @return int how many were kept because they are in use
-     */
-    public function deleteMany(array $ids): int
-    {
-        $kept = 0;
-
-        foreach ($this->units->query()->whereKey($ids)->get() as $unit) {
-            /** @var Unit $unit */
-            if ($unit->isUsed() || ! SafeDelete::attempt(fn () => $this->units->delete($unit))) {
-                $kept++;
-            }
-        }
-
-        return $kept;
-    }
 }

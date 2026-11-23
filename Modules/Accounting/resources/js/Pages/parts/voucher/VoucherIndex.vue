@@ -108,7 +108,7 @@ async function remove(row: VoucherRow): Promise<void> {
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :empty-title="t(kind.empty)">
+    <DataTable :table="table" :columns="columns" :filters="filters" :bulk-delete-url="can_('Delete') ? route(`${kind.routes}.destroy-many`) : undefined" :empty-title="t(kind.empty)">
         <template #cell-reference_no="{ row }">
             <Link v-if="canEdit(row)" :href="route(`${kind.routes}.edit`, row.id)" class="font-medium text-brand-600 hover:underline dark:text-brand-400" dir="ltr">{{ row.reference_no }}</Link>
             <span v-else dir="ltr" :class="{ 'text-muted line-through': row.deleted }">{{ row.reference_no }}</span>

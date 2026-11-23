@@ -41,16 +41,6 @@ class DistrictService
     }
 
     /**
-     * @param  list<int>  $ids
-     */
-    public function deleteMany(array $ids): void
-    {
-        DB::transaction(fn () => $this->districts->query()->whereKey($ids)->get()->each(
-            fn (District $district) => $this->remove($district)
-        ));
-    }
-
-    /**
      * @param  array<string, mixed>  $data
      */
     private function save(District $district, array $data, string $locale): District

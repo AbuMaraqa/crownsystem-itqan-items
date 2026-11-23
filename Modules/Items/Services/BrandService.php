@@ -73,24 +73,4 @@ class BrandService
 
         return SafeDelete::attempt(fn () => $this->brands->delete($brand));
     }
-
-    /**
-     * يحذف غير المستخدم ويترك ما تستخدمه الاصناف.
-     *
-     * @param  list<int>  $ids
-     * @return int how many were kept because they are in use
-     */
-    public function deleteMany(array $ids): int
-    {
-        $kept = 0;
-
-        foreach ($this->brands->query()->whereKey($ids)->get() as $brand) {
-            /** @var Brand $brand */
-            if ($this->brands->isUsed($brand) || ! SafeDelete::attempt(fn () => $this->brands->delete($brand))) {
-                $kept++;
-            }
-        }
-
-        return $kept;
-    }
 }

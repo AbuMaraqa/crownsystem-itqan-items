@@ -65,7 +65,7 @@ const filters = computed<TableFilter[]>(() => [
 
 const itemLines = (row: Row): string => row.items.map((item) => `${item.name ?? '-'} × ${item.quantity} = ${item.total_price}`).join('\n');
 
-const { remove, removeMany } = useRecordDelete('orders');
+const { remove } = useRecordDelete('orders');
 </script>
 
 <template>
@@ -80,8 +80,7 @@ const { remove, removeMany } = useRecordDelete('orders');
         :columns="columns"
         :filters="filters"
         :heading="t('Orders')"
-        :searchable="false"
-        :selectable="can('Order Delete')"
+        :bulk-delete-url="can('Order Delete') ? route('orders.destroy-many') : undefined"
         :empty-title="t('No orders found')"
         :empty-text="t('Create a new order by clicking the button below')"
     >
@@ -126,9 +125,6 @@ const { remove, removeMany } = useRecordDelete('orders');
                 ]"
                 @delete="remove(row.id, row.order_number)"
             />
-        </template>
-        <template #bulk="{ selected }">
-            <Button variant="danger" size="sm" @click="removeMany(selected)">{{ t('Delete') }}</Button>
         </template>
     </DataTable>
 </template>

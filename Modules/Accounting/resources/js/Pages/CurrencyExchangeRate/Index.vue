@@ -11,6 +11,7 @@ import Modal from '@/Components/ui/Modal.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { can, t } from '@/lib/i18n';
+import { route } from '@/lib/route';
 import { createdByColumn } from '@/lib/tableColumns';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
 import RecordActions from '@/Components/table/RecordActions.vue';
@@ -96,7 +97,7 @@ function viewFields(row: Row): { label: string; value: string | null }[] {
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :searchable="false" :empty-title="t('No data available')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :bulk-delete-url="can('Currency Exchange Rate Delete') ? route('accounting.currency-exchange-rates.destroy-many') : undefined" :searchable="false" :empty-title="t('No data available')">
         <template #cell-base_currency="{ row }">
             <bdi>{{ row.base_currency ?? '—' }}</bdi>
         </template>

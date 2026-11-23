@@ -144,7 +144,7 @@ async function remove(row: OrderRow): Promise<void> {
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :empty-title="t('No sales orders found')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :bulk-delete-url="can('Sales Order Delete') ? route('accounting.sales-orders.destroy-many') : undefined" :empty-title="t('No sales orders found')">
         <template #cell-reference_no="{ row }">
             <Link v-if="canOpen(row)" :href="route('accounting.sales-orders.edit', row.id)" class="font-medium text-brand-600 hover:underline dark:text-brand-400" dir="ltr">{{ row.reference_no }}</Link>
             <span v-else dir="ltr" :class="{ 'text-muted line-through': row.deleted }">{{ row.reference_no }}</span>

@@ -62,7 +62,7 @@ const { remove } = useRecordDelete('users');
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :empty-title="t('No users found')" :empty-text="t('Add the people who use the system.')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :bulk-delete-url="can('User Delete') ? route('users.destroy-many') : undefined" :empty-title="t('No users found')" :empty-text="t('Add the people who use the system.')">
         <template #cell-name="{ row }">
             <UserCell :name="row.name" :avatar="row.avatar" :href="can('User Update') && row.can_manage ? route('users.edit', row.id) : null" />
         </template>

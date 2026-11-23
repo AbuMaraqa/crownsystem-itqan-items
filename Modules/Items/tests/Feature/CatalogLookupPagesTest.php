@@ -255,13 +255,17 @@ class CatalogLookupPagesTest extends TestCase
         // الحذف الجماعي يحذف غير المستخدم ويبقي المستخدم.
         $freeBrand = $this->record(Brand::class, 'حرة');
         $this->delete(route('brands.destroy-many'), ['ids' => [$brand->id, $freeBrand->id]])
-            ->assertSessionHas('error', __('Brands used by items were not deleted.'));
+            ->assertSessionHas('warning', __(':deleted deleted, :skipped not deleted. :reason', [
+                'deleted' => 1, 'skipped' => 1, 'reason' => __('This brand is used by items and cannot be deleted.'),
+            ]));
         $this->assertNotNull($brand->fresh());
         $this->assertNull($freeBrand->fresh());
 
         $freeUnit = $this->record(Unit::class, 'لتر');
         $this->delete(route('units.destroy-many'), ['ids' => [$unit->id, $freeUnit->id]])
-            ->assertSessionHas('error', __('Units used by items were not deleted.'));
+            ->assertSessionHas('warning', __(':deleted deleted, :skipped not deleted. :reason', [
+                'deleted' => 1, 'skipped' => 1, 'reason' => __('This unit is used by items and cannot be deleted.'),
+            ]));
         $this->assertNotNull($unit->fresh());
         $this->assertNull($freeUnit->fresh());
     }

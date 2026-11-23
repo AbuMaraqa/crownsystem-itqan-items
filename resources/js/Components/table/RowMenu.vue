@@ -7,7 +7,7 @@ import { MoreVertical } from '@/lib/icons';
 </script>
 
 <template>
-    <DropdownMenu content-class="w-48">
+    <DropdownMenu content-class="w-56">
         <template #trigger="{ open }">
             <button
                 type="button"

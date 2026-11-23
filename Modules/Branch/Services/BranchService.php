@@ -42,16 +42,6 @@ class BranchService
     }
 
     /**
-     * @param  list<int>  $ids
-     */
-    public function deleteMany(array $ids): void
-    {
-        DB::transaction(fn () => $this->branches->query()->whereKey($ids)->get()->each(
-            fn (Branch $branch) => $this->branches->delete($branch)
-        ));
-    }
-
-    /**
      * @param  array<string, mixed>  $data
      */
     private function save(Branch $branch, array $data, string $locale): Branch

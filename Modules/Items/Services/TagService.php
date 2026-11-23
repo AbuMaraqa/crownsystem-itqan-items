@@ -57,16 +57,4 @@ class TagService
     {
         return SafeDelete::attempt(fn () => $this->tags->delete($tag));
     }
-
-    /**
-     * كلها او لا شيء.
-     *
-     * @param  list<int>  $ids
-     */
-    public function deleteMany(array $ids): bool
-    {
-        return SafeDelete::attempt(fn () => DB::transaction(fn () => $this->tags->query()->whereKey($ids)->get()->each(
-            fn (Tag $tag) => $this->tags->delete($tag)
-        )));
-    }
 }

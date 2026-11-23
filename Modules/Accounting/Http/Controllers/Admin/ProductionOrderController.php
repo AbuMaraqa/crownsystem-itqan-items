@@ -5,6 +5,7 @@ namespace Modules\Accounting\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use DomainException;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,6 +18,7 @@ use Modules\Accounting\Entities\ProductionOrderServiceLine;
 use Modules\Accounting\Entities\Warehouse;
 use Modules\Accounting\Enums\LaborRateBasis;
 use Modules\Accounting\Enums\ProductionOrderStatus;
+use Modules\Accounting\Http\Controllers\Admin\Concerns\DeletesManyDocuments;
 use Modules\Accounting\Http\Requests\Admin\ProductionOrderRequest;
 use Modules\Accounting\Repositories\Contracts\ProductionOrderRepositoryInterface;
 use Modules\Accounting\Services\CurrencyExchangeRateService;
@@ -43,6 +45,8 @@ use Spatie\QueryBuilder\AllowedFilter;
  */
 class ProductionOrderController extends Controller
 {
+    use DeletesManyDocuments;
+
     public function __construct(
         private readonly ProductionOrderRepositoryInterface $orders,
         private readonly ProductionOrderService $service,
@@ -211,6 +215,19 @@ class ProductionOrderController extends Controller
         }
 
         return to_route('accounting.production-orders.index')->with('success', __('Production order deleted successfully'));
+    }
+
+    protected function bulkDeleteQuery(): Builder
+    {
+        return $this->orders->tableQuery();
+    }
+
+    /**
+     * @param  ProductionOrder  $document
+     */
+    protected function deleteDocument(Model $document): void
+    {
+        $this->service->delete($document);
     }
 
     public function info(int $productionOrder): JsonResponse

@@ -83,7 +83,7 @@ function viewFields(row: Row): { label: string; value: string | null }[] {
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :reorder-url="can('Tax Update') ? route('accounting.taxes.reorder') : undefined" :empty-title="t('No data available')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :bulk-delete-url="can('Tax Delete') ? route('accounting.taxes.destroy-many') : undefined" :reorder-url="can('Tax Update') ? route('accounting.taxes.reorder') : undefined" :empty-title="t('No data available')">
         <template #cell-name="{ row }">
             <button v-if="can('Tax Update')" type="button" class="font-medium text-brand-600 hover:underline dark:text-brand-400" @click="editRow(row)">{{ row.name }}</button>
             <span v-else class="font-medium">{{ row.name }}</span>

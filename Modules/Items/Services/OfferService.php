@@ -89,16 +89,6 @@ class OfferService
     }
 
     /**
-     * @param  list<int>  $ids
-     */
-    public function deleteMany(array $ids): bool
-    {
-        return SafeDelete::attempt(fn () => DB::transaction(fn () => $this->offers->query()->whereKey($ids)->get()->each(
-            fn (Offer $offer) => $this->offers->delete($offer)
-        )));
-    }
-
-    /**
      * @param  array<string, mixed>  $data
      */
     private function fill(Offer $offer, array $data, string $locale): void

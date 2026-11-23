@@ -5,8 +5,8 @@ import { t } from '@/lib/i18n';
 import { route } from '@/lib/route';
 
 /**
- * Delete one row or the selected rows of a table, after a confirmation. `routes` is the route
- * names' prefix: `tags` in `tags.destroy`.
+ * Delete one row of a table, after a confirmation. `routes` is the route names' prefix: `tags` in
+ * `tags.destroy`. Selected rows are deleted by `DataTable :bulk-delete-url` itself.
  */
 export function useRecordDelete(routes: string) {
     async function remove(id: number, name: string): Promise<void> {
@@ -15,11 +15,5 @@ export function useRecordDelete(routes: string) {
         }
     }
 
-    async function removeMany(ids: (number | string)[]): Promise<void> {
-        if (await confirm({ title: t('Delete :count items?', { count: ids.length }), description: t('This cannot be undone.') })) {
-            router.delete(route(`${routes}.destroy-many`), { data: { ids }, preserveScroll: true });
-        }
-    }
-
-    return { remove, removeMany };
+    return { remove };
 }

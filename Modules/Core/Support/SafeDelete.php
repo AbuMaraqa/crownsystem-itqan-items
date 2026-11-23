@@ -25,13 +25,20 @@ class SafeDelete
 
             return true;
         } catch (QueryException $exception) {
-            // مخالفة قيد مرجعي: 23000 في MySQL/SQLite، و23503 في PostgreSQL.
-            if (! in_array((string) $exception->getCode(), ['23000', '23503'], true)) {
+            if (! self::isLinked($exception)) {
                 throw $exception;
             }
 
             return false;
         }
+    }
+
+    /**
+     * مخالفة قيد مرجعي: 23000 في MySQL/SQLite، و23503 في PostgreSQL.
+     */
+    public static function isLinked(QueryException $exception): bool
+    {
+        return in_array((string) $exception->getCode(), ['23000', '23503'], true);
     }
 
     public static function message(): string

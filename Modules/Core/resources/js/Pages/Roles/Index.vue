@@ -10,6 +10,7 @@ import PageHeader from '@/Components/ui/PageHeader.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { can, t } from '@/lib/i18n';
 import { ShieldCheck } from '@/lib/icons';
+import { route } from '@/lib/route';
 import { useRecordDelete } from '@/lib/useRecordDelete';
 import type { TableColumn, TableFilter, TablePayload } from '@/types/table';
 
@@ -59,7 +60,7 @@ const { remove } = useRecordDelete('roles');
         </template>
     </PageHeader>
 
-    <DataTable :table="table" :columns="columns" :filters="filters" :empty-title="t('No roles found')" :empty-text="t('Create a role, then give it to your staff.')">
+    <DataTable :table="table" :columns="columns" :filters="filters" :bulk-delete-url="can('Roles And Permissions Delete') ? route('roles.destroy-many') : undefined" :empty-title="t('No roles found')" :empty-text="t('Create a role, then give it to your staff.')">
         <template #cell-summary="{ row }">
             <RoleSummaryCell :summary="row.summary" />
         </template>
