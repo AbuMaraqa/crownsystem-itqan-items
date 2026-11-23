@@ -30,6 +30,7 @@ class SidebarServiceProvider extends ServiceProvider
                 ->add(new SidebarItem('Customer Groups', 'solar-users-group-two-rounded-bold-duotone', ['Customer Group View List'], 'accounting.customer-groups.index'))
                 ->add(new SidebarItem('Sales Quotations', 'solar-document-text-bold-duotone', ['Sales Quotation View List'], 'accounting.sales-quotations.index'))
                 ->add(new SidebarItem('Sales Orders', 'solar-cart-large-bold-duotone', ['Sales Order View List'], 'accounting.sales-orders.index'))
+                ->add(new SidebarItem('Sales Order Types', 'solar-clipboard-list-bold-duotone', ['Sales Order Type View List'], 'accounting.sales-order-types.index'))
                 ->add(new SidebarItem('Sales Invoices', 'solar-clipboard-list-bold-duotone', ['Sales Invoice View List'], 'accounting.sales-invoices.index'))
                 ->add(new SidebarItem('Sales Returns', 'solar-refresh-square-bold-duotone', ['Sales Return View List'], 'accounting.sales-returns.index'))
                 ->add(new SidebarItem('Receipt Vouchers', 'solar-inbox-in-bold-duotone', ['Receipt Voucher View List'], 'accounting.receipt-vouchers.index'))

@@ -11,6 +11,7 @@ export interface SalesOrderForm {
     warehouse_id: number | null;
     fulfillment_type: string;
     direct_supplier_id: number | string | null;
+    order_type_id: number | null;
     order_date: string;
     expected_delivery_date: string | null;
     currency_id: number | null;
@@ -28,7 +29,13 @@ export interface SalesOrderOptions {
     currencyOptions: Option[];
     taxOptions: TaxOption[];
     fulfillmentOptions: Option[];
+    orderTypeOptions: OrderTypeOption[];
     serviceOptions: ServiceOptions;
+}
+
+/** A sales order type with its maximum lead time, in days from the order's confirmation. */
+export interface OrderTypeOption extends Option {
+    lead_days: number;
 }
 
 interface Link {
@@ -44,6 +51,9 @@ export interface SalesOrderRecord {
     client: Option | null;
     direct_supplier: Option | null;
     margin_hint: string | null;
+    /** Ready to invoice by (d/m/Y): confirmation date + the type's lead time. */
+    ready_by: string | null;
+    late: boolean;
     editable: boolean;
     fulfillment_locked: boolean;
     can_confirm: boolean;

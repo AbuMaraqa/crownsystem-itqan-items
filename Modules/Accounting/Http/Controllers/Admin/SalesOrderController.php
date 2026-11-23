@@ -13,6 +13,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Modules\Accounting\Entities\DeliveryNote;
 use Modules\Accounting\Entities\SalesOrder;
+use Modules\Accounting\Entities\SalesOrderType;
 use Modules\Accounting\Entities\SalesQuotation;
 use Modules\Accounting\Enums\SalesOrderFulfillmentType;
 use Modules\Accounting\Enums\SalesOrderStatus;
@@ -67,6 +68,7 @@ class SalesOrderController extends Controller
                     AdminFilter::exact('warehouse', 'warehouse_id'),
                     AdminFilter::text('notes'),
                     AdminFilter::exact('status'),
+                    AdminFilter::exact('order_type', 'order_type_id'),
                     AdminFilter::exact('currency', 'currency_id'),
                     AdminFilter::exact('created_by'),
                     $this->itemsFilter('barcode'),
@@ -76,6 +78,13 @@ class SalesOrderController extends Controller
                         'due_today' => fn (Builder $query) => $query->whereDate('expected_delivery_date', $today),
                         'upcoming' => fn (Builder $query) => $query->whereDate('expected_delivery_date', '>', $today),
                         'no_date' => fn (Builder $query) => $query->whereNull('expected_delivery_date'),
+                    ]),
+                    // موعد الجاهزية للفوترة حسب نوع الطلبية: المتأخرة مفتوحة مضى موعدها.
+                    $this->stateFilter('readiness_state', [
+                        'late' => fn (Builder $query) => $query->whereIn('status', array_map(fn (SalesOrderStatus $status) => $status->value(), SalesOrder::OPEN_STATUSES))->whereDate('ready_by_date', '<', $today),
+                        'due_today' => fn (Builder $query) => $query->whereIn('status', array_map(fn (SalesOrderStatus $status) => $status->value(), SalesOrder::OPEN_STATUSES))->whereDate('ready_by_date', $today),
+                        'on_time' => fn (Builder $query) => $query->whereDate('ready_by_date', '>', $today),
+                        'no_date' => fn (Builder $query) => $query->whereNull('ready_by_date'),
                     ]),
                     $this->stateFilter('items_state', [
                         'with_items' => fn (Builder $query) => $query->whereHas('items'),
@@ -88,11 +97,12 @@ class SalesOrderController extends Controller
                     AllowedFilter::trashed(),
                     ...AdminFilter::dateRange('order_date'),
                     ...AdminFilter::dateRange('expected_delivery_date'),
+                    ...AdminFilter::dateRange('ready_by_date'),
                     ...AdminFilter::numberRange('sub_total'),
                     ...AdminFilter::numberRange('order_discount'),
                     ...AdminFilter::numberRange('total_amount'),
                 )
-                ->sorts('reference_no', 'order_date', 'expected_delivery_date', 'total_amount', 'status', 'id')
+                ->sorts('reference_no', 'order_date', 'expected_delivery_date', 'ready_by_date', 'total_amount', 'status', 'id')
                 ->defaultSort('-order_date')
                 ->withCreator()
                 ->rows(fn (SalesOrder $order) => [
@@ -100,6 +110,9 @@ class SalesOrderController extends Controller
                     'reference_no' => $order->reference_no,
                     'order_date' => $order->order_date?->format('d/m/Y'),
                     'expected_delivery_date' => $order->expected_delivery_date?->format('d/m/Y'),
+                    'order_type' => $order->orderType?->name,
+                    'ready_by' => $order->ready_by_date?->format('d/m/Y'),
+                    'late' => $order->isLate(),
                     'sales_quotation' => $order->salesQuotation?->reference_no,
                     'client' => UserCellData::of($order->client),
                     'warehouse' => $order->warehouse?->name,
@@ -113,6 +126,7 @@ class SalesOrderController extends Controller
                     'can_delete' => ! $order->trashed() && $order->canBeDeleted(),
                 ]),
             'statusOptions' => SelectOptions::from(SalesOrderStatus::options()),
+            'orderTypeOptions' => SalesOrderType::options(),
             'currencyOptions' => SelectOptions::currencies(),
             'warehouseOptions' => $this->documentOptions()['warehouseOptions'],
             'userOptions' => $this->userOptions(),
@@ -133,6 +147,7 @@ class SalesOrderController extends Controller
             'warehouse_id' => null,
             'fulfillment_type' => SalesOrderFulfillmentType::WAREHOUSE->value,
             'direct_supplier_id' => null,
+            'order_type_id' => null,
             'order_date' => $today,
             'expected_delivery_date' => null,
             'currency_id' => $currencyId,
@@ -223,6 +238,7 @@ class SalesOrderController extends Controller
                 'warehouse_id' => $order->warehouse_id,
                 'fulfillment_type' => $order->fulfillment_type?->value ?? SalesOrderFulfillmentType::WAREHOUSE->value,
                 'direct_supplier_id' => $order->direct_supplier_id,
+                'order_type_id' => $order->order_type_id,
                 'order_date' => $order->order_date?->toDateString(),
                 'expected_delivery_date' => $order->expected_delivery_date?->toDateString(),
                 'currency_id' => $order->currency_id,
@@ -245,6 +261,8 @@ class SalesOrderController extends Controller
                 'client' => $order->client ? ['value' => $order->client->id, 'label' => (string) $order->client->name] : null,
                 'direct_supplier' => $order->directSupplier ? ['value' => $order->directSupplier->id, 'label' => (string) $order->directSupplier->name] : null,
                 'margin_hint' => CustomerProfitMargin::hint($order->client_id),
+                'ready_by' => $order->ready_by_date?->format('d/m/Y'),
+                'late' => $order->isLate(),
                 'editable' => $order->canBeEdited(),
                 'fulfillment_locked' => $order->hasDirectPurchaseOrder(),
                 'can_confirm' => $order->status === SalesOrderStatus::DRAFT,
@@ -438,6 +456,7 @@ class SalesOrderController extends Controller
         return [
             ...$this->documentOptions(),
             'fulfillmentOptions' => SelectOptions::from(SalesOrderFulfillmentType::options()),
+            'orderTypeOptions' => SalesOrderType::options(),
             'serviceOptions' => SalesServiceLine::options(),
         ];
     }

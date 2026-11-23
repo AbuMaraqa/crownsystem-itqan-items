@@ -166,6 +166,8 @@ const linkClass = 'font-semibold underline underline-offset-2';
             :quotation="quotationOption"
             :direct-supplier="record.direct_supplier"
             :margin-hint="record.margin_hint"
+            :ready-by="record.ready_by"
+            :late="record.late"
             :readonly="!editable"
             :fulfillment-locked="record.fulfillment_locked"
         />

@@ -36,6 +36,9 @@ const props = defineProps<{
     quotation?: Option | null;
     directSupplier?: Option | null;
     marginHint?: string | null;
+    /** Ready to invoice by (d/m/Y), set when the order is confirmed. */
+    readyBy?: string | null;
+    late?: boolean;
     readonly?: boolean;
     /** The direct purchase order exists: the fulfillment source no longer changes. */
     fulfillmentLocked?: boolean;
@@ -54,6 +57,13 @@ const api = createGridApi(DOCUMENT, () => ({ partyId: props.form.client_id, exch
 const taxRate = computed(() => props.options.taxOptions.find((tax) => String(tax.value) === String(props.form.tax_id))?.rate ?? '0');
 const currency = computed(() => props.options.currencyOptions.find((option) => String(option.value) === String(props.form.currency_id))?.label ?? null);
 const isDirect = computed(() => props.form.fulfillment_type === DIRECT);
+const orderType = computed(() => props.options.orderTypeOptions.find((type) => String(type.value) === String(props.form.order_type_id)) ?? null);
+// The saved date while the type is unchanged; before confirmation (or after changing the type) the lead time.
+const typeHint = computed(() => {
+    if (props.readyBy) return props.late ? t('Late: it was due to be ready to invoice by :date', { date: props.readyBy }) : t('Ready to invoice by :date', { date: props.readyBy });
+
+    return orderType.value ? t('Ready to invoice within :count days of the customer\'s confirmation', { count: orderType.value.lead_days }) : undefined;
+});
 const fulfillmentReadonly = computed(() => props.readonly || props.fulfillmentLocked);
 
 const gridContext = computed(() => ({
@@ -210,6 +220,7 @@ function setMaterials(lines: CustomerMaterial[]): void {
                     :hint="isDirect ? t('Once confirmed, the order is sent to the purchasing department to create a purchase order shipped directly to the customer.') : undefined"
                     :error="form.errors.fulfillment_type"
                 />
+                <SelectInput v-model="form.order_type_id" :label="t('Order Type')" :options="options.orderTypeOptions" :placeholder="t('Select')" :disabled="readonly" :hint="typeHint" :error="form.errors.order_type_id" />
                 <template v-if="isDirect">
                     <TextInput v-if="fulfillmentReadonly" :model-value="directSupplier?.label ?? t('Purchasing will choose the supplier')" :label="t('Suggested Supplier')" disabled />
                     <RemoteSelect

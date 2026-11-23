@@ -17,7 +17,7 @@ class SalesOrderRepository extends BaseEloquentRepository implements SalesOrderR
     public function tableQuery(): Builder
     {
         return $this->query()
-            ->with(['salesQuotation:id,reference_no', 'client.media', 'warehouse.translations', 'currency', 'salesInvoices:id,sales_order_id']);
+            ->with(['salesQuotation:id,reference_no', 'orderType:id,name', 'client.media', 'warehouse.translations', 'currency', 'salesInvoices:id,sales_order_id']);
     }
 
     public function findForPage(int $id): SalesOrder

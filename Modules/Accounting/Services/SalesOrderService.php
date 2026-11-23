@@ -5,6 +5,7 @@ namespace Modules\Accounting\Services;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 use Modules\Accounting\Entities\SalesOrder;
+use Modules\Accounting\Entities\SalesOrderType;
 use Modules\Accounting\Entities\SalesOrderItem;
 use Modules\Accounting\Entities\SalesQuotation;
 use Modules\Accounting\Entities\Tax;
@@ -240,6 +241,7 @@ class SalesOrderService
             $data = array_merge($data, $this->calculateTotals($items, $data['order_discount'], $data['tax_rate']));
 
             $order->update($data);
+            $this->syncReadyBy($order);
             $this->syncItems($order, $items);
 
             if ($materials !== null) {
@@ -277,6 +279,7 @@ class SalesOrderService
     {
         return DB::transaction(function () use ($order) {
             $order = $this->transition($order, SalesOrderStatus::CONFIRMED, ['confirmed_at' => now()]);
+            $this->syncReadyBy($order);
             $this->notifyPurchasingWhenNeeded($order);
 
             return $order->refresh()->load(self::RELATIONS);
@@ -304,6 +307,20 @@ class SalesOrderService
         $order->update(['purchasing_notified_at' => now()]);
 
         DB::afterCommit(fn () => app(PurchasingNotifier::class)->directSupplyRequested($order));
+    }
+
+    /**
+     * موعد جاهزية الطلبية للفوترة = يوم تأكيدها + مهلة نوعها، يُحفظ على الطلبية فلا يتغير بتغيير
+     * المهلة لاحقاً، ويُعاد حسابه اذا تغيّر نوع طلبية مؤكدة. قبل التأكيد او بلا نوع: لا موعد.
+     */
+    private function syncReadyBy(SalesOrder $order): void
+    {
+        $type = $order->order_type_id ? SalesOrderType::withTrashed()->find($order->order_type_id) : null;
+        $readyBy = $type && $order->confirmed_at ? $type->readyBy($order->confirmed_at)->toDateString() : null;
+
+        if ($order->ready_by_date?->toDateString() !== $readyBy) {
+            $order->update(['ready_by_date' => $readyBy]);
+        }
     }
 
     public function sendToPreparation(SalesOrder $order): SalesOrder
@@ -367,6 +384,7 @@ class SalesOrderService
             'warehouse_id' => filled($data['warehouse_id'] ?? null) ? (int) $data['warehouse_id'] : $quotation?->warehouse_id,
             'fulfillment_type' => $isDirect ? SalesOrderFulfillmentType::DIRECT->value : SalesOrderFulfillmentType::WAREHOUSE->value,
             'direct_supplier_id' => $isDirect && filled($data['direct_supplier_id'] ?? null) ? (int) $data['direct_supplier_id'] : null,
+            'order_type_id' => filled($data['order_type_id'] ?? null) ? (int) $data['order_type_id'] : null,
             'order_date' => $orderDate,
             'expected_delivery_date' => $data['expected_delivery_date'] ?? null,
             'currency_id' => $currencyId,

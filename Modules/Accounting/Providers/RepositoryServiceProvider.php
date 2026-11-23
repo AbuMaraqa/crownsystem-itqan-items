@@ -13,6 +13,7 @@ class RepositoryServiceProvider extends ServiceProvider
         Contracts\AccountMappingRepositoryInterface::class => Repositories\AccountMappingRepository::class,
         Contracts\AccountRepositoryInterface::class => Repositories\AccountRepository::class,
         Contracts\AdditionalCostTypeRepositoryInterface::class => Repositories\AdditionalCostTypeRepository::class,
+        Contracts\SalesOrderTypeRepositoryInterface::class => Repositories\SalesOrderTypeRepository::class,
         Contracts\AttachmentCategoryRepositoryInterface::class => Repositories\AttachmentCategoryRepository::class,
         Contracts\ChequeRepositoryInterface::class => Repositories\ChequeRepository::class,
         Contracts\ClearanceAttachmentTypeRepositoryInterface::class => Repositories\ClearanceAttachmentTypeRepository::class,

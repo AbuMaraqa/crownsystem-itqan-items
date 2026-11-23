@@ -30,11 +30,13 @@ class SalesOrder extends Model
         'warehouse_id',
         'fulfillment_type',
         'direct_supplier_id',
+        'order_type_id',
         'purchasing_notified_at',
         'reference_no',
         'status',
         'order_date',
         'expected_delivery_date',
+        'ready_by_date',
         'currency_id',
         'tax_id',
         'exchange_rate',
@@ -54,6 +56,7 @@ class SalesOrder extends Model
     protected $casts = [
         'order_date' => 'date',
         'expected_delivery_date' => 'date',
+        'ready_by_date' => 'date',
         'status' => SalesOrderStatus::class,
         'fulfillment_type' => SalesOrderFulfillmentType::class,
         'purchasing_notified_at' => 'datetime',
@@ -167,6 +170,29 @@ class SalesOrder extends Model
     {
         return $this->hasMany(PurchaseOrder::class, 'direct_sales_order_id');
     }
+
+    /**
+     * نوع الطلبية (SalesOrderType) ومنه مهلة جاهزيتها. النوع المحذوف يبقى ظاهراً على طلبياته.
+     */
+    public function orderType(): BelongsTo
+    {
+        return $this->belongsTo(SalesOrderType::class, 'order_type_id')->withTrashed();
+    }
+
+    /**
+     * متأخرة: مضى موعد جاهزيتها ولم تُفوتر بعد (مؤكدة او قيد التجهيز).
+     */
+    public function isLate(): bool
+    {
+        return $this->ready_by_date !== null
+            && in_array($this->status, self::OPEN_STATUSES, true)
+            && $this->ready_by_date->lt(today());
+    }
+
+    /**
+     * الحالات التي ينتظر فيها موعد الجاهزية: بعد التأكيد وقبل الفوترة.
+     */
+    public const OPEN_STATUSES = [SalesOrderStatus::CONFIRMED, SalesOrderStatus::PREPARING];
 
     public function isDirectSupply(): bool
     {

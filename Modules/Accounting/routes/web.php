@@ -10,6 +10,7 @@ use Modules\Accounting\Http\Controllers\Admin\PurchaseReturnController;
 use Modules\Accounting\Http\Controllers\Admin\AccountController;
 use Modules\Accounting\Http\Controllers\Admin\AccountMappingController;
 use Modules\Accounting\Http\Controllers\Admin\AdditionalCostTypeController;
+use Modules\Accounting\Http\Controllers\Admin\SalesOrderTypeController;
 use Modules\Accounting\Http\Controllers\Admin\AttachmentCategoryController;
 use Modules\Accounting\Http\Controllers\Admin\ChequeController;
 use Modules\Accounting\Http\Controllers\Admin\ClearanceAttachmentTypeController;
@@ -220,6 +221,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::get('/{element}/info', 'info')->whereNumber('element')->name('info')->can('Delivery Cost Element View List');
                     Route::put('/{element}', 'update')->whereNumber('element')->name('update')->can('Delivery Cost Element Update');
                     Route::delete('/{element}', 'destroy')->whereNumber('element')->name('destroy')->can('Delivery Cost Element Delete');
+                });
+
+                Route::prefix('sales-order-types')->as('sales-order-types.')->controller(SalesOrderTypeController::class)->group(function () {
+                    Route::get('/', 'index')->name('index')->can('Sales Order Type View List');
+                    Route::post('/', 'store')->name('store')->can('Sales Order Type Create');
+                    Route::delete('/', 'destroyMany')->name('destroy-many')->can('Sales Order Type Delete');
+                    Route::post('/reorder', 'reorder')->name('reorder')->can('Sales Order Type Update');
+                    Route::get('/{type}/info', 'info')->whereNumber('type')->name('info')->can('Sales Order Type View List');
+                    Route::put('/{type}', 'update')->whereNumber('type')->name('update')->can('Sales Order Type Update');
+                    Route::put('/{type}/active', 'active')->whereNumber('type')->name('active')->can('Sales Order Type Update');
+                    Route::delete('/{type}', 'destroy')->whereNumber('type')->name('destroy')->can('Sales Order Type Delete');
                 });
 
                 Route::prefix('additional-cost-types')->as('additional-cost-types.')->controller(AdditionalCostTypeController::class)->group(function () {

@@ -28,6 +28,10 @@ interface OrderRow {
     reference_no: string;
     order_date: string | null;
     expected_delivery_date: string | null;
+    order_type: string | null;
+    /** Ready to invoice by (d/m/Y): confirmation date + the type's lead time. */
+    ready_by: string | null;
+    late: boolean;
     sales_quotation: string | null;
     client: UserCellData | null;
     warehouse: string | null;
@@ -44,6 +48,7 @@ interface OrderRow {
 const props = defineProps<{
     table: TablePayload<OrderRow>;
     statusOptions: Option[];
+    orderTypeOptions: Option[];
     currencyOptions: Option[];
     warehouseOptions: Option[];
     userOptions: Option[];
@@ -52,6 +57,8 @@ const props = defineProps<{
 const columns = computed<TableColumn[]>(() => [
     { key: 'reference_no', label: t('Reference No'), sort: 'reference_no' },
     { key: 'order_date', label: t('Order Date'), sort: 'order_date' },
+    { key: 'order_type', label: t('Order Type'), toggleable: true },
+    { key: 'ready_by', label: t('Ready By'), sort: 'ready_by_date' },
     { key: 'expected_delivery_date', label: t('Expected Delivery Date'), sort: 'expected_delivery_date', toggleable: true },
     { key: 'sales_quotation', label: t('Sales Quotation'), toggleable: true },
     { key: 'client', label: t('Client') },
@@ -69,10 +76,22 @@ const filters = computed<TableFilter[]>(() => [
     { key: 'warehouse', label: t('Warehouse'), options: props.warehouseOptions },
     { type: 'text', key: 'notes', label: t('Notes'), placeholder: t('Search by notes') },
     { key: 'status', label: t('Status'), options: props.statusOptions },
+    { key: 'order_type', label: t('Order Type'), options: props.orderTypeOptions },
+    {
+        key: 'readiness_state',
+        label: t('Readiness'),
+        options: [
+            { value: 'late', label: t('Late') },
+            { value: 'due_today', label: t('Due Today') },
+            { value: 'on_time', label: t('On time') },
+            { value: 'no_date', label: t('No Date') },
+        ],
+    },
     { key: 'currency', label: t('Currency'), options: props.currencyOptions },
     { type: 'text', key: 'item_description', label: t('Item'), placeholder: t('Search by item description') },
     { type: 'text', key: 'item_barcode', label: t('Barcode'), placeholder: t('Search by barcode') },
     { type: 'date-range', key: 'order_date', label: t('Order Date') },
+    { type: 'date-range', key: 'ready_by_date', label: t('Ready By') },
     { type: 'date-range', key: 'expected_delivery_date', label: t('Expected Delivery Date') },
     {
         key: 'delivery_state',
@@ -121,6 +140,8 @@ function viewFields(row: OrderRow): ViewField[] {
         { label: t('Reference No'), value: row.reference_no },
         { label: t('Sales Quotation'), value: row.sales_quotation ?? t('Manual') },
         { label: t('Order Date'), value: row.order_date },
+        { label: t('Order Type'), value: row.order_type },
+        { label: t('Ready By'), value: row.ready_by },
         { label: t('Status'), value: row.status?.label },
         { label: t('Client'), value: row.client?.name },
         { label: t('Warehouse'), value: row.warehouse },
@@ -150,6 +171,14 @@ async function remove(row: OrderRow): Promise<void> {
             <span v-else dir="ltr" :class="{ 'text-muted line-through': row.deleted }">{{ row.reference_no }}</span>
         </template>
         <template #cell-order_date="{ row }"><span dir="ltr">{{ row.order_date ?? '-' }}</span></template>
+        <template #cell-order_type="{ row }">{{ row.order_type ?? '-' }}</template>
+        <template #cell-ready_by="{ row }">
+            <span v-if="row.ready_by" class="inline-flex items-center gap-1.5">
+                <span dir="ltr" :class="{ 'font-medium text-danger': row.late }">{{ row.ready_by }}</span>
+                <Badge v-if="row.late" tone="danger">{{ t('Late') }}</Badge>
+            </span>
+            <span v-else class="text-muted">-</span>
+        </template>
         <template #cell-expected_delivery_date="{ row }"><span dir="ltr">{{ row.expected_delivery_date ?? '-' }}</span></template>
         <template #cell-sales_quotation="{ row }">
             <span v-if="row.sales_quotation" dir="ltr">{{ row.sales_quotation }}</span>

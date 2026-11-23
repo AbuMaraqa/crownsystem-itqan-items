@@ -6,6 +6,7 @@ use Illuminate\Database\Seeder;
 use Modules\Accounting\Support\InventoryPermissions;
 use Modules\Accounting\Support\LedgerPermissions;
 use Modules\Accounting\Support\PurchasingPermissions;
+use Modules\Accounting\Support\SalesPermissions;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
@@ -251,5 +252,6 @@ class PermissionSeeder extends Seeder
         InventoryPermissions::sync();
         LedgerPermissions::sync();
         PurchasingPermissions::sync();
+        SalesPermissions::sync();
     }
 }

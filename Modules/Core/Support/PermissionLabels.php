@@ -131,6 +131,7 @@ final class PermissionLabels
         'Sync System Data' => 'مزامنة بيانات النظام',
         'Tag' => 'الوسوم',
         'Tax' => 'الضرائب',
+        'Sales Order Type' => 'أنواع طلبيات البيع',
         'Unit' => 'وحدات القياس',
         'Finish' => 'الألوان',
         'User' => 'المستخدمون',
