@@ -5,18 +5,18 @@ namespace Modules\Accounting\tests\Feature;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Modules\Accounting\Entities\StockBalance;
+use Modules\Accounting\Entities\StockCostLayer;
 use Modules\Accounting\Entities\Warehouse;
 use Modules\Accounting\Enums\StockMovementType;
 use Modules\Accounting\Services\StockLedgerService;
 use Modules\Accounting\tests\Feature\Concerns\PriceGroupFixtures;
 use Modules\Core\Entities\User;
 use Modules\Items\Entities\Product;
-use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
 /**
- * بلا صنف رئيسي وهمي: لون المقطع صنف مخزون عادي يحمل عدده ووزنه وقيمته وطبقات تكلفته،
- * وتكلفة الكغم = متوسط القطعة ÷ وزن القطعة. صنف الوزن بلا قياس قطعة يُخزَّن بالكغم.
+ * حساب اتقان على (التصنيف × اللون) بلا صنف رئيسي: المجموعة تحمل الكغم وقيمته بطبقات FIFO بالكغم،
+ * ولون المقطع يتحرك بالعدد بلا قيمة، وتكلفة كغمه متوسط مجموعته. صنف الوزن بلا قياس قطعة يُخزَّن بالكغم.
  *
  * W45 أبيض: طول 6.5 × وزن متر 1.25 = 8.125 كغم للقطعة.
  */
@@ -40,54 +40,57 @@ class WeightVariationStockTest extends TestCase
         $this->ledger = app(StockLedgerService::class);
     }
 
-    private function receive(Product $product, float $quantity, float $weight, float $total): void
+    /**
+     * @param  array<string, int>  $key  ['product_id' => ..] او ['category_finish_id' => ..]
+     */
+    private function receive(array $key, float $quantity, float $weight, float $total): void
     {
-        $this->ledger->receive([
-            'product_id' => $product->id, 'warehouse_id' => $this->warehouse->id, 'quantity' => $quantity, 'weight' => $weight,
+        $this->ledger->receive($key + [
+            'warehouse_id' => $this->warehouse->id, 'quantity' => $quantity, 'weight' => $weight,
             'unit_cost' => $total / $quantity, 'total_cost' => $total, 'type' => StockMovementType::RECEIPT, 'date' => now()->toDateString(),
         ]);
     }
 
-    private function balance(Product $product): StockBalance
+    public function test_a_price_group_holds_the_kg_with_fifo_value_and_its_colours_only_the_count(): void
     {
-        return StockBalance::query()->where('product_id', $product->id)->where('warehouse_id', $this->warehouse->id)->sole();
-    }
+        ['white' => $white, 'whiteW45' => $w45] = $this->alpineGroups();
 
-    public function test_a_colour_variation_is_received_and_issued_with_its_own_value(): void
-    {
-        $w45 = $this->alpineGroups()['whiteW45'];
+        // 3 كغم بـ 10 ثم 5 كغم بـ 12 على المجموعة، وقطعة W45 بلا قيمة ولو أُعطيت كلفة.
+        $this->receive(['category_finish_id' => $white->id], 3, 3, 30);
+        $this->receive(['category_finish_id' => $white->id], 5, 5, 60);
+        $this->receive(['product_id' => $w45->id], 1, 8.125, 99);
 
-        // 10 قطع × 8.125 = 81.25 كغم بسعر 20 للكغم = 1625.
-        $this->receive($w45, 10, 81.25, 1625);
+        $group = StockBalance::query()->where('category_finish_id', $white->id)->sole();
+        $this->assertSame(8.0, (float) $group->weight);
+        $this->assertSame(11.25, $this->ledger->groupAverageCost($white->id));
+        $this->assertSame(0.0, $this->ledger->averageCost($w45->id));
+        $this->assertSame(0, StockCostLayer::query()->where('product_id', $w45->id)->count());
+        $this->assertSame(11.25, $this->ledger->costPerKg($w45));
 
-        $this->assertSame(10.0, (float) $this->balance($w45)->quantity);
-        $this->assertSame(81.25, (float) $this->balance($w45)->weight);
-        $this->assertSame(162.5, $this->ledger->averageCost($w45->id));
-        $this->assertSame(20.0, $this->ledger->costPerKg($w45));
-
-        $movement = $this->ledger->issue([
-            'product_id' => $w45->id, 'warehouse_id' => $this->warehouse->id, 'quantity' => 4,
-            'type' => StockMovementType::DELIVERY, 'date' => now()->toDateString(),
-        ])->sole();
-
-        $this->assertSame(-650.0, (float) $movement->total_cost);
-        $this->assertSame(-32.5, (float) $movement->weight);
-    }
-
-    public function test_a_variation_issued_below_zero_keeps_negative_weight_and_value(): void
-    {
-        Permission::firstOrCreate(['name' => StockLedgerService::NEGATIVE_STOCK_PERMISSION, 'guard_name' => 'web']);
-        auth()->user()->givePermissionTo(StockLedgerService::NEGATIVE_STOCK_PERMISSION);
-        $w45 = $this->alpineGroups()['whiteW45'];
-        $this->receive($w45, 2, 16.25, 325);
-
-        $this->ledger->issue([
-            'product_id' => $w45->id, 'warehouse_id' => $this->warehouse->id, 'quantity' => 3, 'weight' => 24.375,
+        // صرف 4 كغم: 3 × 10 + 1 × 12 = 42 (FIFO).
+        $issued = $this->ledger->issue([
+            'category_finish_id' => $white->id, 'warehouse_id' => $this->warehouse->id, 'quantity' => 4, 'weight' => 4,
             'type' => StockMovementType::DELIVERY, 'date' => now()->toDateString(),
         ]);
 
-        $this->assertSame(-1.0, (float) $this->balance($w45)->quantity);
-        $this->assertSame(-8.125, (float) $this->balance($w45)->weight);
+        $this->assertSame(-42.0, (float) $issued->sum('total_cost'));
+        $this->assertSame(4.0, $this->ledger->groupOnHand($white->id));
+    }
+
+    public function test_a_group_receipt_is_reversed_exactly(): void
+    {
+        $white = $this->alpineGroups()['white'];
+        $source = User::factory()->create();
+        $this->ledger->receive([
+            'category_finish_id' => $white->id, 'warehouse_id' => $this->warehouse->id, 'quantity' => 8, 'weight' => 8,
+            'unit_cost' => 11, 'type' => StockMovementType::RECEIPT, 'date' => now()->toDateString(), 'source' => $source,
+        ]);
+
+        $this->ledger->reverse($source, now()->toDateString());
+
+        $this->assertSame(0.0, $this->ledger->groupOnHand($white->id));
+        $this->assertSame(0.0, (float) \Modules\Accounting\Entities\ProductCost::query()->where('category_finish_id', $white->id)->value('value'));
+        $this->assertSame(0, StockCostLayer::query()->where('category_finish_id', $white->id)->count());
     }
 
     public function test_a_weight_item_without_a_piece_measure_is_stored_by_kg(): void
@@ -97,7 +100,7 @@ class WeightVariationStockTest extends TestCase
         $rubber->translateOrNew('ar')->name = 'مطاط';
         $rubber->save();
 
-        $this->receive($rubber, 50, 50, 200);
+        $this->receive(['product_id' => $rubber->id], 50, 50, 200);
 
         $this->assertTrue($this->ledger->storesByWeight($rubber));
         $this->assertFalse($this->ledger->storesByWeight($this->alpineGroups()['whiteW45']));

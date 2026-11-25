@@ -13,6 +13,7 @@ class StockBalance extends Model
 {
     protected $fillable = [
         'product_id',
+        'category_finish_id',
         'warehouse_id',
         'location_id',
         'quantity',

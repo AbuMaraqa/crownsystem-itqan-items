@@ -13,6 +13,7 @@ class ProductCost extends Model
 {
     protected $fillable = [
         'product_id',
+        'category_finish_id',
         'quantity',
         'value',
         'average_cost',

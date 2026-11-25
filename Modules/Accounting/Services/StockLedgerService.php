@@ -15,7 +15,9 @@ use Modules\Accounting\Entities\StockMovement;
 use Modules\Accounting\Entities\Warehouse;
 use Modules\Accounting\Entities\WarehouseLocation;
 use Modules\Accounting\Enums\StockMovementType;
+use Modules\Accounting\Support\StockKey;
 use Modules\Items\Entities\Product;
+use Modules\Items\Support\PriceGroupSearch;
 
 /**
  * المكان الوحيد الذي يغيّر ارصدة المخزون. كل تغيير = حركة في الدفتر + تحديث الرصيد
@@ -58,30 +60,34 @@ class StockLedgerService
         }
 
         return DB::transaction(function () use ($data, $quantity) {
-            $productId = (int) $data['product_id'];
+            $key = StockKey::from($data);
             $warehouseId = (int) $data['warehouse_id'];
-            $unitCost = max(round((float) $data['unit_cost'], 6), 0);
-            $carried = $this->carriedEntries($data['layers_from'] ?? null);
+            $isPiece = $this->isGroupPiece($key);
+            $unitCost = $isPiece ? 0.0 : max(round((float) $data['unit_cost'], 6), 0);
+            $carried = $isPiece ? collect() : $this->carriedEntries($data['layers_from'] ?? null);
             // total_cost الصريح يبقي قيمة السطر كما هي بلا تقريب كلفة الوحدة.
             $totalCost = match (true) {
+                $isPiece => 0.0,
                 $carried->isNotEmpty() => round((float) $carried->sum('value'), 4),
                 default => round((float) ($data['total_cost'] ?? $quantity * $unitCost), 4),
             };
             $weight = round((float) ($data['weight'] ?? 0), 4);
             $locationId = (int) ($data['location_id'] ?? 0);
 
-            $this->applyCost($this->lockedCost($productId), $quantity, $totalCost, $unitCost);
+            $this->applyCost($this->lockedCost($key), $quantity, $totalCost, $unitCost);
 
-            $balance = $this->lockedBalance($productId, $warehouseId, $locationId);
+            $balance = $this->lockedBalance($key, $warehouseId, $locationId);
             $balance->quantity = round((float) $balance->quantity + $quantity, 4);
             $balance->weight = round((float) $balance->weight + $weight, 4);
             $balance->save();
 
             $movement = $this->record($data, $locationId, $quantity, $weight, $unitCost, $totalCost);
 
-            $this->addLayers($movement, $quantity, $unitCost, $totalCost, $carried);
+            if (! $isPiece) {
+                $this->addLayers($movement, $quantity, $unitCost, $totalCost, $carried);
+            }
 
-            $this->syncProductStock($productId);
+            $this->syncProductStock($key);
 
             return $movement;
         });
@@ -100,12 +106,13 @@ class StockLedgerService
         }
 
         return DB::transaction(function () use ($data, $quantity) {
-            $productId = (int) $data['product_id'];
+            $key = StockKey::from($data);
             $warehouseId = (int) $data['warehouse_id'];
-            $cost = $this->lockedCost($productId);
+            $cost = $this->lockedCost($key);
+            $isPiece = $this->isGroupPiece($key);
             $explicitCost = array_key_exists('unit_cost', $data) && $data['unit_cost'] !== null ? round((float) $data['unit_cost'], 6) : null;
 
-            $allocations = $this->allocate($productId, $warehouseId, $data['location_id'] ?? null, $quantity);
+            $allocations = $this->allocate($key, $warehouseId, $data['location_id'] ?? null, $quantity);
             $requestedWeight = isset($data['weight']) && $data['weight'] !== null ? round((float) $data['weight'], 4) : null;
             $movements = collect();
             $remainingWeight = $requestedWeight;
@@ -114,13 +121,15 @@ class StockLedgerService
                 $isLast = $index === array_key_last($allocations);
                 $weight = $this->issuedWeight($balance, $take, $quantity, $requestedWeight, $remainingWeight, $isLast);
                 $remainingWeight = $remainingWeight !== null ? round($remainingWeight - $weight, 4) : null;
-                $consumed = $this->consumeLayers($productId, $warehouseId, $take);
+                $consumed = $isPiece ? [] : $this->consumeLayers($key, $warehouseId, $take);
                 $layersValue = round(array_sum(array_column($consumed, 'value')), 4);
                 $lineCost = match (true) {
+                    $isPiece => 0.0,
                     $explicitCost !== null => round($take * $explicitCost, 4),
                     default => $layersValue,
                 };
                 $unitCost = match (true) {
+                    $isPiece => 0.0,
                     $explicitCost !== null => $explicitCost,
                     default => round($layersValue / $take, 6),
                 };
@@ -146,7 +155,7 @@ class StockLedgerService
             $totalCost = round((float) $movements->sum(fn (StockMovement $movement) => -(float) $movement->total_cost), 4);
             $this->applyCost($cost, -$quantity, -$totalCost);
 
-            $this->syncProductStock($productId);
+            $this->syncProductStock($key);
 
             return $movements;
         });
@@ -171,7 +180,7 @@ class StockLedgerService
     public function revalue(array $data): float
     {
         return DB::transaction(function () use ($data) {
-            $cost = $this->lockedCost((int) $data['product_id']);
+            $cost = $this->lockedCost(StockKey::from($data));
             $layers = StockCostLayer::query()
                 ->whereIn('stock_movement_id', $data['movements'] ?? [])
                 ->lockForUpdate()
@@ -244,6 +253,7 @@ class StockLedgerService
             foreach ($movements as $movement) {
                 $payload = [
                     'product_id' => $movement->product_id,
+                    'category_finish_id' => $movement->category_finish_id,
                     'warehouse_id' => $movement->warehouse_id,
                     'location_id' => $movement->location_id ?: null,
                     'quantity' => abs((float) $movement->quantity),
@@ -272,8 +282,21 @@ class StockLedgerService
 
     public function onHand(int $productId, ?int $warehouseId = null, ?int $locationId = null): float
     {
+        return $this->balanceOf(StockKey::product($productId), $warehouseId, $locationId);
+    }
+
+    /**
+     * رصيد كيلو مجموعة السعر (التصنيف × اللون) في مخزن او كل المخازن.
+     */
+    public function groupOnHand(int $categoryFinishId, ?int $warehouseId = null): float
+    {
+        return $this->balanceOf(StockKey::group($categoryFinishId), $warehouseId, null);
+    }
+
+    private function balanceOf(StockKey $key, ?int $warehouseId, ?int $locationId): float
+    {
         return round((float) StockBalance::query()
-            ->where('product_id', $productId)
+            ->where($key->column, $key->id)
             ->when($warehouseId, fn ($query) => $query->where('warehouse_id', $warehouseId))
             ->when($locationId !== null, fn ($query) => $query->where('location_id', (int) $locationId))
             ->sum('quantity'), 4);
@@ -285,11 +308,37 @@ class StockLedgerService
     }
 
     /**
-     * تكلفة الكغم من مخزون الصنف: صنف الوزن المخزَّن بالكغم متوسطه هو تكلفة الكغم، ولون المقطع
-     * المخزَّن بالقطعة متوسط قطعته ÷ وزن القطعة (الطول × وزن المتر)، وغيرهما متوسطه كما هو.
+     * متوسط تكلفة الكيلو لمجموعة السعر.
+     */
+    public function groupAverageCost(int $categoryFinishId): float
+    {
+        return round((float) ProductCost::query()->where('category_finish_id', $categoryFinishId)->value('average_cost'), 6);
+    }
+
+    /**
+     * لون مقطع في مجموعة سعر (صنف وزن له مجموعة وقياس قطعة): يتحرك بالعدد بلا قيمة ولا طبقات؛
+     * الكيلو وقيمته على مجموعته، كما كان المقطع تحت صنفه الرئيسي في اتقان.
+     */
+    public function isGroupPiece(StockKey $key): bool
+    {
+        return ! $key->isGroup() && Product::query()
+            ->whereKey($key->id)
+            ->where('pricing_type', 'weight')
+            ->whereNotNull('category_finish_id')
+            ->whereRaw('COALESCE(length, 0) * COALESCE(weight_per_meter, 0) > 0')
+            ->exists();
+    }
+
+    /**
+     * تكلفة الكغم: لون المقطع في مجموعة سعر = متوسط كيلو مجموعته، وصنف الوزن المخزَّن بالكغم متوسطه،
+     * وصنف وزن بالقطعة بلا مجموعة متوسط قطعته ÷ وزن القطعة، وغيرهما متوسطه كما هو.
      */
     public function costPerKg(Product $product): float
     {
+        if ($this->isGroupPiece(StockKey::product((int) $product->id))) {
+            return $this->groupAverageCost((int) $product->category_finish_id);
+        }
+
         $perPiece = (float) $product->length * (float) $product->weight_per_meter;
 
         if ($product->pricing_type !== 'weight' || $perPiece <= 0) {
@@ -302,12 +351,12 @@ class StockLedgerService
     /**
      * متوسط التكلفة المرجّح لعدة اصناف باستعلام واحد؛ الصنف الذي لم يُشترَ بعد تكلفته صفر.
      *
-     * @param  array<int, int>  $productIds
+     * @param  array<int, int>  $keys
      * @return array<int, float>
      */
-    public function averageCosts(array $productIds): array
+    public function averageCosts(array $keys): array
     {
-        $ids = array_values(array_unique(array_map('intval', $productIds)));
+        $ids = array_values(array_unique(array_map('intval', $keys)));
 
         if ($ids === []) {
             return [];
@@ -325,21 +374,21 @@ class StockLedgerService
      */
     private function reverseReceive(StockMovement $movement, array $payload): void
     {
-        $productId = (int) $payload['product_id'];
+        $key = StockKey::from($payload);
         $warehouseId = (int) $payload['warehouse_id'];
         $locationId = (int) ($payload['location_id'] ?? 0);
         $quantity = round((float) $payload['quantity'], 4);
-        $balance = $this->lockedBalance($productId, $warehouseId, $locationId);
+        $balance = $this->lockedBalance($key, $warehouseId, $locationId);
 
         if ((float) $balance->quantity + self::EPSILON < $quantity) {
             throw new DomainException(__('Cannot cancel: :item was already issued from the warehouse (available :available, required :required).', [
-                'item' => $this->productLabel($productId),
+                'item' => $this->productLabel($key),
                 'available' => $this->formatQuantity((float) $balance->quantity),
                 'required' => $this->formatQuantity($quantity),
             ]));
         }
 
-        $cost = $this->lockedCost($productId);
+        $cost = $this->lockedCost($key);
         $layers = StockCostLayer::query()->where('stock_movement_id', $movement->id)->lockForUpdate()->get();
         $entries = [];
 
@@ -348,7 +397,7 @@ class StockLedgerService
 
             if ($remaining + self::EPSILON < $quantity) {
                 throw new DomainException(__('Cannot cancel: :item was already issued from the warehouse (available :available, required :required).', [
-                    'item' => $this->productLabel($productId),
+                    'item' => $this->productLabel($key),
                     'available' => $this->formatQuantity($remaining),
                     'required' => $this->formatQuantity($quantity),
                 ]));
@@ -356,8 +405,10 @@ class StockLedgerService
 
             $totalCost = round((float) $layers->sum('remaining_value'), 4);
             StockCostLayer::query()->whereKey($layers->modelKeys())->delete();
+        } elseif ($this->isGroupPiece($key)) {
+            $totalCost = round((float) ($payload['total_cost'] ?? $quantity * (float) $payload['unit_cost']), 4);
         } else {
-            $entries = $this->consumeLayers($productId, $warehouseId, $quantity);
+            $entries = $this->consumeLayers($key, $warehouseId, $quantity);
             $totalCost = round(array_sum(array_column($entries, 'value')), 4);
         }
 
@@ -371,7 +422,7 @@ class StockLedgerService
 
         $reversal = $this->record($payload, $locationId, -$quantity, -$weight, (float) $payload['unit_cost'], -$totalCost);
         $this->linkEntries($reversal, $entries);
-        $this->syncProductStock($productId);
+        $this->syncProductStock($key);
     }
 
     /**
@@ -380,13 +431,13 @@ class StockLedgerService
      */
     private function reverseIssue(StockMovement $movement, array $payload): void
     {
-        $productId = (int) $payload['product_id'];
+        $key = StockKey::from($payload);
         $warehouseId = (int) $payload['warehouse_id'];
         $locationId = (int) ($payload['location_id'] ?? 0);
         $quantity = round((float) $payload['quantity'], 4);
         $totalCost = round((float) ($payload['total_cost'] ?? 0), 4);
         $weight = round((float) ($payload['weight'] ?? 0), 4);
-        $cost = $this->lockedCost($productId);
+        $cost = $this->lockedCost($key);
 
         $entries = StockCostLayerEntry::query()
             ->where('stock_movement_id', $movement->id)
@@ -404,7 +455,7 @@ class StockLedgerService
 
         $this->applyCost($cost, $quantity, $totalCost, (float) $payload['unit_cost']);
 
-        $balance = $this->lockedBalance($productId, $warehouseId, $locationId);
+        $balance = $this->lockedBalance($key, $warehouseId, $locationId);
         $balance->quantity = round((float) $balance->quantity + $quantity, 4);
         $balance->weight = round((float) $balance->weight + $weight, 4);
         $balance->save();
@@ -412,11 +463,11 @@ class StockLedgerService
         $reversal = $this->record($payload, $locationId, $quantity, $weight, (float) $payload['unit_cost'], $totalCost);
         $restored = (float) $entries->sum('value');
 
-        if (round($totalCost - $restored, 4) > 0) {
+        if (! $this->isGroupPiece($key) && round($totalCost - $restored, 4) > 0) {
             $this->addLayers($reversal, round($quantity - (float) $entries->sum('quantity'), 4), (float) $payload['unit_cost'], round($totalCost - $restored, 4), collect());
         }
 
-        $this->syncProductStock($productId);
+        $this->syncProductStock($key);
     }
 
     /**
@@ -424,8 +475,8 @@ class StockLedgerService
      */
     private function reverseRevalue(StockMovement $movement, array $payload): void
     {
-        $productId = (int) $payload['product_id'];
-        $cost = $this->lockedCost($productId);
+        $key = StockKey::from($payload);
+        $cost = $this->lockedCost($key);
         $entries = StockCostLayerEntry::query()
             ->where('stock_movement_id', $movement->id)
             ->where('kind', StockCostLayerEntry::REVALUE)
@@ -437,7 +488,7 @@ class StockLedgerService
 
             if ((float) $layer->remaining_quantity + self::EPSILON < (float) $entry->remaining_at_entry) {
                 throw new DomainException(__('Cannot cancel: :item was already issued from the warehouse (available :available, required :required).', [
-                    'item' => $this->productLabel($productId),
+                    'item' => $this->productLabel($key),
                     'available' => $this->formatQuantity((float) $layer->remaining_quantity),
                     'required' => $this->formatQuantity((float) $entry->remaining_at_entry),
                 ]));
@@ -495,7 +546,7 @@ class StockLedgerService
     private function newLayer(StockMovement $movement, float $quantity, float $unitCost, float $value, ?int $sequence): void
     {
         $layer = StockCostLayer::query()->create([
-            'product_id' => $movement->product_id,
+            ...StockKey::from($movement)->attributes(),
             'warehouse_id' => $movement->warehouse_id,
             'stock_movement_id' => $movement->id,
             'sequence' => $sequence ?? 0,
@@ -516,10 +567,10 @@ class StockLedgerService
      *
      * @return array<int, array{stock_cost_layer_id:int, kind:string, quantity:float, value:float}>
      */
-    private function consumeLayers(int $productId, int $warehouseId, float $quantity): array
+    private function consumeLayers(StockKey $key, int $warehouseId, float $quantity): array
     {
         $layers = StockCostLayer::query()
-            ->where('product_id', $productId)
+            ->where($key->column, $key->id)
             ->where('warehouse_id', $warehouseId)
             ->where('remaining_quantity', '>', 0)
             ->orderBy('sequence')
@@ -576,10 +627,10 @@ class StockLedgerService
      *
      * @return array<int, array{0: StockBalance, 1: float}>
      */
-    private function allocate(int $productId, int $warehouseId, ?int $locationId, float $quantity): array
+    private function allocate(StockKey $key, int $warehouseId, ?int $locationId, float $quantity): array
     {
         $balances = StockBalance::query()
-            ->where('product_id', $productId)
+            ->where($key->column, $key->id)
             ->where('warehouse_id', $warehouseId)
             ->when($locationId, fn ($query) => $query->where('location_id', $locationId))
             ->where('quantity', '>', 0)
@@ -593,15 +644,16 @@ class StockLedgerService
             $location = $locationId ? WarehouseLocation::query()->whereKey($locationId)->value('code') : null;
 
             throw new DomainException(__('Insufficient stock for :item in :warehouse: available :available, required :required.', [
-                'item' => $this->productLabel($productId),
+                'item' => $this->productLabel($key),
                 'warehouse' => trim((Warehouse::query()->with('translations')->find($warehouseId)?->name ?? '').($location ? ' / '.$location : '')),
                 'available' => $this->formatQuantity($available),
                 'required' => $this->formatQuantity($quantity),
             ]));
         }
 
+        // اماكن الرفوف للاصناف فقط؛ كيلو المجموعة يُصرف بترتيب ارصدته.
         $locationOrder = ProductLocation::query()
-            ->where('product_id', $productId)
+            ->where('product_id', $key->isGroup() ? 0 : $key->id)
             ->where('warehouse_id', $warehouseId)
             ->orderByDesc('is_primary')
             ->orderBy('id')
@@ -636,7 +688,7 @@ class StockLedgerService
             if ($index !== false) {
                 $allocations[$index][1] = round($allocations[$index][1] + $remaining, 4);
             } else {
-                $allocations[] = [$this->lockedBalance($productId, $warehouseId, $target), $remaining];
+                $allocations[] = [$this->lockedBalance($key, $warehouseId, $target), $remaining];
             }
         }
 
@@ -665,7 +717,7 @@ class StockLedgerService
         $source = $data['source'] ?? null;
 
         return StockMovement::create([
-            'product_id' => (int) $data['product_id'],
+            ...StockKey::from($data)->attributes(),
             'warehouse_id' => (int) $data['warehouse_id'],
             'location_id' => $locationId,
             'movement_date' => $data['date'],
@@ -683,10 +735,10 @@ class StockLedgerService
         ]);
     }
 
-    private function lockedCost(int $productId): ProductCost
+    private function lockedCost(StockKey $key): ProductCost
     {
         ProductCost::query()->insertOrIgnore([
-            'product_id' => $productId,
+            $key->column => $key->id,
             'quantity' => 0,
             'value' => 0,
             'average_cost' => 0,
@@ -694,13 +746,13 @@ class StockLedgerService
             'updated_at' => now(),
         ]);
 
-        return ProductCost::query()->where('product_id', $productId)->lockForUpdate()->firstOrFail();
+        return ProductCost::query()->where($key->column, $key->id)->lockForUpdate()->firstOrFail();
     }
 
-    private function lockedBalance(int $productId, int $warehouseId, int $locationId): StockBalance
+    private function lockedBalance(StockKey $key, int $warehouseId, int $locationId): StockBalance
     {
         StockBalance::query()->insertOrIgnore([
-            'product_id' => $productId,
+            $key->column => $key->id,
             'warehouse_id' => $warehouseId,
             'location_id' => $locationId,
             'quantity' => 0,
@@ -710,7 +762,7 @@ class StockLedgerService
         ]);
 
         return StockBalance::query()
-            ->where('product_id', $productId)
+            ->where($key->column, $key->id)
             ->where('warehouse_id', $warehouseId)
             ->where('location_id', $locationId)
             ->lockForUpdate()
@@ -721,23 +773,32 @@ class StockLedgerService
      * «الكمية» ووزنها في بطاقة الصنف وشجرة الاصناف = مجموع ارصدته في كل المخازن،
      * ثم مقارنة الرصيد الجديد بحدود الصنف (قسم المتابعة والتنبيهات) داخل نفس المعاملة.
      */
-    private function syncProductStock(int $productId): void
+    private function syncProductStock(StockKey $key): void
     {
-        $totals = StockBalance::query()->where('product_id', $productId)->selectRaw('COALESCE(SUM(quantity), 0) as quantity, COALESCE(SUM(weight), 0) as weight')->first();
+        // رصيد كيلو المجموعة يُقرأ من دفترها؛ لا صنف يُحدَّث ولا حدود تُقاس عليه.
+        if ($key->isGroup()) {
+            return;
+        }
 
-        Product::query()->whereKey($productId)->update([
+        $totals = StockBalance::query()->where($key->column, $key->id)->selectRaw('COALESCE(SUM(quantity), 0) as quantity, COALESCE(SUM(weight), 0) as weight')->first();
+
+        Product::query()->whereKey($key->id)->update([
             'stock_quantity' => $totals->quantity,
             'stock_weight' => $totals->weight,
         ]);
 
-        app(StockAlertService::class)->evaluate($productId);
+        app(StockAlertService::class)->evaluate($key->id);
     }
 
-    private function productLabel(int $productId): string
+    private function productLabel(StockKey $key): string
     {
-        $product = Product::query()->with('translations')->find($productId);
+        if ($key->isGroup()) {
+            return PriceGroupSearch::labels([$key->id])[$key->id] ?? '#'.$key->id;
+        }
 
-        return trim(($product?->barcode ? $product->barcode.' - ' : '').($product?->name ?? '#'.$productId));
+        $product = Product::query()->with('translations')->find($key->id);
+
+        return trim(($product?->barcode ? $product->barcode.' - ' : '').($product?->name ?? '#'.$key->id));
     }
 
     private function formatQuantity(float $quantity): string

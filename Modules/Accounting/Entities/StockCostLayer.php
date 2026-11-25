@@ -11,6 +11,7 @@ class StockCostLayer extends Model
 {
     protected $fillable = [
         'product_id',
+        'category_finish_id',
         'warehouse_id',
         'stock_movement_id',
         'sequence',
