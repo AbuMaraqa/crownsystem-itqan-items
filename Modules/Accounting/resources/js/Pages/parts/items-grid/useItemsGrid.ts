@@ -776,8 +776,8 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
             row.category_finish_id = null;
         }
 
-        // In group mode the categories show even without text, to browse them.
-        if (document.activeElement !== input || (needle === '' && mode === 'item')) {
+        // In group mode the categories show even without text, to browse them; so do the items of a category row.
+        if (document.activeElement !== input || (needle === '' && mode === 'item' && !row.category_id)) {
             search.results = [];
             search.open = false;
 
@@ -832,6 +832,12 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
 
     function onProductFocus(rowIndex: number): void {
         search.rowIndex = rowIndex;
+
+        // An empty row under a category lists that category's items at once, as in the old system.
+        const row = rows.value[rowIndex];
+        if (config.value.editable && row && row.row_type !== 'category' && row.category_id && !row.product_id && !row.category_finish_id) {
+            void searchProducts(rowIndex, '');
+        }
     }
 
     function onProductBlur(rowIndex: number): void {
@@ -866,7 +872,7 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
     function chooseResult(rowIndex: number, option: SearchResult | undefined): void {
         if (!option) return;
 
-        if (search.mode === 'category') chooseCategory(rowIndex, option);
+        if (search.mode === 'category' || option.kind === 'category') chooseCategory(rowIndex, option);
         else if (option.kind === 'group') void chooseGroup(rowIndex, option);
         else void chooseProduct(rowIndex, option);
     }

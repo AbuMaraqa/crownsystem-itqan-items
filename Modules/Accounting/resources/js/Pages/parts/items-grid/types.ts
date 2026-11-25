@@ -177,8 +177,11 @@ export interface CustomerMaterial {
 export interface SearchResult {
     id: number;
     label: string;
-    /** `group`: a price group (category × colour), the id is the group's. */
-    kind?: 'item' | 'group';
+    /**
+     * `group`: a price group (category × colour), the id is the group's.
+     * `category`: a category; picked, it becomes a group header and its items are added under it.
+     */
+    kind?: 'item' | 'group' | 'category';
     main_label?: string | null;
     /** A colour variation: the group line it goes into. */
     group_label?: string | null;

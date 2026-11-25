@@ -56,14 +56,16 @@ final class ItemsGrid
     /**
      * بحث خانة الصنف: المعرف والاسم فقط، والتفاصيل تُجلب عند الاختيار. الخدمات لها قسمها.
      *
-     * - مجموعات السعر (التصنيف × اللون) اولاً: تصير سطراً رئيسياً بالكيلو قطعه ألوان مقاطعه.
+     * - التصنيفات المطابقة اولاً، كما في النظام القديم: التصنيف يصير رأس مجموعة تُضاف اصنافه تحته.
+     * - ثم مجموعات السعر (التصنيف × اللون): تصير سطراً رئيسياً بالكيلو قطعه ألوان مقاطعه.
      * - ثم الاصناف. مقطع الوزن الذي له ألوان تحل محله ألوانه (يُباع اللون لا المقطع)، مع اسم مجموعتها.
      * - داخل صف مجموعة تصنيف قديم يقتصر البحث على اصناف التصنيف وفروعه.
      *
-     * @return array<int, array{id: int, label: string, kind: string, main_label: ?string, group_label: ?string}>
+     * @return array<int, array{id: int, label: string, kind: 'category'|'group'|'item', main_label: ?string, group_label: ?string}>
      */
     public static function searchProducts(string $term, mixed $categoryId = null): array
     {
+        $categories = filled($categoryId) || trim($term) === '' ? [] : CategorySearch::options($term, 5);
         $groups = filled($categoryId) ? [] : PriceGroupSearch::options($term, 8);
         $options = filled($categoryId)
             ? CategorySearch::productOptions($categoryId, $term, 25)
@@ -76,6 +78,10 @@ final class ItemsGrid
         // الصنف الفرعي القديم يظهر مع اسم صنفه الرئيسي لانه سيُضاف داخله.
         $mainLabels = ProductSearch::mainProductLabels(array_keys($options));
         $results = [];
+
+        foreach ($categories as $id => $label) {
+            $results[] = ['id' => (int) $id, 'label' => $label, 'kind' => 'category', 'main_label' => null, 'group_label' => null];
+        }
 
         foreach ($groups as $groupId => $label) {
             $results[] = ['id' => (int) $groupId, 'label' => $label, 'kind' => 'group', 'main_label' => null, 'group_label' => null];

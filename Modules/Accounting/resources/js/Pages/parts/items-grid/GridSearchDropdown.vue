@@ -60,10 +60,11 @@ const emit = defineEmits<{ choose: [result: SearchResult]; hover: [index: number
                     @mousemove="emit('hover', index)"
                 >
                     <span class="flex min-w-0 items-center gap-2">
-                        <Layers v-if="mode === 'category' || result.kind === 'group'" class="size-4 shrink-0 text-brand-500" />
+                        <Layers v-if="mode === 'category' || result.kind === 'group' || result.kind === 'category'" class="size-4 shrink-0 text-brand-500" />
                         <span class="min-w-0">
-                            <span class="block truncate" :class="{ 'font-semibold': result.kind === 'group' }">{{ result.label }}</span>
-                            <span v-if="result.kind === 'group'" class="block truncate text-[11px] text-muted">{{ t('Category · by weight: its profiles go inside it') }}</span>
+                            <span class="block truncate" :class="{ 'font-semibold': result.kind === 'group' || result.kind === 'category' }">{{ result.label }}</span>
+                            <span v-if="result.kind === 'category'" class="block truncate text-[11px] text-muted">{{ t('Category · pick it, then add its items under it') }}</span>
+                            <span v-else-if="result.kind === 'group'" class="block truncate text-[11px] text-muted">{{ t('Category · by weight: its profiles go inside it') }}</span>
                             <span v-else-if="result.group_label" class="block truncate text-[11px] text-muted">{{ t('Goes into:') }} {{ result.group_label }}</span>
                             <span v-else-if="result.main_label" class="block truncate text-[11px] text-muted">{{ t('Inside main item:') }} {{ result.main_label }}</span>
                         </span>

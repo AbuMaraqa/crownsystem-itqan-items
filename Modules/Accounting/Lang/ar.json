@@ -1783,5 +1783,6 @@
     "Sales Order Type View List": "عرض أنواع طلبيات البيع",
     "Sales Order Type Create": "إضافة نوع طلبية بيع",
     "Sales Order Type Update": "تعديل نوع طلبية بيع",
-    "Sales Order Type Delete": "حذف نوع طلبية بيع"
+    "Sales Order Type Delete": "حذف نوع طلبية بيع",
+    "Category · pick it, then add its items under it": "تصنيف: اختره ثم أضف أصنافه تحته"
 }
