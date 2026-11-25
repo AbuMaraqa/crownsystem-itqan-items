@@ -526,7 +526,7 @@ class InvoiceStockService
             }
 
             // صنف رئيسي بلا قطع: كميته الكغم الفعلي، ولا صف غيره.
-            if ($ledger->isMainItem($product)) {
+            if ($ledger->storesByWeight($product)) {
                 $lines[] = [
                     'item_id' => (int) $item->id,
                     'product_id' => (int) $product->id,

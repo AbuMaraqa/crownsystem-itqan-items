@@ -60,12 +60,10 @@ class StockLedgerService
         return DB::transaction(function () use ($data, $quantity) {
             $productId = (int) $data['product_id'];
             $warehouseId = (int) $data['warehouse_id'];
-            $isPiece = $this->isPiece($productId);
-            $unitCost = $isPiece ? 0.0 : max(round((float) $data['unit_cost'], 6), 0);
-            $carried = $isPiece ? collect() : $this->carriedEntries($data['layers_from'] ?? null);
+            $unitCost = max(round((float) $data['unit_cost'], 6), 0);
+            $carried = $this->carriedEntries($data['layers_from'] ?? null);
             // total_cost الصريح يبقي قيمة السطر كما هي بلا تقريب كلفة الوحدة.
             $totalCost = match (true) {
-                $isPiece => 0.0,
                 $carried->isNotEmpty() => round((float) $carried->sum('value'), 4),
                 default => round((float) ($data['total_cost'] ?? $quantity * $unitCost), 4),
             };
@@ -81,9 +79,7 @@ class StockLedgerService
 
             $movement = $this->record($data, $locationId, $quantity, $weight, $unitCost, $totalCost);
 
-            if (! $isPiece) {
-                $this->addLayers($movement, $quantity, $unitCost, $totalCost, $carried);
-            }
+            $this->addLayers($movement, $quantity, $unitCost, $totalCost, $carried);
 
             $this->syncProductStock($productId);
 
@@ -107,7 +103,6 @@ class StockLedgerService
             $productId = (int) $data['product_id'];
             $warehouseId = (int) $data['warehouse_id'];
             $cost = $this->lockedCost($productId);
-            $isPiece = $this->isPiece($productId);
             $explicitCost = array_key_exists('unit_cost', $data) && $data['unit_cost'] !== null ? round((float) $data['unit_cost'], 6) : null;
 
             $allocations = $this->allocate($productId, $warehouseId, $data['location_id'] ?? null, $quantity);
@@ -119,15 +114,13 @@ class StockLedgerService
                 $isLast = $index === array_key_last($allocations);
                 $weight = $this->issuedWeight($balance, $take, $quantity, $requestedWeight, $remainingWeight, $isLast);
                 $remainingWeight = $remainingWeight !== null ? round($remainingWeight - $weight, 4) : null;
-                $consumed = $isPiece ? [] : $this->consumeLayers($productId, $warehouseId, $take);
+                $consumed = $this->consumeLayers($productId, $warehouseId, $take);
                 $layersValue = round(array_sum(array_column($consumed, 'value')), 4);
                 $lineCost = match (true) {
-                    $isPiece => 0.0,
                     $explicitCost !== null => round($take * $explicitCost, 4),
                     default => $layersValue,
                 };
                 $unitCost = match (true) {
-                    $isPiece => 0.0,
                     $explicitCost !== null => $explicitCost,
                     default => round($layersValue / $take, 6),
                 };
@@ -160,25 +153,12 @@ class StockLedgerService
     }
 
     /**
-     * المقطع: صنف وزن تحت صنف رئيسي. يتحرك بالعدد وقيمته صفر؛ القيمة على صنفه الرئيسي.
+     * صنف وزن بلا قياس قطعة (الطول × وزن المتر = 0)، كالمطاط: يُخزَّن ويتحرك بالكغم. صنف الوزن
+     * الذي له قياس قطعة (لون مقطع) يُخزَّن بالقطعة ووزنها وقيمتها.
      */
-    public function isPiece(int $productId): bool
+    public function storesByWeight(Product $product): bool
     {
-        return Product::query()->whereKey($productId)->where('pricing_type', 'weight')->whereNotNull('main_product_id')->exists();
-    }
-
-    /**
-     * الصنف الرئيسي يتحرك بالكغم: له اصناف فرعية، او صنف وزن بلا صنف رئيسي ولا قياس قطعة
-     * يحوّل وزنه الى عدد.
-     */
-    public function isMainItem(Product $product): bool
-    {
-        if ($product->pricing_type !== 'weight' || filled($product->main_product_id)) {
-            return Product::query()->where('main_product_id', $product->id)->exists();
-        }
-
-        return (float) $product->length * (float) $product->weight_per_meter <= 0
-            || Product::query()->where('main_product_id', $product->id)->exists();
+        return $product->pricing_type === 'weight' && (float) $product->length * (float) $product->weight_per_meter <= 0;
     }
 
     /**
@@ -305,21 +285,14 @@ class StockLedgerService
     }
 
     /**
-     * تكلفة الكغم من مخزون الصنف، ايّاً كانت وحدة رصيده:
-     * - الصنف الرئيسي يُخزَّن بالكغم: متوسطه هو تكلفة الكغم.
-     * - المقطع (صنف فرعي قديم) بلا قيمة: قيمته على صنفه الرئيسي، فتكلفة كغمه تكلفة كغم الرئيسي.
-     * - صنف وزن يُخزَّن بالقطعة (لون مقطع): متوسط القطعة ÷ وزن القطعة (الطول × وزن المتر).
-     * - غير ذلك: المتوسط كما هو.
+     * تكلفة الكغم من مخزون الصنف: صنف الوزن المخزَّن بالكغم متوسطه هو تكلفة الكغم، ولون المقطع
+     * المخزَّن بالقطعة متوسط قطعته ÷ وزن القطعة (الطول × وزن المتر)، وغيرهما متوسطه كما هو.
      */
     public function costPerKg(Product $product): float
     {
-        if ($this->isPiece((int) $product->id)) {
-            return $this->averageCost((int) $product->main_product_id);
-        }
-
         $perPiece = (float) $product->length * (float) $product->weight_per_meter;
 
-        if ($product->pricing_type !== 'weight' || $perPiece <= 0 || $this->isMainItem($product)) {
+        if ($product->pricing_type !== 'weight' || $perPiece <= 0) {
             return $this->averageCost((int) $product->id);
         }
 
@@ -383,8 +356,6 @@ class StockLedgerService
 
             $totalCost = round((float) $layers->sum('remaining_value'), 4);
             StockCostLayer::query()->whereKey($layers->modelKeys())->delete();
-        } elseif ($this->isPiece($productId)) {
-            $totalCost = round((float) ($payload['total_cost'] ?? $quantity * (float) $payload['unit_cost']), 4);
         } else {
             $entries = $this->consumeLayers($productId, $warehouseId, $quantity);
             $totalCost = round(array_sum(array_column($entries, 'value')), 4);
@@ -441,7 +412,7 @@ class StockLedgerService
         $reversal = $this->record($payload, $locationId, $quantity, $weight, (float) $payload['unit_cost'], $totalCost);
         $restored = (float) $entries->sum('value');
 
-        if (! $this->isPiece($productId) && round($totalCost - $restored, 4) > 0) {
+        if (round($totalCost - $restored, 4) > 0) {
             $this->addLayers($reversal, round($quantity - (float) $entries->sum('quantity'), 4), (float) $payload['unit_cost'], round($totalCost - $restored, 4), collect());
         }
 

@@ -340,7 +340,7 @@ class GoodsReceiptService
             }
 
             // صنف رئيسي بلا قطع يُستلم بالكغم.
-            $isMainLine = app(StockLedgerService::class)->isMainItem($item->product);
+            $isMainLine = app(StockLedgerService::class)->storesByWeight($item->product);
             $quantity = $isMainLine ? $item->invoiceQuantity() : (float) $item->quantity;
 
             if ($quantity <= 0) {

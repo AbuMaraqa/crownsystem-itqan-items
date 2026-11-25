@@ -400,19 +400,6 @@ class InventoryFlowTest extends TestCase
         $this->assertSame(10.0, app(StockLedgerService::class)->averageCost($main->id));
     }
 
-    public function test_opening_a_weight_piece_gives_it_a_count_and_no_value(): void
-    {
-        // القطعة 5 م × 1.2 كغم/م = 6 كغم للمعلومة، وقيمتها صفر ولو كان للكغم تكلفة.
-        $main = $this->product('بدون دهان 1025', 'M-1026', 'weight');
-        $sub = $this->product('ثابت 3 مجاري', 'S-1026', 'weight', $main->id, 1.2, 5);
-
-        $this->openingBalance($sub, [[2, null, null]]);
-
-        $this->assertSame(2.0, app(StockLedgerService::class)->onHand($sub->id));
-        $this->assertSame(12.0, (float) $sub->refresh()->stock_weight);
-        $this->assertSame(0.0, app(StockLedgerService::class)->averageCost($sub->id));
-    }
-
     private function warehouse(string $name, string $code): Warehouse
     {
         $warehouse = Warehouse::create(['code' => $code, 'is_active' => true]);

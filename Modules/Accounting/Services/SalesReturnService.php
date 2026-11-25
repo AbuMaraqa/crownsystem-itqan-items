@@ -676,7 +676,7 @@ class SalesReturnService
             return [round($quantity, 4), 0.0];
         }
 
-        if (app(StockLedgerService::class)->isMainItem($product)) {
+        if (app(StockLedgerService::class)->storesByWeight($product)) {
             return [round($quantity, 4), round($quantity, 4)];
         }
 

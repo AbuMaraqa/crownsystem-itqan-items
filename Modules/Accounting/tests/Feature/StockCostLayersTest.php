@@ -188,20 +188,6 @@ class StockCostLayersTest extends TestCase
         $this->assertSame(110.0, (float) ProductCost::query()->where('product_id', $this->product->id)->value('value'));
     }
 
-    public function test_a_piece_has_no_layers_and_no_value(): void
-    {
-        $main = $this->makeProduct(['pricing_type' => 'weight']);
-        $piece = $this->makeProduct(['pricing_type' => 'weight', 'main_product_id' => $main->id]);
-
-        $this->ledger->receive($this->movement(['product_id' => $piece->id, 'quantity' => 3, 'unit_cost' => 99, 'type' => StockMovementType::RECEIPT]));
-
-        $this->assertSame(0, StockCostLayer::query()->where('product_id', $piece->id)->count());
-        $this->assertSame(0.0, (float) ProductCost::query()->where('product_id', $piece->id)->value('value'));
-
-        $issued = $this->ledger->issue($this->movement(['product_id' => $piece->id, 'quantity' => 1, 'type' => StockMovementType::DELIVERY]));
-        $this->assertSame(0.0, (float) $issued->sum('total_cost'));
-    }
-
     public function test_revaluing_reprices_what_remains_of_the_named_receipts_and_reverses_exactly(): void
     {
         $receipt = $this->in(4, 10);

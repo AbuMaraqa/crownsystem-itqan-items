@@ -104,7 +104,7 @@ trait PostsInventoryJournal
      */
     protected function stockWeight(?Product $product, float $quantity): float
     {
-        if ($product && app(StockLedgerService::class)->isMainItem($product)) {
+        if ($product && app(StockLedgerService::class)->storesByWeight($product)) {
             return round($quantity, 4);
         }
 

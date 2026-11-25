@@ -122,9 +122,7 @@ class StockAdjustmentService
                 ];
 
                 if ($quantity > 0) {
-                    // المقطع بلا قيمة؛ القيمة على صنفه الرئيسي.
                     $unitCost = match (true) {
-                        $ledger->isPiece((int) $item->product_id) => 0.0,
                         (float) $item->unit_cost > 0 => (float) $item->unit_cost,
                         default => $this->fallbackCost($item->product),
                     };
@@ -311,11 +309,6 @@ class StockAdjustmentService
             return 0;
         }
 
-        // المقطع بلا قيمة؛ كلفة الكغم على صنفه الرئيسي الذي تتحرك كمياته بالكغم.
-        if (app(StockLedgerService::class)->isPiece($product->id)) {
-            return 0;
-        }
-
         // التكلفة من المشتريات الفعلية فقط؛ لا سعر تكلفة يُكتب في بطاقة الصنف.
         return app(StockLedgerService::class)->averageCost($product->id);
     }
@@ -392,13 +385,13 @@ class StockAdjustmentService
                 throw new DomainException(__('Unit cost cannot be negative.'));
             }
 
-            if ($unitCost == 0 || $ledger->isPiece($product->id)) {
+            if ($unitCost == 0) {
                 $unitCost = $this->fallbackCost($product);
             }
 
             // المخزون الداخل يُقيَّم بتكلفته (مبدأ التكلفة التاريخية): صنف لم يُشترَ بعد لا متوسط
             // تكلفة له، فتُكتب تكلفة وحدته في السطر بدل ادخاله بقيمة صفر.
-            if ($quantity > 0 && $unitCost == 0 && ! $ledger->isPiece($product->id)) {
+            if ($quantity > 0 && $unitCost == 0) {
                 throw new DomainException(__('Enter the unit cost of :item: it has no purchase cost yet.', ['item' => $product->name]));
             }
 
