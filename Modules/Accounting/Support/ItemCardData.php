@@ -3,6 +3,7 @@
 namespace Modules\Accounting\Support;
 
 use Modules\Items\Entities\Product;
+use Modules\Items\Support\PriceGroupSearch;
 
 /**
  * بيانات بطاقة الصنف كما ترسل الى Vue، مصدر واحد لصفحة بطاقة الصنف (ItemStockCardController)
@@ -20,7 +21,7 @@ final class ItemCardData
             'id' => $product->id,
             'name' => $product->name,
             'image' => $product->image ?: null,
-            'main_product' => $product->mainProduct?->name,
+            'price_group' => $product->category_finish_id ? (PriceGroupSearch::labels([$product->category_finish_id])[(int) $product->category_finish_id] ?? null) : null,
             'barcode' => $product->barcode,
             'sku' => $product->sku,
             'weight_per_meter' => (float) $product->weight_per_meter ? Quantity::format($product->weight_per_meter, 3) : null,
@@ -41,7 +42,7 @@ final class ItemCardData
     public static function summary(array $summary): array
     {
         $levels = $summary['levels'];
-        $main = $summary['mainLevels'];
+        $main = $summary['parentLevels'];
         $fmt = fn ($value, int $decimals = 2): string => Quantity::format($value, $decimals);
         $canSeeCost = (bool) auth()->user()?->can('Stock Value View');
         $cost = null;
@@ -66,7 +67,7 @@ final class ItemCardData
             'value' => $canSeeCost && $main ? $fmt($main['value']) : null,
             'cost' => $cost,
             'main' => $main ? [
-                'sub_items' => (int) $main['sub_items'],
+                'sub_items' => (int) $main['variations'],
                 'on_hand' => $fmt($main['on_hand']),
                 'weight' => $fmt($main['weight']),
                 'reserved' => $fmt($main['reserved']),

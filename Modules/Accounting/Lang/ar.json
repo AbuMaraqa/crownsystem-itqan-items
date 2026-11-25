@@ -1784,5 +1784,12 @@
     "Sales Order Type Create": "إضافة نوع طلبية بيع",
     "Sales Order Type Update": "تعديل نوع طلبية بيع",
     "Sales Order Type Delete": "حذف نوع طلبية بيع",
-    "Category · pick it, then add its items under it": "تصنيف: اختره ثم أضف أصنافه تحته"
+    "Category · pick it, then add its items under it": "تصنيف: اختره ثم أضف أصنافه تحته",
+    "Price Group": "مجموعة السعر",
+    "Group total": "مجموع المجموعة",
+    ":count colours": ":count ألوان",
+    "Total of :count colours": "مجموع :count ألوان",
+    "Load a price group...": "تحميل مجموعة سعر...",
+    "Colours": "الألوان",
+    "The item holds no stock of its own; its balance is the total of its colours.": "لا رصيد للصنف نفسه؛ رصيده مجموع أرصدة ألوانه."
 }

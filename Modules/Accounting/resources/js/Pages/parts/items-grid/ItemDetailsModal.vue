@@ -57,7 +57,7 @@ const facts = computed(() => {
 
     return product
         ? [
-              [t('Aluminum Type'), product.main_product],
+              [t('Price Group'), product.price_group],
               [t('Barcode'), product.barcode],
               [t('Code'), product.sku],
               [t('Weight per Meter'), product.weight_per_meter],
@@ -96,7 +96,7 @@ const isHere = (warehouseId: number): boolean => !!props.warehouseId && Number(p
                         <span v-if="details.card.levels.weight" class="text-muted">
                             {{ t('Weight') }}: <b class="text-gray-800 tabular-nums dark:text-gray-100" dir="ltr">{{ details.card.levels.weight }}</b> {{ t('kg') }}
                         </span>
-                        <span v-if="details.card.main" class="text-muted">· {{ t('Sub Items') }}: <b class="tabular-nums" dir="ltr">{{ details.card.main.sub_items }}</b></span>
+                        <span v-if="details.card.main" class="text-muted">· {{ t('Colours') }}: <b class="tabular-nums" dir="ltr">{{ details.card.main.sub_items }}</b></span>
                     </div>
                 </div>
             </div>

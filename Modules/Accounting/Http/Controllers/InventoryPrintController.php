@@ -38,7 +38,7 @@ class InventoryPrintController extends Controller
     {
         return $this->pdf->stockReport(
             $request->integer('warehouse') ?: null,
-            $request->integer('main_product') ?: null,
+            $request->integer('price_group') ?: null,
             $request->string('status')->toString() ?: null,
         );
     }

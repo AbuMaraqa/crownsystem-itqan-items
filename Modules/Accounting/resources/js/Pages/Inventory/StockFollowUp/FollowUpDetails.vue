@@ -75,7 +75,7 @@ const fields = [
             <div class="flex flex-wrap items-center justify-between gap-3 text-xs text-muted">
                 <span>
                     <bdi dir="ltr">{{ details.code }}</bdi>
-                    <template v-if="details.main_product"> · {{ t('Aluminum Type') }}: {{ details.main_product }}</template>
+                    <template v-if="details.price_group"> · {{ t('Price Group') }}: {{ details.price_group }}</template>
                     <template v-if="details.since"> · {{ t('In follow-up since') }} <span dir="ltr">{{ details.since }}</span></template>
                 </span>
                 <Button v-if="can('Stock Item Card View')" size="sm" :href="route('accounting.inventory.item-card', details.id)"><ExternalLink />{{ t('Item Stock Card') }}</Button>

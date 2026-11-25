@@ -79,7 +79,7 @@ async function removePlacement(id: number): Promise<void> {
 const details = computed(() =>
     props.product
         ? [
-              [t('Aluminum Type'), props.product.main_product],
+              [t('Price Group'), props.product.price_group],
               [t('Profile Name'), props.product.name],
               [t('Barcode'), props.product.barcode],
               [t('Code'), props.product.sku],
@@ -226,8 +226,8 @@ const orderBlocks = computed(() =>
                 </div>
             </div>
 
-            <!-- A main item: its balance is the total of its sub-items -->
-            <Card v-if="card.main" :title="t('Sub Items')" :description="t('The main item holds no stock of its own; its balance is the total of its sub-items.')">
+            <!-- An item with colours: its balance is the total of its colours -->
+            <Card v-if="card.main" :title="t('Colours')" :description="t('The item holds no stock of its own; its balance is the total of its colours.')">
                 <div class="-m-5 overflow-x-auto">
                     <table :class="[c.table, 'min-w-[48rem]']">
                         <thead :class="c.head">

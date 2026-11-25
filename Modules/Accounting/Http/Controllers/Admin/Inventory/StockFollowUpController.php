@@ -20,6 +20,7 @@ use Modules\Accounting\Support\StatusBadge;
 use Modules\Accounting\Support\StockLimits;
 use Modules\Core\Support\UserCellData;
 use Modules\Items\Entities\Product;
+use Modules\Items\Support\PriceGroupSearch;
 
 /**
  * قسم متابعة المخزون: الاصناف التي وصل رصيدها الى الحد الادنى 1 او اقل، الاخطر اولاً. لكل فئة
@@ -28,6 +29,9 @@ use Modules\Items\Entities\Product;
  */
 class StockFollowUpController extends Controller
 {
+    /** @var array<int, ?string> */
+    private array $priceGroupLabels = [];
+
     public function __construct(private readonly StockFollowUpService $service) {}
 
     public function index(Request $request, string $category): Response
@@ -64,7 +68,7 @@ class StockFollowUpController extends Controller
                     'alert_id' => $row['alert']->id,
                     'name' => $row['product']->name,
                     'code' => $row['product']->barcode ?: $row['product']->sku,
-                    'main_product' => $row['product']->mainProduct?->name,
+                    'price_group' => $this->priceGroupLabel($row['product']),
                     'quantity' => $fmt($row['product']->stock_quantity),
                     'min_limit_1' => $fmt($row['product']->min_limit_1),
                     'min_limit_2' => $fmt($row['product']->min_limit_2),
@@ -114,10 +118,20 @@ class StockFollowUpController extends Controller
     /**
      * يُفتح فقط صنف من فئة الصفحة، فلا يرى صاحب صلاحية فئة اصناف الفئة الاخرى عبر الرابط.
      */
+    /**
+     * مجموعة سعر الصنف (التصنيف × اللون)، مثل «الوبين — أبيض»؛ تُحفظ في الطلب فلا تُقرأ للمجموعة الواحدة مرتين.
+     */
+    private function priceGroupLabel(Product $product): ?string
+    {
+        $groupId = (int) $product->category_finish_id;
+
+        return $groupId ? ($this->priceGroupLabels[$groupId] ??= PriceGroupSearch::labels([$groupId])[$groupId] ?? null) : null;
+    }
+
     private function findProduct(StockFollowUpCategory $category, int $productId): ?Product
     {
         return $category->scope(Product::query())
-            ->with(['translations', 'mainProduct.translations', 'unit.translations'])
+            ->with(['translations', 'unit.translations'])
             ->find($productId);
     }
 
@@ -148,7 +162,7 @@ class StockFollowUpController extends Controller
             'id' => $product->id,
             'label' => $this->service->itemLabel($product),
             'code' => $product->barcode ?: $product->sku,
-            'main_product' => $product->mainProduct?->name,
+            'price_group' => $this->priceGroupLabel($product),
             'since' => $alert?->entered_at?->setTimezone($tz)->format('d/m/Y H:i'),
             'quantity' => $fmt($quantity),
             'max_limit' => $fmt($product->max_limit),

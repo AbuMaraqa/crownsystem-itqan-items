@@ -45,7 +45,7 @@ class ItemStockCardController extends Controller
         // الحركة الافتراضية لآخر ستة اشهر؛ ما قبلها يظهر كرصيد افتتاحي.
         $from = $request->has('from') ? ($request->string('from')->toString() ?: null) : now()->subMonths(6)->startOfMonth()->toDateString();
         $to = $request->string('to')->toString() ?: null;
-        $record = $product ? Product::query()->with(['translations', 'mainProduct.translations', 'media', 'unit.translations'])->find($product) : null;
+        $record = $product ? Product::query()->with(['translations', 'media', 'unit.translations'])->find($product) : null;
 
         return Inertia::render('Accounting/Inventory/ItemCard/Index', [
             'filters' => ['warehouse' => $warehouseId, 'from' => $from, 'to' => $to],
@@ -118,7 +118,7 @@ class ItemStockCardController extends Controller
 
         return [
             ...ItemCardData::summary($card),
-            'sub_items' => $card['subItems']->map(fn (array $row) => [
+            'sub_items' => $card['variations']->map(fn (array $row) => [
                 'id' => $row['product']->id,
                 'code' => $row['product']->barcode ?: $row['product']->sku,
                 'name' => $row['product']->name,

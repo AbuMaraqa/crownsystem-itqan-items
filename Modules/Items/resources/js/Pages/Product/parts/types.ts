@@ -169,7 +169,7 @@ export interface MadeFromRow {
 export type BadgeTone = Tone;
 
 export interface StockSummary {
-    is_main: boolean;
+    is_parent: boolean;
     levels: { on_hand: string; reserved: string; incoming: string; available: string; available_negative: boolean; weight: string | null };
     status: { label: string; tone: BadgeTone };
     value: string | null;

@@ -28,7 +28,7 @@ interface BalanceRow {
     barcode: string | null;
     name: string;
     detail: string | null;
-    is_main: boolean;
+    is_parent: boolean;
     location: string | null;
     on_hand: string;
     on_hand_tone: StatusBadge['tone'];
@@ -50,7 +50,8 @@ interface BalanceRow {
 const props = defineProps<{
     table: TablePayload<BalanceRow>;
     warehouseId: number | null;
-    mainProduct: Option | null;
+    priceGroup: Option | null;
+    groupTotal: { on_hand: string; weight: string; value: string | null; variations: number } | null;
     warehouseOptions: Option[];
     statusOptions: Option[];
     canSeeCost: boolean;
@@ -82,19 +83,18 @@ const columns = computed<TableColumn[]>(() => [
 
 const filters = computed<TableFilter[]>(() => [
     { key: 'warehouse', label: t('Warehouse'), options: props.warehouseOptions },
-    // The aluminium type is chosen above the table (a long list); its chip shows and clears it here.
-    { key: 'main_product', label: t('Aluminum Type'), options: props.mainProduct ? [props.mainProduct] : [] },
+    // The price group (category × colour) is chosen above the table (a long list); its chip shows and clears it here.
+    { key: 'price_group', label: t('Price Group'), options: props.priceGroup ? [props.priceGroup] : [] },
     { key: 'status', label: t('Status'), options: props.statusOptions },
-    { type: 'boolean', key: 'main_items', label: t('Main items only (aluminum types)') },
     { type: 'boolean', key: 'with_stock', label: t('Only items with stock or movements'), trueLabel: t('Yes'), falseLabel: t('All items') },
 ]);
 
-const mainProductId = ref<string | number | null>(props.mainProduct?.value ?? null);
+const priceGroupId = ref<string | number | null>(props.priceGroup?.value ?? null);
 
-/** A new aluminium type reloads the page with it, keeping the other filters. */
-function chooseMainProduct(value: string | number | null | undefined): void {
-    mainProductId.value = value ?? null;
-    const filter = { ...props.table.query.filter, main_product: value ?? undefined };
+/** A new price group reloads the page with its colours, keeping the other filters. */
+function choosePriceGroup(value: string | number | null | undefined): void {
+    priceGroupId.value = value ?? null;
+    const filter = { ...props.table.query.filter, price_group: value ?? undefined };
 
     router.get(window.location.pathname, { filter, sort: props.table.query.sort }, { preserveScroll: true });
 }
@@ -119,17 +119,24 @@ function labelsUrl(ids: (number | string)[]): string {
     <Card class="mb-4">
         <div class="grid gap-4 md:grid-cols-3">
             <RemoteSelect
-                :model-value="mainProductId"
-                :url="route('accounting.inventory.stock.main-products')"
-                :initial="mainProduct ? [mainProduct] : []"
-                :label="t('Aluminum Type')"
+                :model-value="priceGroupId"
+                :url="route('accounting.inventory.stock.price-groups')"
+                :initial="priceGroup ? [priceGroup] : []"
+                :label="t('Price Group')"
                 :placeholder="t('All')"
-                @update:model-value="chooseMainProduct"
+                @update:model-value="choosePriceGroup"
             />
+            <!-- The chosen group's total: the sum of its colours. -->
+            <div v-if="groupTotal" class="md:col-span-2 flex flex-wrap items-end gap-x-6 gap-y-1 text-sm">
+                <span class="text-muted">{{ t('Group total') }} ({{ t(':count colours', { count: groupTotal.variations }) }}):</span>
+                <span>{{ t('On Hand') }}: <b class="tabular-nums" dir="ltr">{{ groupTotal.on_hand }}</b></span>
+                <span>{{ t('Weight') }}: <b class="tabular-nums" dir="ltr">{{ groupTotal.weight }}</b> {{ t('kg') }}</span>
+                <span v-if="groupTotal.value !== null">{{ t('Stock Value') }}: <b class="tabular-nums" dir="ltr">{{ groupTotal.value }}</b></span>
+            </div>
         </div>
     </Card>
 
-    <DataTable :key="String(mainProduct?.value ?? '')" :table="table" :columns="columns" :filters="filters" :selectable="can('Shelf Label Print')" :row-class="(row) => toneRow[row.status.tone]" :empty-title="t('No items found')">
+    <DataTable :key="String(priceGroup?.value ?? '')" :table="table" :columns="columns" :filters="filters" :selectable="can('Shelf Label Print')" :row-class="(row) => toneRow[row.status.tone]" :empty-title="t('No items found')">
         <template #bulk="{ selected }">
             <Button size="sm" external new-tab :href="labelsUrl(selected)"><QrCode />{{ t('Print Shelf Labels') }}</Button>
         </template>
@@ -147,7 +154,7 @@ function labelsUrl(ids: (number | string)[]): string {
         </template>
         <template #cell-location="{ row }"><bdi class="font-mono text-xs" dir="ltr">{{ row.location ?? '-' }}</bdi></template>
         <template #cell-on_hand="{ row }"><b class="tabular-nums" :class="toneText[row.on_hand_tone]" dir="ltr">{{ row.on_hand }}</b></template>
-        <template #cell-weight="{ row }"><span class="tabular-nums" :class="row.is_main ? 'font-semibold' : ''" dir="ltr">{{ row.weight }}</span></template>
+        <template #cell-weight="{ row }"><span class="tabular-nums" :class="row.is_parent ? 'font-semibold' : ''" dir="ltr">{{ row.weight }}</span></template>
         <template #cell-reserved="{ row }"><span class="tabular-nums text-warning-600 dark:text-warning-400" dir="ltr">{{ row.reserved }}</span></template>
         <template #cell-incoming="{ row }"><span class="tabular-nums text-blue-light-600 dark:text-blue-light-400" dir="ltr">{{ row.incoming }}</span></template>
         <template #cell-available="{ row }"><span class="tabular-nums" :class="row.available_negative ? 'text-error-600' : ''" dir="ltr">{{ row.available }}</span></template>

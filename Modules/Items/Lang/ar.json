@@ -632,5 +632,6 @@
     "Finish View List": "عرض قائمة الألوان",
     "Finish Create": "إضافة لون",
     "Finish Update": "تعديل لون",
-    "Finish Delete": "حذف لون"
+    "Finish Delete": "حذف لون",
+    "This item has colours: its balance is the total of its colours, and stock is received and delivered on each colour.": "لهذا الصنف ألوان: رصيده مجموع أرصدة ألوانه، ويُستلم المخزون ويُسلَّم على كل لون."
 }

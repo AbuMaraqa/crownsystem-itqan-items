@@ -24,7 +24,7 @@ interface Row {
     alert_id: number;
     name: string;
     code: string | null;
-    main_product: string | null;
+    price_group: string | null;
     quantity: string;
     min_limit_1: string;
     min_limit_2: string;
@@ -106,7 +106,7 @@ function openItem(id: number): void {
                     <thead class="bg-gray-50/80 text-[13px] text-gray-500 dark:bg-white/[0.02] dark:text-gray-400">
                         <tr class="border-b border-line">
                             <th class="px-4 py-2.5 text-start font-medium">{{ t('Item') }}</th>
-                            <th v-if="isAluminum" class="px-4 py-2.5 text-start font-medium">{{ t('Aluminum Type') }}</th>
+                            <th v-if="isAluminum" class="px-4 py-2.5 text-start font-medium">{{ t('Price Group') }}</th>
                             <th class="px-4 py-2.5 text-end font-medium">{{ t('Quantity') }}</th>
                             <th class="px-4 py-2.5 text-end font-medium">{{ t('Min Limit 1') }}</th>
                             <th class="px-4 py-2.5 text-end font-medium">{{ t('Min Limit 2') }}</th>
@@ -128,7 +128,7 @@ function openItem(id: number): void {
                                 <div class="font-medium text-gray-900 dark:text-white">{{ row.name }}</div>
                                 <div class="text-xs text-muted"><bdi dir="ltr">{{ row.code }}</bdi></div>
                             </td>
-                            <td v-if="isAluminum" class="px-4 py-2.5 text-gray-600 dark:text-gray-300">{{ row.main_product ?? '—' }}</td>
+                            <td v-if="isAluminum" class="px-4 py-2.5 text-gray-600 dark:text-gray-300">{{ row.price_group ?? '—' }}</td>
                             <td class="px-4 py-2.5 text-end font-semibold tabular-nums" dir="ltr">{{ row.quantity }}</td>
                             <td class="px-4 py-2.5 text-end tabular-nums" dir="ltr">{{ row.min_limit_1 }}</td>
                             <td class="px-4 py-2.5 text-end tabular-nums" dir="ltr">{{ row.min_limit_2 }}</td>

@@ -28,7 +28,7 @@ use Modules\Accounting\Support\SelectOptions;
 use Modules\Accounting\Support\StatusBadge;
 use Modules\Core\Support\AdminFilter;
 use Modules\Items\Entities\Product;
-use Modules\Items\Support\ProductSearch;
+use Modules\Items\Support\PriceGroupSearch;
 use Modules\Core\Support\RecordInfo;
 
 /**
@@ -76,7 +76,7 @@ class StockAdjustmentController extends Controller
         $type = StockAdjustmentType::tryFrom((string) $request->query('type')) ?? StockAdjustmentType::COUNT;
         $warehouseId = $request->integer('warehouse') ?: ((int) array_key_first(Warehouse::options()) ?: null);
         $product = $request->integer('product') ? Product::query()->with('translations')->find($request->integer('product')) : null;
-        $lines = $product && ! $product->isService() ? InventoryLines::byMainItem([$this->service->newLine($product, $type, $warehouseId)]) : [];
+        $lines = $product && ! $product->isService() ? InventoryLines::byPriceGroup([$this->service->newLine($product, $type, $warehouseId)]) : [];
 
         return Inertia::render('Accounting/Inventory/StockAdjustment/Add', [
             'adjustment' => [
@@ -123,7 +123,7 @@ class StockAdjustmentController extends Controller
     public function edit(int $stockAdjustment): Response
     {
         $adjustment = $this->adjustments->findForPage($stockAdjustment);
-        $lines = InventoryLines::byMainItem($adjustment->items->map(fn (StockAdjustmentItem $item) => [
+        $lines = InventoryLines::byPriceGroup($adjustment->items->map(fn (StockAdjustmentItem $item) => [
             'id' => $item->id,
             'product_id' => $item->product_id,
             'barcode' => $item->barcode,
@@ -244,39 +244,33 @@ class StockAdjustmentController extends Controller
 
         $line = $this->service->newLine($product, StockAdjustmentType::from($data['type']), $data['warehouse_id'] ?? null);
 
-        return response()->json(InventoryLines::byMainItem([$line])[0]);
+        return response()->json(InventoryLines::byPriceGroup([$line])[0]);
     }
 
     /**
-     * كشف الجرد: اصناف المخزن، او نوع المنيوم واحد، دون الموجود في المستند.
+     * كشف الجرد: اصناف المخزن، او ألوان مجموعة سعر واحدة، دون الموجود في المستند.
      */
     public function countSheet(Request $request): JsonResponse
     {
         $data = $request->validate([
             'warehouse_id' => ['required', 'integer'],
-            'main_product_id' => ['nullable', 'integer'],
+            'price_group_id' => ['nullable', 'integer'],
             'except' => ['array'],
             'except.*' => ['integer'],
         ]);
         $warehouse = Warehouse::query()->findOrFail($data['warehouse_id']);
 
-        return response()->json(InventoryLines::byMainItem($this->service->countSheetLines($warehouse, $data['main_product_id'] ?? null, $data['except'] ?? [])));
+        return response()->json(InventoryLines::byPriceGroup($this->service->countSheetLines($warehouse, $data['price_group_id'] ?? null, $data['except'] ?? [])));
     }
 
     /**
-     * انواع الالمنيوم (اصناف رئيسية) لتحميل كشف جرد نوع واحد.
+     * مجموعات السعر (التصنيف × اللون) لتحميل كشف جرد مجموعة واحدة.
      */
-    public function mainProducts(Request $request): JsonResponse
+    public function priceGroups(Request $request): JsonResponse
     {
         $term = trim($request->string('q')->toString());
 
-        if ($term === '') {
-            return response()->json([]);
-        }
-
-        $mainIds = ProductSearch::idsWithSubProducts(ProductSearch::find($term, 30)->ids);
-
-        return response()->json(SelectOptions::from(ProductSearch::labels(array_slice($mainIds, 0, 10))));
+        return response()->json($term === '' ? [] : SelectOptions::from(PriceGroupSearch::options($term, 10)));
     }
 
     private function find(int $id): StockAdjustment

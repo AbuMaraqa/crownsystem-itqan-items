@@ -25,7 +25,7 @@ export interface ItemCardProduct {
     id: number;
     name: string;
     image: string | null;
-    main_product: string | null;
+    price_group: string | null;
     barcode: string | null;
     sku: string | null;
     weight_per_meter: string | null;

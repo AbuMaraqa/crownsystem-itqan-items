@@ -34,7 +34,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
                 Route::controller(StockBalanceController::class)->prefix('stock')->as('stock.')->group(function () {
                     Route::get('/', 'index')->name('index')->can('Stock View List');
-                    Route::get('/main-products', 'mainProducts')->name('main-products')->can('Stock View List');
+                    Route::get('/price-groups', 'priceGroups')->name('price-groups')->can('Stock View List');
                 });
 
                 Route::controller(ItemStockCardController::class)->prefix('items')->as('item-card')->group(function () {
@@ -115,7 +115,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::get('/products', 'products')->name('products')->can('Stock Adjustment View List');
                     Route::get('/line', 'line')->name('line')->can('Stock Adjustment View List');
                     Route::get('/count-sheet', 'countSheet')->name('count-sheet')->can('Stock Adjustment View List');
-                    Route::get('/main-products', 'mainProducts')->name('main-products')->can('Stock Adjustment View List');
+                    Route::get('/price-groups', 'priceGroups')->name('price-groups')->can('Stock Adjustment View List');
                     Route::get('/{stockAdjustment}', 'edit')->whereNumber('stockAdjustment')->name('edit')->can('Stock Adjustment View List');
                     Route::put('/{stockAdjustment}', 'update')->whereNumber('stockAdjustment')->name('update')->can('Stock Adjustment Update');
                     Route::post('/{stockAdjustment}/post', 'post')->whereNumber('stockAdjustment')->name('post')->can('Stock Adjustment Post');

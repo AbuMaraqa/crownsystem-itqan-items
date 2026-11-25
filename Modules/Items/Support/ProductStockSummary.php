@@ -29,13 +29,13 @@ final class ProductStockSummary
 
         $summary = app(StockLevelService::class)->productSummary($product);
         $levels = $summary['levels'];
-        $isMain = (bool) $summary['mainLevels'];
+        $isParent = (bool) $summary['parentLevels'];
         $canSeeValue = $user->can('Stock Value View');
         $fmt = fn ($value, int $decimals = 2): string => Quantity::format($value, $decimals);
 
         $cost = null;
 
-        if ($canSeeValue && ! $isMain && $summary['cost']) {
+        if ($canSeeValue && ! $isParent && $summary['cost']) {
             $average = (float) $summary['cost']->average_cost;
             $value = (float) $levels['on_hand'] * $average;
 
@@ -48,7 +48,7 @@ final class ProductStockSummary
         }
 
         return [
-            'is_main' => $isMain,
+            'is_parent' => $isParent,
             'levels' => [
                 'on_hand' => $fmt($levels['on_hand']),
                 'reserved' => $fmt($levels['reserved']),
@@ -58,7 +58,7 @@ final class ProductStockSummary
                 'weight' => (float) $levels['weight'] > 0 ? $fmt($levels['weight']) : null,
             ],
             'status' => ['label' => (string) $summary['status']->getLabel(), 'tone' => StatusBadge::tone($summary['status']->color())],
-            'value' => $canSeeValue && $isMain ? $fmt($summary['mainLevels']['value']) : null,
+            'value' => $canSeeValue && $isParent ? $fmt($summary['parentLevels']['value']) : null,
             'cost' => $cost,
             'warehouses' => array_map(fn (array $row) => [
                 'name' => $row['name'],
@@ -110,9 +110,10 @@ final class ProductStockSummary
             $links[] = ['label' => __('Item Stock Card'), 'href' => route('accounting.inventory.item-card', $product)];
         }
 
-        $isMain = Product::query()->where('main_product_id', $product->id)->exists();
+        // الصنف الاب لا رصيد له: رصيده على ألوانه، فرصيدها الافتتاحي يُدخل على كل لون.
+        $isParent = Product::query()->where('parent_id', $product->id)->exists();
 
-        if (! $isMain && $user->can('Stock Adjustment Create') && Route::has('accounting.inventory.adjustments.add')) {
+        if (! $isParent && $user->can('Stock Adjustment Create') && Route::has('accounting.inventory.adjustments.add')) {
             $links[] = [
                 'label' => __('Opening Balance'),
                 'href' => route('accounting.inventory.adjustments.add', ['type' => StockAdjustmentType::OPENING->value, 'product' => $product->id]),

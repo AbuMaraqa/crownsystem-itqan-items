@@ -21,7 +21,7 @@ defineProps<{ stock: StockSummary | null; links: { label: string; href: string }
             <div class="space-y-1">
                 <p class="font-semibold">{{ t('Quantities are not entered on the item.') }}</p>
                 <p>{{ t('Stock changes only through inventory documents: opening balance, goods receipt, delivery note, transfer and stock count. Each document posts its journal entry, so the stock always matches the accounts.') }}</p>
-                <p v-if="stock?.is_main">{{ t('This is a main item: its balance is the total of its sub-items, and stock is received and delivered on the sub-items.') }}</p>
+                <p v-if="stock?.is_parent">{{ t('This item has colours: its balance is the total of its colours, and stock is received and delivered on each colour.') }}</p>
             </div>
         </div>
 

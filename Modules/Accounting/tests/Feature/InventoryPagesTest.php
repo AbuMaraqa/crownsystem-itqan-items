@@ -259,49 +259,6 @@ class InventoryPagesTest extends TestCase
         }
     }
 
-    public function test_main_item_shows_its_own_kg_and_value_and_the_count_of_its_sub_items(): void
-    {
-        $main = $this->product('المنيوم سبير ابيض', 'MAIN439');
-        $main->update(['pricing_type' => 'weight']);
-        $subA = $this->product('دفة تريس K0581', 'BLT837B');
-        $subB = $this->product('جنب 3 مجاري K4923', 'BLT1571');
-
-        foreach ([$subA, $subB] as $sub) {
-            $sub->update(['pricing_type' => 'weight', 'main_product_id' => $main->id, 'length' => 6, 'weight_per_meter' => 0.5]);
-            $this->opening($sub, 10, 5);
-        }
-
-        // المقطع بلا قيمة ولو أُدخلت له كلفة؛ الكغم والقيمة على الصنف الرئيسي: 30 كغم × 4 = 120.
-        $this->opening($main, 30, 4);
-
-        // يظهر الصنف الرئيسي في الارصدة، ويُعرض وحده بفلتر «الاصناف الرئيسية».
-        $this->get(route('accounting.inventory.stock.index'))->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->where('table.data', fn ($rows) => collect($rows)->pluck('barcode')->intersect(['MAIN439', 'BLT837B'])->count() === 2));
-        $this->get(route('accounting.inventory.stock.index', ['filter' => ['main_items' => 1]]))->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->where('table.data', fn ($rows) => collect($rows)->pluck('barcode')->all() === ['MAIN439'])
-                ->where('table.data.0.detail', __('Total of :count sub-items', ['count' => 2]))
-                ->where('table.data.0.on_hand', '20')
-                ->where('table.data.0.weight', '30')
-                ->where('table.data.0.stock_value', '120'));
-
-        // نوع الالمنيوم: الصنف الرئيسي ومقاطعه فقط.
-        $this->get(route('accounting.inventory.stock.index', ['filter' => ['main_product' => $main->id]]))->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->where('mainProduct.value', $main->id)
-                ->where('table.meta.total', 3));
-
-        $this->get(route('accounting.inventory.item-card', ['product' => $main->id]))
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->where('card.main.on_hand', '20')
-                ->where('card.main.weight', '30')
-                ->where('card.main.sub_items', 2)
-                ->where('card.main.value', '120')
-                ->where('card.sub_items', fn ($rows) => collect($rows)->pluck('code')->sort()->values()->all() === ['BLT1571', 'BLT837B']));
-
-    }
-
     public function test_stock_balances_keep_the_old_warehouse_link(): void
     {
         $this->get(route('accounting.inventory.stock.index', ['tableFilters' => ['warehouse' => ['value' => $this->warehouse->id]]]))

@@ -79,7 +79,7 @@
                     <td colspan="8">{{ __('Total') }}</td>
                     <td class="num">{{ $fmt($items->sum('stock_on_hand')) }}</td>
                     <td colspan="2"></td>
-                    <td class="num">{{ $fmt($mainWeights[$groupName] ?? $items->sum('stock_weight')) }}</td>
+                    <td class="num">{{ $fmt($items->sum('stock_weight')) }}</td>
                 </tr>
             </tbody>
         </table>

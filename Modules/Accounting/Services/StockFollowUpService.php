@@ -96,7 +96,7 @@ class StockFollowUpService
     public function groups(StockFollowUpCategory $category, string $search = ''): Collection
     {
         $alerts = StockAlert::query()
-            ->with(['product.translations', 'product.mainProduct.translations', 'product.unit.translations'])
+            ->with(['product.translations', 'product.unit.translations'])
             ->whereHas('product', function (Builder $query) use ($category, $search) {
                 $category->scope($query);
 

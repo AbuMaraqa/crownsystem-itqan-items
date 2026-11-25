@@ -76,7 +76,7 @@ class ProductStockFieldsTest extends TestCase
         $summary = app(StockLevelService::class)->productSummary($product);
 
         $this->assertSame(0.0, $summary['levels']['on_hand']);
-        $this->assertNull($summary['mainLevels']);
+        $this->assertNull($summary['parentLevels']);
         $this->assertSame(StockStatus::OUT, $summary['status']);
         $this->assertSame([], $summary['warehouses']);
     }

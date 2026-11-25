@@ -3,7 +3,7 @@
 namespace Modules\Accounting\Support;
 
 use Modules\Items\Entities\Product;
-use Modules\Items\Support\ProductSearch;
+use Modules\Items\Support\PriceGroupSearch;
 
 /**
  * تجميع سطور مستند للعرض كما في شبكة الاصناف: الصنف الرئيسي (صنف الوزن) صف واحد
@@ -43,34 +43,34 @@ class ItemLineGroups
     }
 
     /**
-     * سطور اصناف مسطّحة (تسوية، جرد، تحويل): تُجمع الاصناف الفرعية تحت صنفها الرئيسي
-     * (items_products.main_product_id) باستعلام واحد، والباقي صفوف مستقلة.
+     * سطور اصناف مسطّحة (تسوية، جرد، تحويل): تُجمع ألوان المقاطع تحت مجموعة سعرها
+     * (التصنيف × اللون) باستعلام واحد، والباقي صفوف مستقلة.
      *
      * @param  array<int, array<string, mixed>>  $lines
      * @return array<int, array{key: string, main: bool, label: ?string, lines: array<int, array<string, mixed>>}>
      */
-    public static function byMainItem(array $lines, string $productKey = 'product_id'): array
+    public static function byPriceGroup(array $lines, string $productKey = 'product_id'): array
     {
         $productIds = collect($lines)->pluck($productKey)->filter()->map(fn ($id) => (int) $id)->unique()->values()->all();
 
-        $mainOf = $productIds === []
+        $groupOf = $productIds === []
             ? []
-            : Product::query()->whereIn('id', $productIds)->whereNotNull('main_product_id')->pluck('main_product_id', 'id')->all();
+            : Product::query()->whereIn('id', $productIds)->whereNotNull('category_finish_id')->pluck('category_finish_id', 'id')->all();
 
-        $labels = ProductSearch::labels(array_values($mainOf));
+        $labels = PriceGroupSearch::labels(array_values(array_unique($groupOf)));
         $groups = [];
 
         foreach ($lines as $index => $line) {
-            $mainId = $mainOf[(int) ($line[$productKey] ?? 0)] ?? null;
+            $groupId = $groupOf[(int) ($line[$productKey] ?? 0)] ?? null;
 
-            if (! $mainId) {
+            if (! $groupId) {
                 $groups['line-'.$index] = ['key' => 'line-'.$index, 'main' => false, 'label' => null, 'lines' => [$index => $line]];
 
                 continue;
             }
 
-            $key = 'main-'.$mainId;
-            $groups[$key] ??= ['key' => $key, 'main' => true, 'label' => $labels[$mainId] ?? null, 'lines' => []];
+            $key = 'group-'.$groupId;
+            $groups[$key] ??= ['key' => $key, 'main' => true, 'label' => $labels[$groupId] ?? null, 'lines' => []];
             $groups[$key]['lines'][$index] = $line;
         }
 

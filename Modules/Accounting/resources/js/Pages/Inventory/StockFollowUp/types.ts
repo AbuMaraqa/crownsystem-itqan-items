@@ -11,7 +11,7 @@ export interface Details {
     id: number;
     label: string;
     code: string | null;
-    main_product: string | null;
+    price_group: string | null;
     since: string | null;
     quantity: string;
     max_limit: string;

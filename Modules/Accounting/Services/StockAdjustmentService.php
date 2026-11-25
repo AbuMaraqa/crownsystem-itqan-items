@@ -214,7 +214,7 @@ class StockAdjustmentService
      * @param  array<int, int>|null  $productIds
      * @return array<int, array<string, mixed>>
      */
-    public function countSheet(Warehouse $warehouse, ?array $productIds = null, ?int $mainProductId = null): array
+    public function countSheet(Warehouse $warehouse, ?array $productIds = null, ?int $priceGroupId = null): array
     {
         $levels = app(StockLevelService::class);
         $ids = $productIds ?? ProductLocation::query()
@@ -228,7 +228,7 @@ class StockAdjustmentService
         $products = Product::query()
             ->with('translations')
             ->whereIn('id', $ids)
-            ->when($mainProductId, fn ($query) => $query->where(fn ($q) => $q->where('main_product_id', $mainProductId)->orWhere($q->qualifyColumn('id'), $mainProductId)))
+            ->when($priceGroupId, fn ($query) => $query->where('category_finish_id', $priceGroupId))
             ->orderBy('barcode')
             ->get();
         $onHand = $levels->levels($products->pluck('id')->all(), $warehouse->id);
@@ -244,16 +244,16 @@ class StockAdjustmentService
     }
 
     /**
-     * كشف الجرد في الشاشة: اصناف المخزن، او نوع المنيوم واحد (الصنف الرئيسي يُعدّ بالكغم
-     * ومقاطعه بالعدد)، دون الاصناف الموجودة في المستند.
+     * كشف الجرد في الشاشة: اصناف المخزن، او ألوان مجموعة سعر واحدة (التصنيف × اللون، تُعدّ
+     * بالقطعة)، دون الاصناف الموجودة في المستند.
      *
      * @param  array<int, int|string>  $exceptProductIds
      * @return list<array<string, mixed>>
      */
-    public function countSheetLines(Warehouse $warehouse, ?int $mainProductId = null, array $exceptProductIds = []): array
+    public function countSheetLines(Warehouse $warehouse, ?int $priceGroupId = null, array $exceptProductIds = []): array
     {
-        $ids = $mainProductId
-            ? Product::query()->where('main_product_id', $mainProductId)->pluck('id')->push($mainProductId)->all()
+        $ids = $priceGroupId
+            ? Product::query()->where('category_finish_id', $priceGroupId)->pluck('id')->all()
             : null;
         $except = array_map('intval', $exceptProductIds);
 

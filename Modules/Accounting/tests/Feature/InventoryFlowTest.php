@@ -158,35 +158,6 @@ class InventoryFlowTest extends TestCase
         $this->assertSame(3000.0, $this->balance($warehouseAccount));
     }
 
-    public function test_main_item_holds_its_own_kg_and_value_and_counts_its_sub_items(): void
-    {
-        [$order, $subA, $subB] = $this->weightPurchaseOrder();
-        $mainId = $subA->main_product_id;
-        $levels = app(StockLevelService::class);
-
-        $this->assertSame(30.0, $levels->mainItemLevels([$mainId], $this->warehouse->id)[$mainId]['incoming']);
-
-        app(GoodsReceiptService::class)->post($this->receive($order, ['piece:A' => 10, 'piece:B' => 20]));
-
-        $main = $levels->mainItemLevels([$mainId, $subA->id], $this->warehouse->id);
-        // الصنف الفرعي ليس رئيسياً فلا يظهر؛ الرئيسي: 30 قطعة من مقاطعه، و180 كغ (بلا وزن فعلي
-        // يأخذ المحسوب) بقيمة 3000 في صفّه هو.
-        $this->assertSame([$mainId], array_keys($main));
-        $this->assertSame(30.0, $main[$mainId]['on_hand']);
-        $this->assertSame(180.0, $main[$mainId]['weight']);
-        $this->assertSame(3000.0, $main[$mainId]['value']);
-        $this->assertSame(0.0, $main[$mainId]['incoming']);
-        $this->assertSame(2, $main[$mainId]['sub_items']);
-
-        // للرئيسي رصيده بالكغم، والوزن المحسوب على الفرعي للمعلومة.
-        $this->assertSame(180.0, app(StockLedgerService::class)->onHand($mainId, $this->warehouse->id));
-        $this->assertSame(90.0, (float) Product::find($subA->id)->stock_weight);
-        $this->assertSame(90.0, (float) Product::find($subB->id)->stock_weight);
-
-        $this->assertSame([$mainId], Product::query()->mainItems()->whereIn('id', [$mainId, $subA->id, $subB->id])->pluck('id')->all());
-        $this->assertEqualsCanonicalizing([$subA->id, $subB->id], Product::query()->withoutMainItems()->whereIn('id', [$mainId, $subA->id, $subB->id])->pluck('id')->all());
-    }
-
     public function test_purchase_invoice_clears_grni_and_books_price_variance(): void
     {
         [$order] = $this->weightPurchaseOrder();

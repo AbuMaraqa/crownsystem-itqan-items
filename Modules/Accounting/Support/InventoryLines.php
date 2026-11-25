@@ -29,14 +29,14 @@ final class InventoryLines
     }
 
     /**
-     * سطور اصناف مسطّحة (تحويل، تسوية، جرد): الصنف الفرعي تحت صنفه الرئيسي.
+     * سطور اصناف مسطّحة (تحويل، تسوية، جرد): لون المقطع تحت مجموعة سعره (التصنيف × اللون).
      *
      * @param  array<int, array<string, mixed>>  $lines
      * @return list<array<string, mixed>>
      */
-    public static function byMainItem(array $lines): array
+    public static function byPriceGroup(array $lines): array
     {
-        return self::tag($lines, ItemLineGroups::byMainItem($lines));
+        return self::tag($lines, ItemLineGroups::byPriceGroup($lines));
     }
 
     /**
@@ -71,7 +71,7 @@ final class InventoryLines
             return null;
         }
 
-        return self::byMainItem([[
+        return self::byPriceGroup([[
             'product_id' => $product->id,
             'barcode' => $product->barcode,
             'description' => $product->name,

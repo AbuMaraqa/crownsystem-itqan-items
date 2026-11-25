@@ -90,11 +90,11 @@ async function addProduct(option: Option): Promise<void> {
 
 const loading = ref(false);
 
-/** The count sheet: the warehouse's items, or one aluminium type, without those already listed. */
-async function loadCountSheet(mainProductId: number | string | null): Promise<void> {
+/** The count sheet: the warehouse's items, or the colours of one price group, without those already listed. */
+async function loadCountSheet(priceGroupId: number | string | null): Promise<void> {
     if (!props.form.warehouse_id) return;
 
-    if (mainProductId === null && !(await confirm({ title: t('Load all items stored in this warehouse?'), confirmLabel: t('Load Warehouse Items'), tone: 'primary' }))) return;
+    if (priceGroupId === null && !(await confirm({ title: t('Load all items stored in this warehouse?'), confirmLabel: t('Load Warehouse Items'), tone: 'primary' }))) return;
 
     loading.value = true;
 
@@ -102,7 +102,7 @@ async function loadCountSheet(mainProductId: number | string | null): Promise<vo
         const rows = await getJson<AdjustmentLine[]>(
             route('accounting.inventory.adjustments.count-sheet', {
                 warehouse_id: props.form.warehouse_id,
-                main_product_id: mainProductId ?? undefined,
+                price_group_id: priceGroupId ?? undefined,
                 except: props.form.items.map((line) => line.product_id),
             }),
         );
@@ -187,7 +187,7 @@ const hint = computed(() =>
                     </div>
                     <template v-if="isCount">
                         <div class="w-64">
-                            <SearchPicker :url="route('accounting.inventory.adjustments.main-products')" :placeholder="t('Load an aluminum type...')" @pick="(option) => loadCountSheet(option.value)" />
+                            <SearchPicker :url="route('accounting.inventory.adjustments.price-groups')" :placeholder="t('Load a price group...')" @pick="(option) => loadCountSheet(option.value)" />
                         </div>
                         <Button :loading="loading" :disabled="!form.warehouse_id" @click="loadCountSheet(null)"><List />{{ t('Load Warehouse Items') }}</Button>
                     </template>

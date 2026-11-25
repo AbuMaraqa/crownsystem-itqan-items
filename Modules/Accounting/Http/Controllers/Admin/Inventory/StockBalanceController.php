@@ -15,6 +15,7 @@ use Modules\Accounting\Support\SelectOptions;
 use Modules\Accounting\Support\StockStatus;
 use Modules\Core\Support\AdminTable;
 use Modules\Items\Entities\Product;
+use Modules\Items\Support\PriceGroupSearch;
 use Modules\Items\Support\ProductSearch;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
@@ -34,7 +35,6 @@ class StockBalanceController extends Controller
             $legacy = (array) $request->input('tableFilters', []);
             $filter = array_filter([
                 'warehouse' => $legacy['warehouse']['value'] ?? null,
-                'main_product' => $legacy['main_product']['value'] ?? null,
                 'status' => $legacy['status']['value'] ?? null,
             ], fn ($value) => filled($value));
 
@@ -43,9 +43,9 @@ class StockBalanceController extends Controller
 
         $filters = (array) $request->input('filter', []);
         $warehouseId = filled($filters['warehouse'] ?? null) ? (int) $filters['warehouse'] : null;
-        $mainProductId = filled($filters['main_product'] ?? null) ? (int) $filters['main_product'] : null;
+        $priceGroupId = filled($filters['price_group'] ?? null) ? (int) $filters['price_group'] : null;
         $canSeeCost = (bool) $request->user()?->can('Stock Value View');
-        $query = $this->balances->query($warehouseId);
+        $query = $this->balances->query($warehouseId, $priceGroupId);
 
         // «فقط الاصناف التي لها رصيد او حركة» مفعّل افتراضياً؛ filter[with_stock]=0 يعرض الكل.
         if (! array_key_exists('with_stock', $filters)) {
@@ -56,9 +56,8 @@ class StockBalanceController extends Controller
             ->filters(
                 AllowedFilter::callback('search', fn (Builder $query, mixed $value) => ProductSearch::apply($query, trim((string) $value))),
                 AllowedFilter::callback('warehouse', fn (Builder $query) => $query),
-                AllowedFilter::callback('main_product', fn (Builder $query, mixed $value) => $this->balances->applyMainProduct($query, (int) $value)),
+                AllowedFilter::callback('price_group', fn (Builder $query) => $query),
                 AllowedFilter::callback('status', fn (Builder $query, mixed $value) => $this->balances->applyStatus($query, (string) $value)),
-                AllowedFilter::callback('main_items', fn (Builder $query, mixed $value) => filter_var($value, FILTER_VALIDATE_BOOLEAN) ? $query->mainItems() : $query),
                 AllowedFilter::callback('with_stock', fn (Builder $query, mixed $value) => filter_var($value, FILTER_VALIDATE_BOOLEAN) ? $this->balances->applyWithStock($query, $warehouseId) : $query),
             )
             ->sorts(
@@ -74,29 +73,26 @@ class StockBalanceController extends Controller
         return Inertia::render('Accounting/Inventory/StockBalances/Index', [
             'table' => $table,
             'warehouseId' => $warehouseId,
-            'mainProduct' => $mainProductId ? ['value' => $mainProductId, 'label' => (string) ProductSearch::label($mainProductId)] : null,
+            'priceGroup' => $priceGroupId ? ['value' => $priceGroupId, 'label' => (string) (PriceGroupSearch::labels([$priceGroupId])[$priceGroupId] ?? '')] : null,
+            'groupTotal' => $this->balances->groupTotal($priceGroupId, $warehouseId, $canSeeCost),
             'warehouseOptions' => SelectOptions::from(Warehouse::options()),
             'statusOptions' => SelectOptions::from(StockStatus::options()),
             'canSeeCost' => $canSeeCost,
             'printUrl' => route('accounting.inventory.print.stock-report', array_filter([
                 'warehouse' => $warehouseId,
-                'main_product' => $mainProductId,
+                'price_group' => $priceGroupId,
                 'status' => $filters['status'] ?? null,
             ])),
         ]);
     }
 
     /**
-     * انواع الالمنيوم (الاصناف الرئيسية) لفلتر «نوع الالمنيوم».
+     * مجموعات السعر (التصنيف × اللون) لفلتر «المجموعة»، مثل «الوبين — أبيض».
      */
-    public function mainProducts(Request $request): JsonResponse
+    public function priceGroups(Request $request): JsonResponse
     {
         $term = trim($request->string('q')->toString());
 
-        if ($term === '') {
-            return response()->json([]);
-        }
-
-        return response()->json(SelectOptions::from(ProductSearch::labels(ProductSearch::idsWithSubProducts(ProductSearch::find($term, 40)->ids))));
+        return response()->json($term === '' ? [] : SelectOptions::from(PriceGroupSearch::options($term, 40)));
     }
 }

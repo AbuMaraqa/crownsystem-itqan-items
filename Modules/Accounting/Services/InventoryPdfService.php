@@ -14,6 +14,7 @@ use Modules\Accounting\Support\StockStatus;
 use Modules\Core\Services\PdfService;
 use Modules\Core\Support\DashboardTheme;
 use Modules\Items\Entities\Product;
+use Modules\Items\Support\PriceGroupSearch;
 
 /**
  * مطبوعات المخزن: بطاقات الرفوف، تقرير الارصدة بنوع الالمنيوم، والمستندات.
@@ -53,9 +54,10 @@ class InventoryPdfService extends PdfService
     }
 
     /**
-     * تقرير ارصدة المخزن مجمّعاً بنوع الالمنيوم (الصنف الرئيسي) كالتقرير الورقي.
+     * تقرير ارصدة المخزن مجمّعاً بمجموعة السعر (التصنيف × اللون) كالتقرير الورقي؛ وزن المجموعة
+     * مجموع اوزان ألوانها.
      */
-    public function stockReport(?int $warehouseId, ?int $mainProductId, ?string $status)
+    public function stockReport(?int $warehouseId, ?int $priceGroupId, ?string $status)
     {
         $warehouse = $warehouseId ? Warehouse::query()->with('translations')->find($warehouseId) : null;
         $balances = DB::table(config('accounting.table_prefix').'stock_balances')
@@ -65,12 +67,12 @@ class InventoryPdfService extends PdfService
         $products = (new Product)->getTable();
 
         $query = Product::query()
-            ->with(['translations', 'mainProduct.translations', 'categories.translations', 'media'])
+            ->with(['translations', 'categories.translations', 'media'])
             ->joinSub($balances, 'balances', 'balances.product_id', '=', $products.'.id')
             ->select($products.'.*')
             ->selectRaw('balances.quantity as stock_on_hand, balances.weight as stock_weight')
-            ->when($mainProductId, fn ($q) => $q->where(fn ($w) => $w->where($products.'.main_product_id', $mainProductId)->orWhere($products.'.id', $mainProductId)))
-            ->orderBy($products.'.main_product_id')
+            ->when($priceGroupId, fn ($q) => $q->where($products.'.category_finish_id', $priceGroupId))
+            ->orderBy($products.'.category_finish_id')
             ->orderBy($products.'.barcode');
 
         StockStatus::applyFilter($query, $status);
@@ -82,28 +84,12 @@ class InventoryPdfService extends PdfService
         $incoming = $levels->incoming($ids, $warehouseId);
         $locations = $warehouseId ? $levels->locations($ids, $warehouseId) : [];
 
-        // صف الصنف الرئيسي (كغمه الفعلي) لا يُعرض سطراً بين مقاطعه: كغمه هو اجمالي وزن مجموعته،
-        // ولا يُجمع مع الوزن المحسوب للمقاطع.
-        $mainIds = Product::query()->whereIn('main_product_id', $ids)->pluck('main_product_id')
-            ->merge($items->pluck('main_product_id')->filter())->unique()->flip();
-        $mainWeights = [];
-
-        foreach ($items->filter(fn (Product $product) => $mainIds->has($product->id)) as $main) {
-            $mainWeights[$main->name] = (float) $main->stock_weight;
-        }
-
-        $groups = $items
-            ->reject(fn (Product $product) => $mainIds->has($product->id))
-            ->groupBy(fn (Product $product) => $product->mainProduct?->name ?? __('Other Items'));
-
-        foreach ($mainWeights as $name => $weight) {
-            $groups[$name] ??= collect();
-        }
+        $groupLabels = PriceGroupSearch::labels($items->pluck('category_finish_id')->filter()->unique()->values()->all());
+        $groups = $items->groupBy(fn (Product $product) => $groupLabels[(int) $product->category_finish_id] ?? __('Other Items'));
 
         return $this->streamPdf('accounting::pdf.inventory.stock-report', [
             'warehouse' => $warehouse,
             'groups' => $groups,
-            'mainWeights' => $mainWeights,
             'reserved' => $reserved,
             'incoming' => $incoming,
             'locations' => $locations,

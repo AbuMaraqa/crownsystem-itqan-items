@@ -115,7 +115,7 @@ class StockTransferController extends Controller
     public function edit(int $stockTransfer): Response
     {
         $transfer = $this->transfers->findForPage($stockTransfer);
-        $lines = InventoryLines::byMainItem($transfer->items->map(fn (StockTransferItem $item) => [
+        $lines = InventoryLines::byPriceGroup($transfer->items->map(fn (StockTransferItem $item) => [
             'id' => $item->id,
             'product_id' => $item->product_id,
             'barcode' => $item->barcode,

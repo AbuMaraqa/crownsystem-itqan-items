@@ -77,7 +77,7 @@ class StockAlertService
 
         return DB::transaction(function () use ($productId, $notify): ?StockAlertLevel {
             // قفل الصنف يمنع حسابين متزامنين لنفس الصنف من ادخاله القسم مرتين.
-            $product = Product::query()->with(['translations', 'mainProduct'])->lockForUpdate()->find($productId);
+            $product = Product::query()->with(['translations'])->lockForUpdate()->find($productId);
 
             if (! $product) {
                 StockAlert::query()->where('product_id', $productId)->delete();
@@ -150,12 +150,12 @@ class StockAlertService
     }
 
     /**
-     * الصنف الرئيسي وعاء لاصنافه الفرعية (يُتابَع كل فرع وحده)، والخدمات لا مخزون لها.
+     * الصنف الاب وعاء لألوانه (يُتابَع كل لون وحده)، والخدمات لا مخزون لها.
      */
     private function isTracked(Product $product): bool
     {
         return ! $product->isService()
-            && ! Product::query()->where('main_product_id', $product->id)->exists();
+            && ! Product::query()->where('parent_id', $product->id)->exists();
     }
 
     private function notify(Product $product, StockAlertLevel $level, float $quantity): void

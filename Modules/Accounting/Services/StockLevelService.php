@@ -3,6 +3,7 @@
 namespace Modules\Accounting\Services;
 
 use DomainException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\Accounting\Entities\ProductCost;
@@ -70,93 +71,73 @@ class StockLevelService
     }
 
     /**
-     * الصنف الرئيسي (نوع الالمنيوم، مثل «المنيوم سبير ابيض») كما في اتقان: الكغم الفعلي والقيمة
-     * صفّه هو، ولا يُجمعان من مقاطعه ولا يُسوَّى احد الرصيدين بالآخر. عدد القطع والمحجوز والقادم
-     * مجموع مقاطعه. هذا هو المصدر الوحيد لرصيد الصنف الرئيسي في كل الشاشات.
+     * الصنف الاب (المقطع، مثل «ثابت مجرين W45»): رصيده مجموع ألوانه، كل لون بعدده ووزنه وقيمة طبقاته.
+     * مصدر واحد لرصيد الصنف الاب في كل الشاشات.
      *
-     * @param  array<int, int>  $mainIds
-     * @return array<int, array{on_hand:float, weight:float, reserved:float, incoming:float, available:float, value:float, sub_items:int}>
+     * @param  array<int, int>  $parentIds
+     * @return array<int, array{on_hand:float, weight:float, reserved:float, incoming:float, available:float, value:float, variations:int}>
      */
-    public function mainItemLevels(array $mainIds, ?int $warehouseId = null): array
+    public function parentLevels(array $parentIds, ?int $warehouseId = null): array
     {
-        $totals = [];
-        $subLevels = $this->subItemLevels($mainIds, $warehouseId);
-        $pieces = $subLevels === [] ? [] : array_flip(Product::query()
-            ->whereIn('main_product_id', array_keys($subLevels))
-            ->where('pricing_type', 'weight')
-            ->pluck('id')
-            ->all());
-        $own = $this->levels(array_keys($subLevels), $warehouseId);
-        $values = $this->stockValues(array_keys($subLevels), $warehouseId);
-
-        foreach ($subLevels as $mainId => $subItems) {
-            $total = ['on_hand' => 0.0, 'weight' => 0.0, 'reserved' => 0.0, 'incoming' => 0.0, 'available' => 0.0, 'value' => 0.0];
-
-            foreach ($subItems as $subId => $levels) {
-                foreach (['on_hand', 'reserved', 'incoming', 'available'] as $key) {
-                    $total[$key] = round($total[$key] + $levels[$key], 4);
-                }
-
-                // صنف فرعي ليس مقطع وزن يبقى بوزنه وقيمته كما كان.
-                if (! isset($pieces[$subId])) {
-                    $total['weight'] = round($total['weight'] + $levels['weight'], 4);
-                    $total['value'] = round($total['value'] + $levels['value'], 4);
-                }
-            }
-
-            $total['weight'] = round($total['weight'] + $own[$mainId]['weight'], 4);
-            $total['value'] = round($total['value'] + ($values[$mainId] ?? 0), 4);
-
-            $totals[$mainId] = $total + ['sub_items' => count($subItems)];
-        }
-
-        return $totals;
+        return array_map(fn (array $variations): array => $this->total($variations), $this->variationLevels($parentIds, $warehouseId));
     }
 
     /**
-     * رصيد صنف واحد كما يظهر في بطاقته: رصيده الخاص، والصنف الرئيسي من mainItemLevels (عدد
-     * القطع من مقاطعه، والكغم من صفّه) فلا يُعدّ كغمه مرتين.
+     * رصيد (التصنيف × اللون): مجموع ألوان المقاطع التي في المجموعة، بالقطعة والكغم والقيمة.
+     *
+     * @param  array<int, int>  $categoryFinishIds
+     * @return array<int, array{on_hand:float, weight:float, reserved:float, incoming:float, available:float, value:float, variations:int}>
+     */
+    public function groupLevels(array $categoryFinishIds, ?int $warehouseId = null): array
+    {
+        $categoryFinishIds = array_values(array_unique(array_filter(array_map('intval', $categoryFinishIds))));
+
+        if ($categoryFinishIds === []) {
+            return [];
+        }
+
+        return array_map(fn (array $variations): array => $this->total($variations), $this->grouped(
+            Product::query()->whereIn('category_finish_id', $categoryFinishIds)->pluck('category_finish_id', 'id'),
+            $warehouseId,
+        ));
+    }
+
+    /**
+     * رصيد صنف واحد كما يظهر في بطاقته: رصيده الخاص، والصنف الاب من parentLevels (مجموع ألوانه).
      * مصدر واحد لبطاقة الصنف المخزنية وتبويب «المخزون» في تعريف الصنف.
      *
-     * @return array{levels: array{on_hand:float, weight:float, reserved:float, incoming:float, available:float}, mainLevels: ?array}
+     * @return array{levels: array{on_hand:float, weight:float, reserved:float, incoming:float, available:float}, parentLevels: ?array}
      */
     public function productLevels(int $productId, ?int $warehouseId = null): array
     {
         $levels = $this->levels([$productId], $warehouseId)[$productId];
-        $mainLevels = $this->mainItemLevels([$productId], $warehouseId)[$productId] ?? null;
+        $parentLevels = $this->parentLevels([$productId], $warehouseId)[$productId] ?? null;
 
-        if ($mainLevels) {
-            $levels['on_hand'] = $mainLevels['on_hand'];
-            $levels['weight'] = $mainLevels['weight'];
-            $levels['reserved'] = round($levels['reserved'] + $mainLevels['reserved'], 4);
-            $levels['incoming'] = round($levels['incoming'] + $mainLevels['incoming'], 4);
+        if ($parentLevels) {
+            foreach (['on_hand', 'weight', 'reserved', 'incoming'] as $key) {
+                $levels[$key] = round($levels[$key] + $parentLevels[$key], 4);
+            }
+
             $levels['available'] = round($levels['on_hand'] - $levels['reserved'], 4);
         }
 
-        return ['levels' => $levels, 'mainLevels' => $mainLevels];
+        return ['levels' => $levels, 'parentLevels' => $parentLevels];
     }
 
     /**
      * ملخص مخزون الصنف للعرض فقط في تعريفه: الارصدة، الحالة من حدوده، متوسط التكلفة،
-     * والرصيد في كل مخزن مع موقعه الاساسي. الصنف الرئيسي: كغمه من صفّه وعدد القطع من مقاطعه.
+     * والرصيد في كل مخزن مع موقعه الاساسي. الصنف الاب: مجموع ألوانه.
      *
-     * @return array{levels: array, mainLevels: ?array, status: StockStatus, cost: ?ProductCost, warehouses: array<int, array{name:?string, quantity:float, weight:float, location:?string}>}
+     * @return array{levels: array, parentLevels: ?array, status: StockStatus, cost: ?ProductCost, warehouses: array<int, array{name:?string, quantity:float, weight:float, location:?string}>}
      */
     public function productSummary(Product $product): array
     {
-        ['levels' => $levels, 'mainLevels' => $mainLevels] = $this->productLevels($product->id);
-        $subIds = Product::query()->where('main_product_id', $product->id)->pluck('id')->all();
-
-        // بلا فروع: رصيد الصنف نفسه. بفروع: الكمية من الفروع والوزن من صف الصنف الرئيسي.
-        // الشرط المنطقي يُكتب تعبيراً لا ربطاً رقمياً، لأن PostgreSQL لا يقبل عدداً بعد AND/NOT.
-        $hasSubs = $subIds !== [] ? '1 = 1' : '1 = 0';
+        ['levels' => $levels, 'parentLevels' => $parentLevels] = $this->productLevels($product->id);
+        $variationIds = Product::query()->where('parent_id', $product->id)->pluck('id')->all();
         $balances = StockBalance::query()
-            ->whereIn('product_id', [...$subIds, $product->id])
+            ->whereIn('product_id', [...$variationIds, $product->id])
             ->groupBy('warehouse_id')
-            ->selectRaw(
-                "warehouse_id, SUM(CASE WHEN product_id = ? AND ({$hasSubs}) THEN 0 ELSE quantity END) as quantity, SUM(CASE WHEN product_id = ? OR NOT ({$hasSubs}) THEN weight ELSE 0 END) as weight",
-                [$product->id, $product->id]
-            )
+            ->selectRaw('warehouse_id, SUM(quantity) as quantity, SUM(weight) as weight')
             ->get()
             ->keyBy('warehouse_id');
         $placements = ProductLocation::query()
@@ -170,9 +151,9 @@ class StockLevelService
 
         return [
             'levels' => $levels,
-            'mainLevels' => $mainLevels,
+            'parentLevels' => $parentLevels,
             'status' => StockStatus::for($product, $levels['on_hand']),
-            'cost' => $mainLevels ? null : ProductCost::query()->where('product_id', $product->id)->first(),
+            'cost' => $parentLevels ? null : ProductCost::query()->where('product_id', $product->id)->first(),
             'warehouses' => $warehouseIds->map(fn ($id) => [
                 'name' => $warehouses->get($id)?->name,
                 'quantity' => round((float) $balances->get($id)?->quantity, 4),
@@ -183,37 +164,60 @@ class StockLevelService
     }
 
     /**
-     * ارصدة الاصناف الفرعية لكل صنف رئيسي. المقطع بلا قيمة؛ غيره بقيمة طبقاته.
+     * ارصدة ألوان كل صنف اب، لكل لون عدده ووزنه وقيمة طبقاته.
      *
-     * @param  array<int, int>  $mainIds
+     * @param  array<int, int>  $parentIds
      * @return array<int, array<int, array{on_hand:float, weight:float, reserved:float, incoming:float, available:float, value:float}>>
      */
-    public function subItemLevels(array $mainIds, ?int $warehouseId = null): array
+    public function variationLevels(array $parentIds, ?int $warehouseId = null): array
     {
-        $mainIds = array_values(array_unique(array_filter(array_map('intval', $mainIds))));
+        $parentIds = array_values(array_unique(array_filter(array_map('intval', $parentIds))));
 
-        if ($mainIds === []) {
+        if ($parentIds === []) {
             return [];
         }
 
-        $subItems = Product::query()->whereIn('main_product_id', $mainIds)->pluck('main_product_id', 'id');
-        $pieces = Product::query()->whereIn('main_product_id', $mainIds)->where('pricing_type', 'weight')->pluck('id')->flip();
+        return $this->grouped(Product::query()->whereIn('parent_id', $parentIds)->pluck('parent_id', 'id'), $warehouseId);
+    }
 
-        if ($subItems->isEmpty()) {
+    /**
+     * ارصدة اصناف مجمّعة بمفتاح (الصنف الاب او مجموعة السعر).
+     *
+     * @param  Collection<int, int>  $keys  معرّف الصنف => مفتاح مجموعته
+     * @return array<int, array<int, array{on_hand:float, weight:float, reserved:float, incoming:float, available:float, value:float}>>
+     */
+    private function grouped(Collection $keys, ?int $warehouseId): array
+    {
+        if ($keys->isEmpty()) {
             return [];
         }
 
-        $levels = $this->levels($subItems->keys()->all(), $warehouseId);
-        $values = $this->stockValues($subItems->keys()->all(), $warehouseId);
+        $levels = $this->levels($keys->keys()->all(), $warehouseId);
+        $values = $this->stockValues($keys->keys()->all(), $warehouseId);
         $result = [];
 
-        foreach ($subItems as $subId => $mainId) {
-            $result[(int) $mainId][(int) $subId] = $levels[$subId] + [
-                'value' => $pieces->has($subId) ? 0.0 : ($values[$subId] ?? 0.0),
-            ];
+        foreach ($keys as $productId => $key) {
+            $result[(int) $key][(int) $productId] = $levels[$productId] + ['value' => (float) ($values[$productId] ?? 0.0)];
         }
 
         return $result;
+    }
+
+    /**
+     * @param  array<int, array{on_hand:float, weight:float, reserved:float, incoming:float, available:float, value:float}>  $rows
+     * @return array{on_hand:float, weight:float, reserved:float, incoming:float, available:float, value:float, variations:int}
+     */
+    private function total(array $rows): array
+    {
+        $total = ['on_hand' => 0.0, 'weight' => 0.0, 'reserved' => 0.0, 'incoming' => 0.0, 'available' => 0.0, 'value' => 0.0];
+
+        foreach ($rows as $row) {
+            foreach ($total as $key => $sum) {
+                $total[$key] = round($sum + (float) $row[$key], 4);
+            }
+        }
+
+        return $total + ['variations' => count($rows)];
     }
 
     /**

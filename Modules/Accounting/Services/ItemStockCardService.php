@@ -30,7 +30,7 @@ class ItemStockCardService
 
         return [
             ...$summary,
-            'subItems' => $summary['mainLevels'] ? $this->subItems($product, $warehouseId) : collect(),
+            'variations' => $summary['parentLevels'] ? $this->variations($product, $warehouseId) : collect(),
             'placements' => ProductLocation::query()
                 ->with(['location', 'warehouse.translations'])
                 ->where('product_id', $product->id)
@@ -51,12 +51,12 @@ class ItemStockCardService
      */
     public function summary(Product $product, ?int $warehouseId): array
     {
-        // الصنف الرئيسي: رصيده مجموع اصنافه الفرعية.
-        ['levels' => $levels, 'mainLevels' => $mainLevels] = $this->stock->productLevels($product->id, $warehouseId);
+        // الصنف الاب: رصيده مجموع ألوانه.
+        ['levels' => $levels, 'parentLevels' => $parentLevels] = $this->stock->productLevels($product->id, $warehouseId);
 
         return [
             'levels' => $levels,
-            'mainLevels' => $mainLevels,
+            'parentLevels' => $parentLevels,
             'status' => StockStatus::for($product, $levels['on_hand']),
             'cost' => ProductCost::query()->where('product_id', $product->id)->first(),
             'byWarehouse' => StockBalance::query()
@@ -127,19 +127,19 @@ class ItemStockCardService
     }
 
     /**
-     * الاصناف الفرعية للصنف الرئيسي مع رصيد كل منها.
+     * ألوان الصنف الاب مع رصيد كل منها.
      *
      * @return Collection<int, array{product: Product, levels: array<string, float>}>
      */
-    public function subItems(Product $product, ?int $warehouseId): Collection
+    public function variations(Product $product, ?int $warehouseId): Collection
     {
-        $levels = $this->stock->subItemLevels([$product->id], $warehouseId)[$product->id] ?? [];
+        $levels = $this->stock->variationLevels([$product->id], $warehouseId)[$product->id] ?? [];
 
         return Product::query()
             ->with('translations')
             ->whereIn('id', array_keys($levels))
             ->orderBy('barcode')
             ->get()
-            ->map(fn (Product $sub) => ['product' => $sub, 'levels' => $levels[$sub->id]]);
+            ->map(fn (Product $variation) => ['product' => $variation, 'levels' => $levels[$variation->id]]);
     }
 }
