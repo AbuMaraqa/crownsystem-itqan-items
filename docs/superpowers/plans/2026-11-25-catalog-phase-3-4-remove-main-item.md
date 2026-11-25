@@ -136,3 +136,28 @@
 
 - **C — owner review page:** category map (505 rows) + top exception groups with pre-filled defaults; decisions saved and exported to `storage/app/itqan/category-map.csv` + `exception-decisions.csv`, which the importer reads.
 - **D — rehearsal and cutover runbook:** PostgreSQL copy of production, import twice with a reconciliation report, then the production window (backup → down → migrate → delete old catalogue/test documents → import → reconcile → `route:clear` → up), with the owner's two approvals.
+
+---
+
+## Amendment A (2026-11-25): kg ledger on the price group (owner chose option A)
+
+The owner chose Itqan's accounting: the kg balance and its value are **independent of the piece count** and live on the
+price group (spec D-7, §3 line "حركة الكيلو تُكتب بهذا المفتاح بدل product_id"). Buying a bar at 8 kg and selling it at
+5 kg leaves 3 kg and their value on the group with no pieces. This replaces Tasks 1–3's per-piece valuation:
+
+- **Schema (Task 3a):** `accounting_stock_movements`, `accounting_stock_balances`, `accounting_stock_cost_layers`,
+  `accounting_product_costs` get nullable `category_finish_id` (FK `items_category_finishes`, restrictOnDelete) and a
+  nullable `product_id`; a CHECK-free rule in the ledger: exactly one of the two is set. Balances unique
+  `(category_finish_id, warehouse_id, location_id)` `acct_stock_bal_group_unique`; costs unique `category_finish_id`
+  `acct_product_costs_group_unique`; movements index `(category_finish_id, warehouse_id, movement_date)`.
+- **Ledger (Task 3a):** `receive/issue/revalue/reverse` accept `category_finish_id` instead of `product_id` (kg in, kg out,
+  FIFO layers in kg). `StockLedgerService::isGroupPiece(int $productId): bool` — a weight variation with a
+  `category_finish_id` and a piece measure moves by count at zero value, no layers (the old piece rule, keyed by group).
+  `costPerKg(variation)` = the group's average cost per kg. `averageCost`/`onHand` gain `groupAverageCost(int)`/`groupOnHand(int)`.
+- **Levels (Task 3b):** `groupLevels` = kg and value from the group rows + piece counts from its variations; `parentLevels`
+  keeps counts (pieces) and the group kg is shown on the group, not the parent.
+- **Posting (Task 3c):** a group line posts one kg movement on the group (actual kg, or calculated when empty, × line
+  value) plus zero-value count movements per colour — the former main-item path with the group as key; partial receipts
+  and deliveries share kg/value by the pieces handled (`MainItemShare` → `GroupShare`).
+- **Tests:** `WeightLineStockTest` keeps Itqan's numbers with `assertMain` reading the group; `WeightVariationStockTest`
+  and `PriceGroupStockTest` are rewritten to the group key.
