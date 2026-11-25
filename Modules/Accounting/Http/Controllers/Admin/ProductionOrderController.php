@@ -23,6 +23,7 @@ use Modules\Accounting\Http\Requests\Admin\ProductionOrderRequest;
 use Modules\Accounting\Repositories\Contracts\ProductionOrderRepositoryInterface;
 use Modules\Accounting\Services\CurrencyExchangeRateService;
 use Modules\Accounting\Services\ProductionOrderService;
+use Modules\Accounting\Support\ItemsGrid;
 use Modules\Accounting\Support\Number;
 use Modules\Accounting\Support\QuickCreate;
 use Modules\Accounting\Support\SelectOptions;
@@ -32,7 +33,6 @@ use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
 use Modules\Core\Support\RecordInfo;
 use Modules\Core\Support\UserCellData;
-use Modules\Items\Enums\ItemType;
 use Modules\Items\Enums\ServiceCostSource;
 use Modules\Items\Enums\ServicePricingBasis;
 use Modules\Items\Support\ProductSearch;
@@ -270,7 +270,13 @@ class ProductionOrderController extends Controller
      */
     public function materials(Request $request): JsonResponse
     {
-        return response()->json($this->options(ProductSearch::options($request->string('q')->toString(), 25, itemType: ItemType::GOODS->value)));
+        // كاصناف طلبيات البيع والشراء: المقطع بألوانه (مع مجموعة اللون)، والصنف الفرعي مع صنفه الرئيسي.
+        return response()->json(collect(ItemsGrid::searchItems($request->string('q')->toString()))
+            ->map(fn (array $item): array => [
+                'value' => $item['id'],
+                'label' => $item['label'].(filled($item['group_label'] ?? $item['main_label']) ? ' · '.($item['group_label'] ?? $item['main_label']) : ''),
+            ])
+            ->all());
     }
 
     public function services(Request $request): JsonResponse

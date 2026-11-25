@@ -138,6 +138,20 @@ class PriceGroupLinesTest extends TestCase
         $this->assertSame('الوبين — أبيض', $colours->firstWhere('id', $this->whiteW45->id)['group_label']);
     }
 
+    /**
+     * مواد أمر الانتاج تُبحث كاصناف طلبيات البيع والشراء: المقطع بألوانه، والاسم يحمل مجموعة اللون.
+     */
+    public function test_production_materials_are_searched_like_the_order_items(): void
+    {
+        $this->catalogue();
+        $this->signIn(['Production Order Create']);
+
+        $results = collect($this->getJson(route('accounting.production-orders.materials', ['q' => 'W45']))->assertOk()->json());
+
+        $this->assertSame([$this->whiteW45->id, $this->meshW45->id], $results->pluck('value')->sort()->values()->all());
+        $this->assertStringContainsString('الوبين — أبيض', $results->firstWhere('value', $this->whiteW45->id)['label']);
+    }
+
     public function test_inside_a_group_line_only_its_colour_is_offered(): void
     {
         $this->catalogue();

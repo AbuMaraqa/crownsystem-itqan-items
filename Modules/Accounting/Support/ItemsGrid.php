@@ -67,6 +67,27 @@ final class ItemsGrid
     {
         $categories = filled($categoryId) || trim($term) === '' ? [] : CategorySearch::options($term, 5);
         $groups = filled($categoryId) ? [] : PriceGroupSearch::options($term, 8);
+        $results = [];
+
+        foreach ($categories as $id => $label) {
+            $results[] = ['id' => (int) $id, 'label' => $label, 'kind' => 'category', 'main_label' => null, 'group_label' => null];
+        }
+
+        foreach ($groups as $groupId => $label) {
+            $results[] = ['id' => (int) $groupId, 'label' => $label, 'kind' => 'group', 'main_label' => null, 'group_label' => null];
+        }
+
+        return [...$results, ...self::searchItems($term, $categoryId)];
+    }
+
+    /**
+     * اصناف البضاعة كما يختارها المستخدم في المستندات (وفي مواد أمر الانتاج): مقطع الوزن الذي له
+     * ألوان تحل محله ألوانه مع اسم مجموعتها، والصنف الفرعي القديم مع اسم صنفه الرئيسي.
+     *
+     * @return list<array{id: int, label: string, kind: 'item', main_label: ?string, group_label: ?string}>
+     */
+    public static function searchItems(string $term, mixed $categoryId = null): array
+    {
         $options = filled($categoryId)
             ? CategorySearch::productOptions($categoryId, $term, 25)
             : ProductSearch::options($term, 25, itemType: ItemType::GOODS->value);
@@ -78,14 +99,6 @@ final class ItemsGrid
         // الصنف الفرعي القديم يظهر مع اسم صنفه الرئيسي لانه سيُضاف داخله.
         $mainLabels = ProductSearch::mainProductLabels(array_keys($options));
         $results = [];
-
-        foreach ($categories as $id => $label) {
-            $results[] = ['id' => (int) $id, 'label' => $label, 'kind' => 'category', 'main_label' => null, 'group_label' => null];
-        }
-
-        foreach ($groups as $groupId => $label) {
-            $results[] = ['id' => (int) $groupId, 'label' => $label, 'kind' => 'group', 'main_label' => null, 'group_label' => null];
-        }
 
         foreach ($options as $productId => $label) {
             foreach ($colours[$productId] ?? [[$productId, $label, null]] as [$id, $itemLabel, $groupLabel]) {
