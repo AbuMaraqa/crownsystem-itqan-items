@@ -9,6 +9,7 @@ use Modules\Accounting\Entities\SalesOrder;
 use Modules\Accounting\Enums\LaborRateBasis;
 use Modules\Accounting\Enums\ProductionOrderStatus;
 use Modules\Accounting\Enums\SalesOrderStatus;
+use Modules\Accounting\Entities\ProductCost;
 use Modules\Accounting\Services\ProductionOrderService;
 use Modules\Accounting\Support\ProductionCost;
 use Modules\Accounting\tests\Feature\Concerns\PriceGroupFixtures;
@@ -214,8 +215,8 @@ class ProductionOrderCostingTest extends TestCase
     {
         $this->actingAs(User::factory()->create());
         ['white' => $white, 'whiteW45' => $w45, 'whiteW60' => $w60] = $this->alpineGroups();
-        ConsolidatedTestFactory::averageCost($w45, 32.5);   // 8.125 كغم للقطعة → 4 للكغم
-        ConsolidatedTestFactory::averageCost($w60, 65);     // 13 كغم للقطعة → 5 للكغم
+        // كما في اتقان: تكلفة الكيلو على المجموعة (4.5)، وكل لون فيها يأخذها.
+        ProductCost::query()->updateOrCreate(['category_finish_id' => $white->id], ['quantity' => 0, 'value' => 0, 'average_cost' => 4.5]);
         $salesOrder = $this->salesOrder();
         $line = $salesOrder->items()->create(['product_id' => null, 'category_finish_id' => $white->id, 'description' => 'الوبين — أبيض', 'quantity' => 40, 'unit_price' => 8, 'total_weight' => 29.25, 'actual_weight' => 40, 'line_total' => 320]);
         $line->pieces()->create(['product_id' => $w45->id, 'description' => $w45->name, 'piece_count' => 2, 'piece_length' => 6.5, 'weight_per_meter' => 1.25, 'total_weight' => 16.25, 'sort_order' => 0]);
@@ -226,7 +227,7 @@ class ProductionOrderCostingTest extends TestCase
         $this->assertCount(2, $materials);
         $this->assertSame([$w45->id, $w60->id], array_column($materials, 'product_id'));
         $this->assertSame([22.2222, 17.7778], array_column($materials, 'weight'));
-        $this->assertSame([4.0, 5.0], array_column($materials, 'unit_cost'));
+        $this->assertSame([4.5, 4.5], array_column($materials, 'unit_cost'));
         $this->assertSame(['weight', 'weight'], array_column($materials, 'pricing_type'));
     }
 

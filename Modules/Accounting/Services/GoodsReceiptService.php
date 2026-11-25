@@ -18,7 +18,7 @@ use Modules\Accounting\Enums\PurchaseQuotationStatus;
 use Modules\Accounting\Enums\StockMovementType;
 use Modules\Accounting\Services\Concerns\PostsInventoryJournal;
 use Modules\Accounting\Support\MainItemShare;
-use Modules\Accounting\Support\WeightPieces;
+use Modules\Accounting\Support\StockKey;
 use Modules\Core\Services\ReferenceNumberService;
 
 /**
@@ -151,9 +151,9 @@ class GoodsReceiptService
                 }
 
                 $ledger->receive([
-                    'product_id' => $row['product_id'],
+                    ...$row['key']->attributes(),
                     'warehouse_id' => $receipt->warehouse_id,
-                    'location_id' => $layout->primaryLocationId($row['product_id'], $receipt->warehouse_id),
+                    'location_id' => $row['key']->isGroup() ? null : $layout->primaryLocationId($row['key']->id, $receipt->warehouse_id),
                     'quantity' => $row['kg'],
                     'weight' => $row['kg'],
                     'unit_cost' => round($row['value'] / $row['kg'], 6),
@@ -299,11 +299,10 @@ class GoodsReceiptService
             $lineValue = $values[$item->id] ?? 0.0;
 
             if ($item->pieces->isNotEmpty()) {
-                // سطر مجموعة السعر بلا صنف رئيسي: كل قطعة تحمل نصيبها من الوزن الفعلي ومن قيمة السطر
-                // بنسبة وزنها المحسوب. قطع الصنف الرئيسي بوزنها المحسوب وبلا قيمة (القيمة على صنفها الرئيسي).
-                $calculated = $item->pieces->mapWithKeys(fn ($piece) => [$piece->id => (float) $piece->total_weight])->all();
-                $weights = $isGroup ? WeightPieces::actualShares($calculated, $item->actual_weight) : $calculated;
-                $shares = $isGroup && $lineValue > 0 ? WeightPieces::actualShares($calculated, $lineValue) : [];
+                // كما في اتقان: القطع بوزنها المحسوب وبلا قيمة؛ الكيلو الفعلي وقيمة السطر على مجموعة
+                // السعر (او صنف السطر) في mainRows.
+                $weights = $item->pieces->mapWithKeys(fn ($piece) => [$piece->id => (float) $piece->total_weight])->all();
+                $shares = [];
 
                 foreach ($item->pieces as $piece) {
                     $count = (float) $piece->piece_count;
@@ -412,7 +411,7 @@ class GoodsReceiptService
      * المحسوب) وقيمة السطر، بنصيب ما عالجه السند من قطع السطر (MainItemShare).
      *
      * @param  iterable<int, mixed>  $rows  سطور السند (قطعة/كمية/وزن)
-     * @return array<int, array{product_id:int, kg:float, value:float, line_id:?int}>
+     * @return array<int, array{key:StockKey, kg:float, value:float, line_id:?int}>
      */
     private function mainRows(PurchaseOrder $order, iterable $rows, ?int $exceptReceiptId, bool $postedOnly): array
     {
@@ -431,8 +430,7 @@ class GoodsReceiptService
         foreach ($grouped as $itemId => $itemRows) {
             $item = $order->items->firstWhere('id', $itemId);
 
-            // سطر مجموعة السعر لا صنف رئيسي له: قطعه تحمل الوزن والقيمة.
-            if (! $item || $item->isPriceGroupLine()) {
+            if (! $item) {
                 continue;
             }
 
@@ -456,7 +454,7 @@ class GoodsReceiptService
             $kg = (float) $item->actual_weight > 0 ? (float) $item->actual_weight : $calculated;
 
             $result[] = [
-                'product_id' => (int) $item->product_id,
+                'key' => $item->isPriceGroupLine() ? StockKey::group((int) $item->category_finish_id) : StockKey::product((int) $item->product_id),
                 'kg' => MainItemShare::slice($kg, $whole, $prior, $current),
                 'value' => MainItemShare::slice((float) ($values[$item->id] ?? 0), $whole, $prior, $current),
                 'line_id' => data_get($itemRows->first(), 'id') ? (int) data_get($itemRows->first(), 'id') : null,

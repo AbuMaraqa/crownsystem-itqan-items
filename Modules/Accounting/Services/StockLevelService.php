@@ -17,6 +17,7 @@ use Modules\Accounting\Enums\PurchaseOrderDeliveryType;
 use Modules\Accounting\Enums\PurchaseOrderStatus;
 use Modules\Accounting\Support\StockStatus;
 use Modules\Items\Entities\Product;
+use Modules\Items\Support\PriceGroupSearch;
 
 /**
  * ارصدة الاصناف كما تظهر لموظف المخزن والمبيعات (مثل شاشة النظام القديم):
@@ -277,6 +278,24 @@ class StockLevelService
             return;
         }
 
+        // كيلو مجموعة السعر (التصنيف × اللون) يُقاس برصيدها في المخزن كله.
+        $groupMessages = [];
+
+        foreach (collect($lines)->filter(fn (array $line) => filled($line['category_finish_id'] ?? null))->groupBy('category_finish_id') as $groupId => $rows) {
+            $needed = round((float) $rows->sum('quantity'), 4);
+            $available = round((float) StockBalance::query()->where('warehouse_id', $warehouseId)->where('category_finish_id', $groupId)->sum('quantity'), 4);
+
+            if ($available + 0.00005 < $needed) {
+                $groupMessages[] = __(':item:location — available :available, required :required', [
+                    'item' => PriceGroupSearch::labels([(int) $groupId])[(int) $groupId] ?? '',
+                    'location' => '',
+                    'available' => $this->format($available),
+                    'required' => $this->format($needed),
+                ]);
+            }
+        }
+
+        $lines = array_values(array_filter($lines, fn (array $line) => blank($line['category_finish_id'] ?? null)));
         $required = [];
 
         foreach ($lines as $line) {
@@ -309,7 +328,7 @@ class StockLevelService
             }
         }
 
-        if ($shortages === []) {
+        if ($shortages === [] && $groupMessages === []) {
             return;
         }
 
@@ -323,6 +342,7 @@ class StockLevelService
             'available' => $this->format($shortage[2]),
             'required' => $this->format($shortage[3]),
         ]), $shortages);
+        $messages = [...$messages, ...$groupMessages];
 
         throw new DomainException(__('Insufficient stock in :warehouse:', ['warehouse' => $warehouse])."\n".implode("\n", $messages));
     }

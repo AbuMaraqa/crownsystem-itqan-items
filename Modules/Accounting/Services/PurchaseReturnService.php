@@ -15,6 +15,7 @@ use Modules\Accounting\Enums\JournalEntryStatus;
 use Modules\Accounting\Enums\PurchaseReturnStatus;
 use Modules\Accounting\Enums\StockMovementType;
 use Modules\Accounting\Support\ReturnPieces;
+use Modules\Accounting\Support\StockKey;
 use Modules\Accounting\Support\WeightPieces;
 use Modules\Core\Services\ReferenceNumberService;
 
@@ -526,20 +527,15 @@ class PurchaseReturnService
         $total = 0.0;
 
         foreach ($return->items as $item) {
-            // سطر مجموعة السعر (D2-6): كل لون يخرج بعدد قطعه وبنصيبه من الوزن المفوتر، بكلفته.
-            if ($item->isPriceGroupLine()) {
-                $total += $this->issuePriceGroupPieces($return, $item, $date);
-
-                continue;
-            }
-
+            $isGroup = $item->isPriceGroupLine();
             $product = $item->product;
 
-            if (! $product || $product->isService()) {
+            if (! $isGroup && (! $product || $product->isService())) {
                 continue;
             }
 
-            // صنف الوزن: يخرج الكغم المرتجع من صنفه الرئيسي بكلفته، وكل قطعة بعددها بلا قيمة.
+            // سطر الوزن، كما في اتقان: يخرج الكغم المرتجع من مجموعة السعر (او صنف السطر) بكلفته، وكل قطعة
+            // بعددها بلا قيمة.
             if ($item->pieces->isNotEmpty()) {
                 $common = [
                     'warehouse_id' => $this->stockWarehouseId($return),
@@ -554,7 +550,7 @@ class PurchaseReturnService
 
                 if ((float) $item->quantity > 0) {
                     $movements = $ledger->issue(array_merge($common, [
-                        'product_id' => $product->id,
+                        ...($isGroup ? StockKey::group((int) $item->category_finish_id) : StockKey::product((int) $product->id))->attributes(),
                         'quantity' => round((float) $item->quantity, 4),
                         'weight' => round((float) $item->quantity, 4),
                     ]));
@@ -668,45 +664,6 @@ class PurchaseReturnService
         }
 
         return ['quantity' => 1.0, 'weight' => 0.0];
-    }
-
-    /**
-     * يخرج قطع سطر مجموعة السعر المرتجعة: كل لون بعدد قطعه وبنصيبه من الوزن المفوتر، بكلفته في
-     * المخزون (FIFO)، ويعيد مجموع الكلفة بالعملة الاساسية.
-     */
-    private function issuePriceGroupPieces(PurchaseReturn $return, PurchaseReturnItem $item, string $date): float
-    {
-        $ledger = app(StockLedgerService::class);
-        $factor = $item->purchaseInvoiceItem ? ReturnPieces::weightFactor($item->purchaseInvoiceItem) : 1.0;
-        $cost = 0.0;
-
-        foreach ($item->pieces as $piece) {
-            if (! $piece->product_id || (float) $piece->piece_count <= 0) {
-                continue;
-            }
-
-            $movements = $ledger->issue([
-                'product_id' => (int) $piece->product_id,
-                'warehouse_id' => $this->stockWarehouseId($return),
-                'quantity' => round((float) $piece->piece_count, 4),
-                'weight' => (float) $piece->total_weight > 0 ? round((float) $piece->total_weight * $factor, 4) : null,
-                'type' => StockMovementType::PURCHASE_RETURN,
-                'date' => $date,
-                'source' => $return,
-                'source_line_id' => $item->id,
-                'reference_no' => $return->reference_no,
-                'description' => __('Purchase return').' '.$return->reference_no,
-            ]);
-            $cost += (float) $movements->sum(fn (StockMovement $movement) => -(float) $movement->total_cost);
-        }
-
-        $cost = round($cost, 4);
-
-        if ((float) $item->quantity > 0) {
-            $item->update(['unit_cost' => round($cost / (float) $item->quantity, 6)]);
-        }
-
-        return $cost;
     }
 
     private function stockWarehouseId(PurchaseReturn $return): int

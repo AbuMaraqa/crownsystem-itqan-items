@@ -21,7 +21,7 @@ use Modules\Accounting\Enums\InventoryDocumentStatus;
 use Modules\Accounting\Enums\JournalEntryStatus;
 use Modules\Accounting\Enums\StockMovementType;
 use Modules\Accounting\Services\Concerns\PostsInventoryJournal;
-use Modules\Accounting\Support\WeightPieces;
+use Modules\Accounting\Support\StockKey;
 use Modules\Items\Entities\Product;
 use Modules\Items\Enums\ItemType;
 
@@ -80,10 +80,11 @@ class InvoiceStockService
         $layout = app(WarehouseLayoutService::class);
 
         foreach ($lines as $line) {
-            $locationId = $layout->primaryLocationId($line['product_id'], $warehouseId);
+            $locationId = filled($line['product_id'] ?? null) ? $layout->primaryLocationId($line['product_id'], $warehouseId) : null;
 
             $ledger->receive([
-                'product_id' => $line['product_id'],
+                'product_id' => $line['product_id'] ?? null,
+                'category_finish_id' => $line['category_finish_id'] ?? null,
                 'warehouse_id' => $warehouseId,
                 'location_id' => $locationId,
                 'quantity' => $line['quantity'],
@@ -135,7 +136,8 @@ class InvoiceStockService
 
         foreach ($lines as $line) {
             $movements = $ledger->issue([
-                'product_id' => $line['product_id'],
+                'product_id' => $line['product_id'] ?? null,
+                'category_finish_id' => $line['category_finish_id'] ?? null,
                 'warehouse_id' => $warehouseId,
                 'quantity' => $line['quantity'],
                 'weight' => $line['weight'] > 0 ? $line['weight'] : null,
@@ -227,20 +229,21 @@ class InvoiceStockService
 
         foreach ($this->orderWeightLines($invoice, 'purchase_order_item_id') as $item) {
             $lineIds = GoodsReceiptItem::query()->whereIn('goods_receipt_id', $receiptIds)->where('purchase_order_item_id', $item->purchase_order_item_id)->pluck('id');
-            $movements = $this->mainMovements((int) $item->product_id, (new GoodsReceipt)->getMorphClass(), $receiptIds->all(), $lineIds->all(), StockMovementType::RECEIPT);
+            $key = $this->kgKey($item);
+            $movements = $this->mainMovements($key, (new GoodsReceipt)->getMorphClass(), $receiptIds->all(), $lineIds->all(), StockMovementType::RECEIPT);
             $receivedKg = round((float) $movements->sum('quantity'), 4);
             $receivedValue = round((float) $movements->sum('total_cost'), 4);
             $warehouseId = (int) ($movements->last()?->warehouse_id ?: ($invoice->warehouse_id ?: $order->warehouse_id));
             $invoicedKg = round((float) $item->quantity, 4);
             $invoicedValue = round((float) $item->line_total * $factor * $rate, 4);
             $difference = round($invoicedKg - $receivedKg, 4);
-            $common = $this->trueUpMovement($invoice, $item, (int) $item->product_id, $warehouseId, $date);
+            $common = $this->trueUpMovement($invoice, $item, $key, $warehouseId, $date);
             $change = 0.0;
 
             if ($difference > 0) {
                 $total = round($difference * $invoicedValue / $invoicedKg, 4);
                 $ledger->receive(array_merge($common, [
-                    'location_id' => app(WarehouseLayoutService::class)->primaryLocationId((int) $item->product_id, $warehouseId),
+                    'location_id' => $this->kgLocation($key, $warehouseId),
                     'quantity' => $difference,
                     'weight' => $difference,
                     'unit_cost' => round($total / $difference, 6),
@@ -260,50 +263,7 @@ class InvoiceStockService
             $byWarehouse[$warehouseId] = round(($byWarehouse[$warehouseId] ?? 0) + $change, 4);
         }
 
-        foreach ($this->priceGroupRevaluations($invoice, $order, $receiptIds->all(), $factor * $rate) as $warehouseId => $change) {
-            $byWarehouse[$warehouseId] = round(($byWarehouse[$warehouseId] ?? 0) + $change, 4);
-        }
-
         $this->postTrueUpJournal($invoice, 'PurchaseInvoice', $date, $byWarehouse, InventoryAccounts::PRICE_VARIANCE_KEY);
-    }
-
-    /**
-     * سطر مجموعة السعر في فاتورة من طلبية (D2-6): كل لون استُلم بنصيبه من قيمة الطلبية، فيُعاد
-     * تقييمه الى نصيبه من قيمة الفاتورة بنسبة وزنه المحسوب. العدد والوزن كما استُلما.
-     *
-     * @param  array<int, int>  $receiptIds
-     * @return array<int, float> المخزن => تغيّر قيمة المخزون
-     */
-    private function priceGroupRevaluations(PurchaseInvoice $invoice, PurchaseOrder $order, array $receiptIds, float $factor): array
-    {
-        $ledger = app(StockLedgerService::class);
-        $date = $invoice->invoice_date->toDateString();
-        $byWarehouse = [];
-        $lines = $invoice->items->filter(fn ($item) => filled($item->purchase_order_item_id) && $item->isPriceGroupLine() && $item->pieces->isNotEmpty());
-
-        foreach ($lines as $item) {
-            $pieces = $item->pieces->filter(fn ($piece) => $piece->product_id && filled($piece->purchase_order_item_piece_id))->values();
-            $shares = WeightPieces::actualShares($pieces->map(fn ($piece) => (float) $piece->total_weight)->all(), round((float) $item->line_total * $factor, 4));
-
-            foreach ($pieces as $index => $piece) {
-                $lineIds = GoodsReceiptItem::query()->whereIn('goods_receipt_id', $receiptIds)->where('purchase_order_item_piece_id', $piece->purchase_order_item_piece_id)->pluck('id');
-                $movements = $this->mainMovements((int) $piece->product_id, (new GoodsReceipt)->getMorphClass(), $receiptIds, $lineIds->all(), StockMovementType::RECEIPT);
-                $residual = round($shares[$index] - (float) $movements->sum('total_cost'), 4);
-
-                if ($movements->isEmpty() || $residual == 0.0) {
-                    continue;
-                }
-
-                $warehouseId = (int) $movements->last()->warehouse_id;
-                $change = $ledger->revalue(array_merge(
-                    $this->trueUpMovement($invoice, $item, (int) $piece->product_id, $warehouseId, $date),
-                    ['amount' => $residual, 'movements' => $movements->pluck('id')->all()]
-                ));
-                $byWarehouse[$warehouseId] = round(($byWarehouse[$warehouseId] ?? 0) + $change, 4);
-            }
-        }
-
-        return $byWarehouse;
     }
 
     /**
@@ -319,19 +279,20 @@ class InvoiceStockService
 
         foreach ($this->orderWeightLines($invoice, 'sales_order_item_id') as $item) {
             $lineIds = DeliveryNoteItem::query()->whereIn('delivery_note_id', $noteIds)->where('sales_order_item_id', $item->sales_order_item_id)->pluck('id');
-            $movements = $this->mainMovements((int) $item->product_id, (new DeliveryNote)->getMorphClass(), $noteIds->all(), $lineIds->all(), StockMovementType::DELIVERY);
+            $key = $this->kgKey($item);
+            $movements = $this->mainMovements($key, (new DeliveryNote)->getMorphClass(), $noteIds->all(), $lineIds->all(), StockMovementType::DELIVERY);
             $deliveredKg = round(-(float) $movements->sum('quantity'), 4);
             $deliveredCost = round(-(float) $movements->sum('total_cost'), 4);
             $warehouseId = (int) ($movements->last()?->warehouse_id ?: ($invoice->warehouse_id ?: $order->warehouse_id));
             $difference = round((float) $item->quantity - $deliveredKg, 4);
-            $common = $this->trueUpMovement($invoice, $item, (int) $item->product_id, $warehouseId, $date);
+            $common = $this->trueUpMovement($invoice, $item, $key, $warehouseId, $date);
 
             if ($difference > 0) {
                 $change = (float) $ledger->issue(array_merge($common, ['quantity' => $difference, 'weight' => $difference]))->sum('total_cost');
             } elseif ($difference < 0) {
                 $total = round(-$difference * $deliveredCost / $deliveredKg, 4);
                 $ledger->receive(array_merge($common, [
-                    'location_id' => app(WarehouseLayoutService::class)->primaryLocationId((int) $item->product_id, $warehouseId),
+                    'location_id' => $this->kgLocation($key, $warehouseId),
                     'quantity' => -$difference,
                     'weight' => -$difference,
                     'unit_cost' => round($total / -$difference, 6),
@@ -349,14 +310,29 @@ class InvoiceStockService
     }
 
     /**
-     * سطور الفاتورة التي جاءت من طلبية وهي بقطع: رصيد صنفها الرئيسي يتبع وزنها الفعلي.
+     * سطور الفاتورة التي جاءت من طلبية وهي بقطع: رصيد كيلو مجموعتها يتبع وزنها الفعلي.
      */
     private function orderWeightLines(PurchaseInvoice|SalesInvoice $invoice, string $orderItemKey): Collection
     {
         $invoice->loadMissing(['items.product', 'items.pieces']);
 
-        // سطر مجموعة السعر لا صنف رئيسي له يُسوّى: قطعه تحمل كلفتها ووزنها الفعلي.
-        return $invoice->items->filter(fn ($item) => filled($item->{$orderItemKey}) && $item->pieces->isNotEmpty() && ! $item->isPriceGroupLine())->values();
+        return $invoice->items->filter(fn ($item) => filled($item->{$orderItemKey}) && $item->pieces->isNotEmpty())->values();
+    }
+
+    /**
+     * مفتاح كيلو السطر: مجموعة السعر لسطر المجموعة، والا صنف السطر.
+     */
+    private function kgKey($item): StockKey
+    {
+        return $item->isPriceGroupLine() ? StockKey::group((int) $item->category_finish_id) : StockKey::product((int) $item->product_id);
+    }
+
+    /**
+     * موقع دخول الكيلو: الموقع الاساسي للصنف؛ كيلو المجموعة بلا رف.
+     */
+    private function kgLocation(StockKey $key, int $warehouseId): ?int
+    {
+        return $key->isGroup() ? null : app(WarehouseLayoutService::class)->primaryLocationId($key->id, $warehouseId);
     }
 
     /**
@@ -365,10 +341,10 @@ class InvoiceStockService
      * @param  array<int, int>  $documentIds
      * @param  array<int, int>  $lineIds
      */
-    private function mainMovements(int $productId, string $morphClass, array $documentIds, array $lineIds, StockMovementType $type): Collection
+    private function mainMovements(StockKey $key, string $morphClass, array $documentIds, array $lineIds, StockMovementType $type): Collection
     {
         return StockMovement::query()
-            ->where('product_id', $productId)
+            ->where($key->column, $key->id)
             ->where('type', $type->value)
             ->where('sourceable_type', $morphClass)
             ->whereIn('sourceable_id', $documentIds)
@@ -380,10 +356,10 @@ class InvoiceStockService
     /**
      * @return array<string, mixed>
      */
-    private function trueUpMovement(PurchaseInvoice|SalesInvoice $invoice, $item, int $productId, int $warehouseId, string $date): array
+    private function trueUpMovement(PurchaseInvoice|SalesInvoice $invoice, $item, StockKey $key, int $warehouseId, string $date): array
     {
         return [
-            'product_id' => $productId,
+            ...$key->attributes(),
             'warehouse_id' => $warehouseId,
             'type' => StockMovementType::INVOICE_ADJUSTMENT,
             'date' => $date,
@@ -482,17 +458,13 @@ class InvoiceStockService
         foreach ($invoice->items as $item) {
             $product = $item->product;
 
-            if ($item->isPriceGroupLine()) {
-                array_push($lines, ...$this->priceGroupStockLines($item, round((float) $item->line_total * $factor, 4)));
+            $isGroup = $item->isPriceGroupLine();
 
+            if (! $isGroup && (! $product || $product->isService() || ($item->line_type ?? null) === ItemType::SERVICE->value)) {
                 continue;
             }
 
-            if (! $product || $product->isService() || ($item->line_type ?? null) === ItemType::SERVICE->value) {
-                continue;
-            }
-
-            // السطر بلا وزن فعلي كميته ومبلغه صفر: لا حركة لصنفه الرئيسي، وقطعه تتحرك كغيرها.
+            // السطر بلا وزن فعلي كميته ومبلغه صفر: لا حركة كيلو، وقطعه تتحرك كغيرها.
             $pieces = $item->pieces->filter(fn ($piece) => $piece->product_id && (float) $piece->piece_count > 0)->values();
 
             if ($pieces->isEmpty() && (float) $item->quantity <= 0) {
@@ -502,10 +474,13 @@ class InvoiceStockService
             $amount = round((float) $item->line_total * $factor, 4);
 
             if ($pieces->isNotEmpty()) {
+                // كما في اتقان: الكيلو الفعلي وقيمة السطر على مجموعة السعر (التصنيف × اللون)، وكل قطعة
+                // تحرّك لونها بعددها ووزنها المحسوب بلا قيمة.
                 if ((float) $item->quantity > 0) {
                     $lines[] = [
                         'item_id' => (int) $item->id,
-                        'product_id' => (int) $product->id,
+                        'product_id' => $isGroup ? null : (int) $product->id,
+                        'category_finish_id' => $isGroup ? (int) $item->category_finish_id : null,
                         'quantity' => round((float) $item->quantity, 4),
                         'weight' => round((float) $item->quantity, 4),
                         'amount' => $amount,
@@ -564,28 +539,6 @@ class InvoiceStockService
         }
 
         return $lines;
-    }
-
-    /**
-     * سطر مجموعة السعر (D2-6): لا صنف رئيسي؛ كل قطعة تحرّك لونها بعددها، وبنصيبها من الوزن
-     * الفعلي ومن قيمة السطر بنسبة وزنها المحسوب.
-     *
-     * @return array<int, array{item_id:int, product_id:int, quantity:float, weight:float, amount:float}>
-     */
-    private function priceGroupStockLines(PurchaseInvoiceItem|SalesInvoiceItem $item, float $amount): array
-    {
-        $pieces = $item->pieces->filter(fn ($piece) => $piece->product_id && (float) $piece->piece_count > 0)->values();
-        $calculated = $pieces->map(fn ($piece) => (float) $piece->total_weight)->all();
-        $weights = WeightPieces::actualShares($calculated, $item->actual_weight);
-        $values = WeightPieces::actualShares($calculated, $amount);
-
-        return $pieces->map(fn ($piece, int $index) => [
-            'item_id' => (int) $item->id,
-            'product_id' => (int) $piece->product_id,
-            'quantity' => round((float) $piece->piece_count, 4),
-            'weight' => $weights[$index],
-            'amount' => $amount > 0 ? $values[$index] : 0.0,
-        ])->all();
     }
 
     /**

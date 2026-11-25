@@ -19,6 +19,7 @@ use Modules\Accounting\Enums\SalesReturnStatus;
 use Modules\Accounting\Enums\StockMovementType;
 use Modules\Accounting\Services\Concerns\PostsInventoryJournal;
 use Modules\Accounting\Support\ReturnPieces;
+use Modules\Accounting\Support\StockKey;
 use Modules\Accounting\Support\WeightPieces;
 use Modules\Core\Services\ReferenceNumberService;
 use Modules\Items\Entities\Product;
@@ -554,13 +555,15 @@ class SalesReturnService
         $lines = [];
 
         foreach ($return->items as $item) {
-            // سطر مجموعة السعر (D2-6): كل لون يعود بعدد قطعه وبنصيبه من الوزن المفوتر، بكلفة خروجه.
+            // سطر مجموعة السعر، كما في اتقان: الكيلو يعود الى المجموعة بكلفة خروجه، وكل لون بعدد قطعه بلا قيمة.
             if ($item->isPriceGroupLine()) {
-                $factor = $item->salesInvoiceItem ? ReturnPieces::weightFactor($item->salesInvoiceItem) : 1.0;
+                if ((float) $item->quantity > 0) {
+                    $lines[] = ['item' => $item, 'piece' => null, 'key' => StockKey::group((int) $item->category_finish_id), 'quantity' => (float) $item->quantity, 'weight' => (float) $item->quantity];
+                }
 
                 foreach ($item->pieces as $piece) {
                     if ($piece->product_id && (float) $piece->piece_count > 0) {
-                        $lines[] = ['item' => $item, 'piece' => $piece, 'product_id' => (int) $piece->product_id, 'quantity' => (float) $piece->piece_count, 'weight' => (float) $piece->total_weight * $factor];
+                        $lines[] = ['item' => $item, 'piece' => $piece, 'key' => StockKey::product((int) $piece->product_id), 'quantity' => (float) $piece->piece_count, 'weight' => (float) $piece->total_weight];
                     }
                 }
 
@@ -575,18 +578,18 @@ class SalesReturnService
 
             if ($item->pieces->isNotEmpty()) {
                 if ((float) $item->quantity > 0) {
-                    $lines[] = ['item' => $item, 'piece' => null, 'product_id' => (int) $product->id, 'quantity' => (float) $item->quantity, 'weight' => (float) $item->quantity];
+                    $lines[] = ['item' => $item, 'piece' => null, 'key' => StockKey::product((int) $product->id), 'quantity' => (float) $item->quantity, 'weight' => (float) $item->quantity];
                 }
 
                 foreach ($item->pieces as $piece) {
-                    $lines[] = ['item' => $item, 'piece' => $piece, 'product_id' => (int) $piece->product_id, 'quantity' => (float) $piece->piece_count, 'weight' => (float) $piece->total_weight];
+                    $lines[] = ['item' => $item, 'piece' => $piece, 'key' => StockKey::product((int) $piece->product_id), 'quantity' => (float) $piece->piece_count, 'weight' => (float) $piece->total_weight];
                 }
 
                 continue;
             }
 
             [$quantity, $weight] = $this->legacyStockQuantity($product, (float) $item->quantity);
-            $lines[] = ['item' => $item, 'piece' => null, 'product_id' => (int) $product->id, 'quantity' => $quantity, 'weight' => $weight];
+            $lines[] = ['item' => $item, 'piece' => null, 'key' => StockKey::product((int) $product->id), 'quantity' => $quantity, 'weight' => $weight];
         }
 
         if ($lines === []) {
@@ -602,12 +605,13 @@ class SalesReturnService
         $itemCosts = [];
 
         foreach ($lines as $line) {
-            $unitCost = $issuedCosts[$line['product_id']] ?? $ledger->averageCost($line['product_id']);
+            $key = $line['key'];
+            $unitCost = $issuedCosts[$key->column.':'.$key->id] ?? ($key->isGroup() ? $ledger->groupAverageCost($key->id) : $ledger->averageCost($key->id));
 
             $movement = $ledger->receive([
-                'product_id' => $line['product_id'],
+                ...$key->attributes(),
                 'warehouse_id' => (int) $warehouseId,
-                'location_id' => $layout->primaryLocationId($line['product_id'], (int) $warehouseId),
+                'location_id' => $key->isGroup() ? null : $layout->primaryLocationId($key->id, (int) $warehouseId),
                 'quantity' => round($line['quantity'], 4),
                 'weight' => round($line['weight'], 4),
                 'unit_cost' => $unitCost,
@@ -657,11 +661,11 @@ class SalesReturnService
             ->where(fn ($query) => $query
                 ->where(fn ($query) => $query->where('sourceable_type', $invoice->getMorphClass())->where('sourceable_id', $invoice->id))
                 ->orWhere(fn ($query) => $query->where('sourceable_type', (new DeliveryNote)->getMorphClass())->whereIn('sourceable_id', $noteIds)))
-            ->selectRaw('product_id, SUM(total_cost) as cost, SUM(quantity) as quantity')
-            ->groupBy('product_id')
+            ->selectRaw('product_id, category_finish_id, SUM(total_cost) as cost, SUM(quantity) as quantity')
+            ->groupBy('product_id', 'category_finish_id')
             ->get()
             ->filter(fn ($row) => (float) $row->quantity != 0.0)
-            ->mapWithKeys(fn ($row) => [(int) $row->product_id => round((float) $row->cost / (float) $row->quantity, 6)])
+            ->mapWithKeys(fn ($row) => [StockKey::from($row->toArray())->column.':'.StockKey::from($row->toArray())->id => round((float) $row->cost / (float) $row->quantity, 6)])
             ->all();
     }
 

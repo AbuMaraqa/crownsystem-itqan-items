@@ -18,7 +18,7 @@ use Modules\Accounting\Enums\SalesOrderStatus;
 use Modules\Accounting\Enums\StockMovementType;
 use Modules\Accounting\Services\Concerns\PostsInventoryJournal;
 use Modules\Accounting\Support\MainItemShare;
-use Modules\Accounting\Support\WeightPieces;
+use Modules\Accounting\Support\StockKey;
 use Modules\Core\Services\ReferenceNumberService;
 
 /**
@@ -111,7 +111,7 @@ class DeliveryNoteService
                     'location_id' => $item->location_id,
                     'quantity' => (float) $item->quantity,
                 ])->all(),
-                array_map(fn (array $row) => ['product_id' => $row['product_id'], 'location_id' => null, 'quantity' => $row['kg']], $mainRows)
+                array_map(fn (array $row) => [...$row['key']->attributes(), 'location_id' => null, 'quantity' => $row['kg']], $mainRows)
             ));
 
             $ledger = app(StockLedgerService::class);
@@ -150,7 +150,7 @@ class DeliveryNoteService
 
             foreach ($mainRows as $row) {
                 $movements = $ledger->issue([
-                    'product_id' => $row['product_id'],
+                    ...$row['key']->attributes(),
                     'warehouse_id' => $note->warehouse_id,
                     'quantity' => $row['kg'],
                     'weight' => $row['kg'],
@@ -280,10 +280,8 @@ class DeliveryNoteService
             }
 
             if ($item->pieces->isNotEmpty()) {
-                // قطع سطر مجموعة السعر تحمل وزنه الفعلي (لا صنف رئيسي)، وقطع الصنف الرئيسي وزنها المحسوب.
-                $weights = $isGroup
-                    ? WeightPieces::actualShares($item->pieces->mapWithKeys(fn ($piece) => [$piece->id => (float) $piece->total_weight])->all(), $item->actual_weight)
-                    : $item->pieces->mapWithKeys(fn ($piece) => [$piece->id => (float) $piece->total_weight])->all();
+                // كما في اتقان: القطع بوزنها المحسوب؛ الكيلو الفعلي على مجموعة السعر (او صنف السطر) في mainRows.
+                $weights = $item->pieces->mapWithKeys(fn ($piece) => [$piece->id => (float) $piece->total_weight])->all();
 
                 foreach ($item->pieces as $piece) {
                     $count = (float) $piece->piece_count;
@@ -586,7 +584,7 @@ class DeliveryNoteService
     {
         // تقدير حتى الترحيل: الترحيل يضع كلفة الخروج الفعلية.
         $main = collect($this->mainRows($order, $items, $exceptNoteId, false))
-            ->sum(fn (array $row) => round($row['kg'] * app(StockLedgerService::class)->averageCost($row['product_id']), 4));
+            ->sum(fn (array $row) => round($row['kg'] * ($row['key']->isGroup() ? app(StockLedgerService::class)->groupAverageCost($row['key']->id) : app(StockLedgerService::class)->averageCost($row['key']->id)), 4));
 
         return [
             'total_quantity' => round(array_sum(array_column($items, 'quantity')), 4),
@@ -619,8 +617,7 @@ class DeliveryNoteService
         foreach ($grouped as $itemId => $itemRows) {
             $item = $order->items->firstWhere('id', $itemId);
 
-            // سطر مجموعة السعر لا صنف رئيسي له: قطعه تحمل الوزن والكلفة.
-            if (! $item || $item->isPriceGroupLine()) {
+            if (! $item) {
                 continue;
             }
 
@@ -646,7 +643,7 @@ class DeliveryNoteService
                 : ((float) $item->actual_weight > 0 ? (float) $item->actual_weight : $calculated);
 
             $result[] = [
-                'product_id' => (int) $item->product_id,
+                'key' => $item->isPriceGroupLine() ? StockKey::group((int) $item->category_finish_id) : StockKey::product((int) $item->product_id),
                 'kg' => MainItemShare::slice($kg, $whole, $prior, $current),
                 'line_id' => data_get($itemRows->first(), 'id') ? (int) data_get($itemRows->first(), 'id') : null,
             ];

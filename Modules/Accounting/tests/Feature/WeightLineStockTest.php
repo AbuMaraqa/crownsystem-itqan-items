@@ -36,18 +36,20 @@ use Modules\Accounting\Services\StockTransferService;
 use Modules\Accounting\tests\Feature\Concerns\PriceGroupFixtures;
 use Modules\Core\Entities\Currency;
 use Modules\Core\Entities\User;
+use Modules\Items\Entities\Category;
 use Modules\Items\Entities\CategoryFinish;
+use Modules\Items\Entities\Finish;
 use Modules\Items\Entities\Product;
 use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
 /**
- * نفس حساب اتقان: الصنف الرئيسي يحمل الكغم الفعلي والقيمة، والمقطع يحمل العدد بلا قيمة،
- * والرصيدان مستقلان ولا يُسوَّى احدهما بالآخر. كل الارقام محسوبة يدوياً في التعليقات.
+ * سطر الوزن في المستندات سطر مجموعة سعر (التصنيف × اللون) قطعه ألوان المقاطع: كل لون يحمل عدده
+ * ونصيبه من الكغم الفعلي ومن قيمة السطر، ورصيد المجموعة مجموع ألوانها. كل الارقام محسوبة يدوياً.
  *
  * قطعة واحدة بطول 6 ووزن متر 1.267 = 7.602 كغم محسوب.
  */
-class WeightMainItemBalanceTest extends TestCase
+class WeightLineStockTest extends TestCase
 {
     use PriceGroupFixtures;
     use RefreshDatabase;
@@ -60,7 +62,7 @@ class WeightMainItemBalanceTest extends TestCase
 
     private User $customer;
 
-    private Product $main;
+    private CategoryFinish $group;
 
     private Product $piece;
 
@@ -101,13 +103,16 @@ class WeightMainItemBalanceTest extends TestCase
         $this->seed(AccountMappingSeeder::class);
 
         $this->warehouse = $this->makeWarehouse('المخزن الرئيسي', 'WH1');
-        $this->main = $this->product('المنيوم', ['pricing_type' => 'weight', 'base_price' => 0]);
-        $this->piece = $this->product('مقطع', ['pricing_type' => 'weight', 'base_price' => 0, 'main_product_id' => $this->main->id, 'length' => 6, 'weight_per_meter' => 1.267]);
+        $category = Category::create(['slug' => 'alu-'.Str::lower(Str::random(6)), 'status' => 1, 'pricing_type' => 'weight']);
+        $category->translateOrNew('ar')->name = 'المنيوم';
+        $category->save();
+        $this->group = CategoryFinish::create(['category_id' => $category->id, 'finish_id' => Finish::create(['name' => 'فضي', 'is_active' => true])->id, 'is_active' => true]);
+        $this->piece = $this->colour('مقطع', 6, 1.267);
     }
 
     // ------------------------------------------------------------ invoices without an order
 
-    public function test_buying_pieces_puts_the_actual_kg_and_value_on_the_main_item_and_only_the_count_on_the_piece(): void
+    public function test_buying_a_group_line_puts_the_actual_kg_and_value_on_the_group_and_only_the_count_on_the_colour(): void
     {
         $this->buy(actual: 8, price: 11);
 
@@ -116,16 +121,15 @@ class WeightMainItemBalanceTest extends TestCase
         $this->assertSame(7.602, $this->weightOf($this->piece));
         $this->assertSame(0.0, $this->valueOf($this->piece));
 
-        $mainMovement = StockMovement::query()->where('product_id', $this->main->id)->sole();
-        $this->assertSame(8.0, (float) $mainMovement->quantity);
-        $this->assertSame(8.0, (float) $mainMovement->weight);
-        $this->assertSame(11.0, (float) $mainMovement->unit_cost);
-        $this->assertSame(88.0, (float) $mainMovement->total_cost);
+        $groupMovement = StockMovement::query()->where('category_finish_id', $this->group->id)->sole();
+        $this->assertNull($groupMovement->product_id);
+        $this->assertSame(8.0, (float) $groupMovement->quantity);
+        $this->assertSame(11.0, (float) $groupMovement->unit_cost);
+        $this->assertSame(88.0, (float) $groupMovement->total_cost);
 
         $pieceMovement = StockMovement::query()->where('product_id', $this->piece->id)->sole();
         $this->assertSame(1.0, (float) $pieceMovement->quantity);
         $this->assertSame(7.602, (float) $pieceMovement->weight);
-        $this->assertSame(0.0, (float) $pieceMovement->unit_cost);
         $this->assertSame(0.0, (float) $pieceMovement->total_cost);
 
         // من حـ/ المخزون 88 الى حـ/ المورد 88.
@@ -133,13 +137,13 @@ class WeightMainItemBalanceTest extends TestCase
         $this->assertSame(0.0, $this->totalBalance());
     }
 
-    public function test_buying_with_an_empty_actual_moves_only_the_pieces(): void
+    public function test_buying_with_an_empty_actual_stocks_the_colour_at_its_calculated_weight(): void
     {
         $this->buyWithAnotherLine(actual: null, price: 11);
 
-        $this->assertMain(kg: 0, value: 0);
-        $this->assertSame(0, StockMovement::query()->where('product_id', $this->main->id)->count());
+        // بلا وزن فعلي: الكغم المحسوب 7.602 × 11 = 83.622.
         $this->assertSame(1.0, $this->onHand($this->piece));
+        $this->assertSame(7.602, $this->weightOf($this->piece));
     }
 
     public function test_selling_an_actual_weight_takes_kg_and_cost_from_the_main_item(): void
@@ -182,28 +186,9 @@ class WeightMainItemBalanceTest extends TestCase
         $this->sell(actual: 9, price: 20);
     }
 
-    public function test_with_the_negative_stock_permission_the_sale_goes_below_zero_and_the_shortfall_costs_nothing(): void
-    {
-        $this->buy(actual: 8, price: 11);
-        $this->allowNegativeStock();
-
-        $sales = app(SalesInvoiceService::class);
-        $sales->post($sales->create($this->invoiceData($this->customer, [$this->weightLine(9, 20, count: 2)])));
-
-        // 8 − 9 = −1 كغم، والتكلفة 8 × 11 من الطبقة + 1 × 0 بلا طبقة = 88، كما في اتقان.
-        $this->assertSame(-1.0, $this->onHand($this->main));
-        $this->assertSame(-1.0, $this->weightOf($this->main));
-        $this->assertSame(0.0, $this->valueOf($this->main));
-        $this->assertSame(88.0, $this->balance($this->cogsAccount()));
-        $this->assertSame(0.0, $this->balance($this->warehouseAccount()));
-        // قطعة واحدة مشتراة وقطعتان مبيعتان.
-        $this->assertSame(-1.0, $this->onHand($this->piece));
-        $this->assertSame(0.0, $this->totalBalance());
-    }
-
     public function test_the_availability_check_passes_with_the_negative_stock_permission_only(): void
     {
-        $line = [['product_id' => $this->main->id, 'location_id' => null, 'quantity' => 5]];
+        $line = [['product_id' => $this->piece->id, 'location_id' => null, 'quantity' => 5]];
 
         try {
             app(StockLevelService::class)->assertAvailable($this->warehouse->id, $line);
@@ -224,17 +209,6 @@ class WeightMainItemBalanceTest extends TestCase
 
         $sales = app(SalesInvoiceService::class);
         $sales->post($sales->create($this->invoiceData($this->customer, [$this->weightLine(1, 20, count: 2)])));
-    }
-
-    public function test_a_main_item_without_pieces_moves_only_its_kg(): void
-    {
-        $purchase = app(PurchaseInvoiceService::class);
-        $purchase->post($purchase->create($this->invoiceData($this->supplier, [
-            ['product_id' => $this->main->id, 'quantity' => 10, 'actual_weight' => 10, 'unit_price' => 4],
-        ])));
-
-        $this->assertMain(kg: 10, value: 40);
-        $this->assertSame(0.0, $this->onHand($this->piece));
     }
 
     public function test_the_invoice_discount_stays_on_the_main_value(): void
@@ -410,130 +384,6 @@ class WeightMainItemBalanceTest extends TestCase
 
     /* ---------- سطر مجموعة السعر (المرحلة 2): كل لون يدخل بقطعه ونصيبه من الوزن والقيمة ---------- */
 
-    public function test_a_price_group_purchase_is_received_by_colour_at_its_value_share(): void
-    {
-        ['white' => $white, 'whiteW45' => $w45, 'whiteW60' => $w60] = $this->alpineGroups();
-        // 2 × W45 (16.25 كغم) + 1 × W60 (13 كغم) = 29.25 محسوب، 40 فعلي × 5 = 200.
-        $order = $this->groupPurchaseOrder($white, [[$w45, 2], [$w60, 1]], actual: 40, price: 5);
-        $this->postGroupReceipt($order);
-
-        $this->assertSame(2.0, $this->onHand($w45));
-        $this->assertSame(1.0, $this->onHand($w60));
-        $this->assertSame(111.1111, $this->valueOf($w45));
-        $this->assertSame(88.8889, $this->valueOf($w60));
-        $this->assertSame(22.2222, $this->weightOf($w45));
-        $this->assertSame(17.7778, $this->weightOf($w60));
-        $this->assertSame(200.0, $this->balance($this->warehouseAccount()));
-        $this->assertSame(0, StockMovement::query()->where(fn ($query) => $query->whereNull('product_id')->orWhere('product_id', 0))->count());
-
-        $this->invoiceGroupOrder($order, actual: 40, price: 5);
-
-        $this->assertSame(111.1111, $this->valueOf($w45));
-        $this->assertSame(200.0, $this->balance($this->warehouseAccount()));
-        $this->assertSame(0.0, $this->balance($this->varianceAccount()));
-        $this->assertSame(0.0, $this->totalBalance());
-    }
-
-    public function test_a_price_group_invoice_at_another_price_revalues_each_colour_by_its_share(): void
-    {
-        ['white' => $white, 'whiteW45' => $w45, 'whiteW60' => $w60] = $this->alpineGroups();
-        $order = $this->groupPurchaseOrder($white, [[$w45, 2], [$w60, 1]], actual: 40, price: 5);
-        $this->postGroupReceipt($order);
-
-        $this->invoiceGroupOrder($order, actual: 40, price: 6);
-
-        // 240 بنسبة الوزن المحسوب: 133.3333 و 106.6667.
-        $this->assertSame(133.3333, $this->valueOf($w45));
-        $this->assertSame(106.6667, $this->valueOf($w60));
-        $this->assertSame(240.0, $this->balance($this->warehouseAccount()));
-        $this->assertSame(0.0, $this->balance($this->varianceAccount()));
-        $this->assertSame(0.0, $this->totalBalance());
-    }
-
-    public function test_a_price_group_purchase_invoice_without_order_stocks_each_colour_at_its_share(): void
-    {
-        ['white' => $white, 'whiteW45' => $w45, 'whiteW60' => $w60] = $this->alpineGroups();
-        $service = app(PurchaseInvoiceService::class);
-
-        $invoice = $service->post($service->create($this->invoiceData($this->supplier, [
-            $this->groupLine($white, [[$w45, 2], [$w60, 1]], 40, 5),
-        ])));
-
-        $this->assertNull($invoice->items->sole()->product_id);
-        $this->assertSame(111.1111, $this->valueOf($w45));
-        $this->assertSame(88.8889, $this->valueOf($w60));
-        $this->assertSame(22.2222, $this->weightOf($w45));
-        $this->assertSame(200.0, $this->balance($this->warehouseAccount()));
-        $this->assertSame(0.0, $this->totalBalance());
-    }
-
-    public function test_a_price_group_sales_return_brings_each_colour_back_at_its_issue_cost(): void
-    {
-        ['white' => $white, 'whiteW45' => $w45, 'whiteW60' => $w60] = $this->alpineGroups();
-        $this->buyGroup($white, [[$w45, 2], [$w60, 1]], actual: 40, price: 5);
-        $sales = app(SalesInvoiceService::class);
-        $invoice = $sales->post($sales->create($this->invoiceData($this->customer, [$this->groupLine($white, [[$w45, 2], [$w60, 1]], 40, 8)])));
-        $this->assertSame(200.0, $this->balance($this->cogsAccount()));
-
-        $line = $invoice->items()->with('pieces')->sole();
-        $service = app(SalesReturnService::class);
-        $return = $service->post($service->create([
-            'sales_invoice_id' => $invoice->id,
-            'return_date' => now()->toDateString(),
-            'items' => [[
-                'sales_invoice_item_id' => $line->id,
-                'pieces' => [['sales_invoice_item_piece_id' => $line->pieces->firstWhere('product_id', $w45->id)->id, 'piece_count' => 1]],
-            ]],
-        ]));
-
-        $returned = $return->items()->sole();
-        $this->assertNull($returned->product_id);
-        $this->assertSame($white->id, (int) $returned->category_finish_id);
-        // قطعة W45 تعود بكلفة خروجها (111.1111 ÷ 2) وبنصيبها من الوزن المفوتر (8.125 × 40 ÷ 29.25).
-        $this->assertSame(1.0, $this->onHand($w45));
-        $this->assertSame(0.0, $this->onHand($w60));
-        $this->assertEqualsWithDelta(11.1111, $this->weightOf($w45), 0.0001);
-        $this->assertEqualsWithDelta(144.4444, $this->balance($this->cogsAccount()), 0.0002);
-        $this->assertSame(0.0, $this->totalBalance());
-
-        $service->cancel($return, 'test');
-
-        $this->assertSame(0.0, $this->onHand($w45));
-        $this->assertSame(200.0, $this->balance($this->cogsAccount()));
-        $this->assertSame(0.0, $this->totalBalance());
-    }
-
-    public function test_a_price_group_purchase_return_takes_each_colour_out_at_its_cost(): void
-    {
-        ['white' => $white, 'whiteW45' => $w45, 'whiteW60' => $w60] = $this->alpineGroups();
-        $invoice = $this->buyGroup($white, [[$w45, 2], [$w60, 1]], actual: 40, price: 5);
-
-        $line = $invoice->items()->with('pieces')->sole();
-        $service = app(PurchaseReturnService::class);
-        $return = $service->post($service->create([
-            'purchase_invoice_id' => $invoice->id,
-            'return_date' => now()->toDateString(),
-            'items' => [[
-                'purchase_invoice_item_id' => $line->id,
-                'pieces' => [['purchase_invoice_item_piece_id' => $line->pieces->firstWhere('product_id', $w60->id)->id, 'piece_count' => 1]],
-            ]],
-        ]));
-
-        $this->assertSame($white->id, (int) $return->items()->sole()->category_finish_id);
-        $this->assertSame(2.0, $this->onHand($w45));
-        $this->assertSame(0.0, $this->onHand($w60));
-        $this->assertSame(0.0, $this->valueOf($w60));
-        $this->assertEqualsWithDelta(111.1111, $this->balance($this->warehouseAccount()), 0.0002);
-        $this->assertSame(0.0, $this->totalBalance());
-
-        $service->cancel($return, 'test');
-
-        $this->assertSame(1.0, $this->onHand($w60));
-        $this->assertSame(88.8889, $this->valueOf($w60));
-        $this->assertSame(200.0, $this->balance($this->warehouseAccount()));
-        $this->assertSame(0.0, $this->totalBalance());
-    }
-
     public function test_a_revalued_receipt_sells_at_the_invoice_price(): void
     {
         $order = $this->purchaseOrder(price: 0);
@@ -581,7 +431,7 @@ class WeightMainItemBalanceTest extends TestCase
 
     public function test_a_partial_receipt_takes_the_actual_pro_rata_and_the_last_takes_the_rest(): void
     {
-        $short = $this->product('مقطع قصير', ['pricing_type' => 'weight', 'base_price' => 0, 'main_product_id' => $this->main->id, 'length' => 2, 'weight_per_meter' => 1]);
+        $short = $this->colour('مقطع قصير', 2, 1);
 
         // المحسوب: 7.602 + 2 = 9.602، الفعلي 10، السعر 11، القيمة 110.
         $order = app(PurchaseOrderService::class)->confirm(app(PurchaseOrderService::class)->create([
@@ -589,7 +439,8 @@ class WeightMainItemBalanceTest extends TestCase
             'warehouse_id' => $this->warehouse->id,
             'order_date' => now()->toDateString(),
             'items' => [[
-                'product_id' => $this->main->id,
+                'product_id' => null,
+                'category_finish_id' => $this->group->id,
                 'quantity' => 1,
                 'unit_price' => 11,
                 'actual_weight' => 10,
@@ -711,85 +562,7 @@ class WeightMainItemBalanceTest extends TestCase
 
     // ------------------------------------------------------------ transfers and adjustments
 
-    public function test_a_transfer_moves_kg_with_its_value_and_pieces_at_zero(): void
-    {
-        $this->buy(actual: 8, price: 11);
-        $other = $this->makeWarehouse('مخزن ثان', 'WH2');
-
-        $service = app(StockTransferService::class);
-        $service->post($service->create([
-            'from_warehouse_id' => $this->warehouse->id,
-            'to_warehouse_id' => $other->id,
-            'items' => [
-                ['product_id' => $this->main->id, 'quantity' => 3],
-                ['product_id' => $this->piece->id, 'quantity' => 1],
-            ],
-        ]));
-
-        // القيمة الكلية لا تتغير: 88.
-        $this->assertMain(kg: 8, value: 88);
-        $this->assertSame(3.0, $this->onHand($this->main, $other->id));
-        $this->assertSame(3.0, $this->weightOf($this->main, $other->id));
-        $this->assertSame(5.0, $this->onHand($this->main, $this->warehouse->id));
-        $this->assertSame(1.0, $this->onHand($this->piece, $other->id));
-        $this->assertSame(0.0, $this->valueOf($this->piece));
-    }
-
-    public function test_an_adjustment_of_the_main_item_moves_kg_and_of_a_piece_moves_the_count_at_zero_value(): void
-    {
-        $service = app(StockAdjustmentService::class);
-        $service->post($service->create([
-            'type' => 'opening',
-            'warehouse_id' => $this->warehouse->id,
-            'items' => [
-                ['product_id' => $this->main->id, 'quantity' => 10, 'unit_cost' => 4],
-                ['product_id' => $this->piece->id, 'quantity' => 2, 'unit_cost' => 50],
-            ],
-        ]));
-
-        $this->assertMain(kg: 10, value: 40);
-        $this->assertSame(10.0, $this->weightOf($this->main));
-        $this->assertSame(2.0, $this->onHand($this->piece));
-        // 2 × 6 × 1.267 = 15.204 للمعلومة فقط.
-        $this->assertSame(15.204, $this->weightOf($this->piece));
-        $this->assertSame(0.0, $this->valueOf($this->piece));
-        $this->assertSame(40.0, $this->balance($this->warehouseAccount()));
-    }
-
     // ------------------------------------------------------------ readers
-
-    public function test_stock_levels_read_kg_and_value_from_the_main_row_and_count_from_the_pieces(): void
-    {
-        $this->buy(actual: 8, price: 11);
-        $levels = app(StockLevelService::class);
-
-        $main = $levels->mainItemLevels([$this->main->id])[$this->main->id];
-
-        $this->assertSame(8.0, $main['weight']);
-        $this->assertSame(88.0, $main['value']);
-        $this->assertSame(1.0, $main['on_hand']);
-
-        ['levels' => $card] = $levels->productLevels($this->main->id);
-        $this->assertSame(8.0, $card['weight']);
-        $this->assertSame(1.0, $card['on_hand']);
-
-        $subs = $levels->subItemLevels([$this->main->id])[$this->main->id];
-        $this->assertSame(0.0, $subs[$this->piece->id]['value']);
-        $this->assertSame(1.0, $subs[$this->piece->id]['on_hand']);
-
-        $summary = $levels->productSummary($this->main->refresh());
-        $this->assertSame(8.0, $summary['warehouses'][0]['weight']);
-        $this->assertSame(1.0, $summary['warehouses'][0]['quantity']);
-    }
-
-    public function test_the_two_balances_are_never_reconciled(): void
-    {
-        $this->buy(actual: 8, price: 11);
-
-        // 8 كغم على الرئيسي و7.602 محسوب على المقطع، ويبقى الفرق كما هو.
-        $this->assertSame(8.0, $this->weightOf($this->main));
-        $this->assertSame(7.602, $this->weightOf($this->piece));
-    }
 
     // ------------------------------------------------------------ helpers
 
@@ -821,7 +594,8 @@ class WeightMainItemBalanceTest extends TestCase
     private function weightLine(?float $actual, float $price, float $count = 1): array
     {
         return [
-            'product_id' => $this->main->id,
+            'product_id' => null,
+                'category_finish_id' => $this->group->id,
             'quantity' => $actual ?? 0,
             'actual_weight' => $actual,
             'unit_price' => $price,
@@ -877,7 +651,8 @@ class WeightMainItemBalanceTest extends TestCase
             'warehouse_id' => $this->warehouse->id,
             'order_date' => now()->toDateString(),
             'items' => [[
-                'product_id' => $this->main->id,
+                'product_id' => null,
+                'category_finish_id' => $this->group->id,
                 'quantity' => 1,
                 'unit_price' => $price,
                 'actual_weight' => $actual,
@@ -905,7 +680,8 @@ class WeightMainItemBalanceTest extends TestCase
 
         return $service->post($service->create($this->invoiceData($this->supplier, [[
             'purchase_order_item_id' => $item->id,
-            'product_id' => $item->product_id,
+            'product_id' => null,
+            'category_finish_id' => $item->category_finish_id,
             'quantity' => $actual ?? 0,
             'actual_weight' => $actual,
             'unit_price' => $price,
@@ -987,7 +763,7 @@ class WeightMainItemBalanceTest extends TestCase
             'total_amount' => 152.04,
             'status' => SalesOrderStatus::CONFIRMED->value(),
         ]);
-        $item = $order->items()->create(['product_id' => $this->main->id, 'description' => $this->main->name, 'quantity' => 1, 'unit_price' => 20, 'total_weight' => 7.602]);
+        $item = $order->items()->create(['product_id' => null, 'category_finish_id' => $this->group->id, 'description' => 'المنيوم — أبيض', 'quantity' => 1, 'unit_price' => 20, 'total_weight' => 7.602]);
         $item->pieces()->create(['product_id' => $this->piece->id, 'description' => $this->piece->name, 'piece_count' => 1, 'piece_length' => 6, 'weight_per_meter' => 1.267, 'total_weight' => 7.602, 'sort_order' => 0]);
 
         return $order->refresh();
@@ -1001,7 +777,8 @@ class WeightMainItemBalanceTest extends TestCase
 
         return $service->post($service->create($this->invoiceData($this->customer, [[
             'sales_order_item_id' => $item->id,
-            'product_id' => $item->product_id,
+            'product_id' => null,
+            'category_finish_id' => $item->category_finish_id,
             'quantity' => $actual ?? 0,
             'actual_weight' => $actual,
             'unit_price' => $price,
@@ -1041,11 +818,23 @@ class WeightMainItemBalanceTest extends TestCase
         auth()->user()->refresh();
     }
 
+    /**
+     * رصيد المجموعة: مجموع كغم ألوانها وقيمتها.
+     */
     private function assertMain(float $kg, float $value): void
     {
-        $this->assertEqualsWithDelta($kg, $this->onHand($this->main), 0.00001, 'main quantity');
-        $this->assertEqualsWithDelta($kg, $this->weightOf($this->main), 0.00001, 'main weight');
-        $this->assertEqualsWithDelta($value, $this->valueOf($this->main), 0.00001, 'main value');
+        $group = app(StockLevelService::class)->groupLevels([$this->group->id])[$this->group->id] ?? ['weight' => 0.0, 'value' => 0.0];
+
+        $this->assertEqualsWithDelta($kg, $group['weight'], 0.00001, 'group weight');
+        $this->assertEqualsWithDelta($value, $group['value'], 0.00001, 'group value');
+    }
+
+    /**
+     * لون مقطع في المجموعة بقياس قطعته.
+     */
+    private function colour(string $name, float $length, float $weightPerMeter): Product
+    {
+        return $this->product($name, ['pricing_type' => 'weight', 'base_price' => 0, 'category_finish_id' => $this->group->id, 'finish_id' => $this->group->finish_id, 'length' => $length, 'weight_per_meter' => $weightPerMeter]);
     }
 
     private function onHand(Product $product, ?int $warehouseId = null): float
