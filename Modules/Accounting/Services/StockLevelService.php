@@ -83,7 +83,8 @@ class StockLevelService
     }
 
     /**
-     * رصيد (التصنيف × اللون): مجموع ألوان المقاطع التي في المجموعة، بالقطعة والكغم والقيمة.
+     * رصيد (التصنيف × اللون) كما في اتقان: الكيلو وقيمته من دفتر المجموعة نفسها (مستقلان عن عدد القطع)،
+     * وعدد القطع والمحجوز والقادم مجموع ألوانها.
      *
      * @param  array<int, int>  $categoryFinishIds
      * @return array<int, array{on_hand:float, weight:float, reserved:float, incoming:float, available:float, value:float, variations:int}>
@@ -96,10 +97,32 @@ class StockLevelService
             return [];
         }
 
-        return array_map(fn (array $variations): array => $this->total($variations), $this->grouped(
-            Product::query()->whereIn('category_finish_id', $categoryFinishIds)->pluck('category_finish_id', 'id'),
-            $warehouseId,
-        ));
+        $pieces = $this->grouped(Product::query()->whereIn('category_finish_id', $categoryFinishIds)->pluck('category_finish_id', 'id'), $warehouseId);
+        $kg = StockBalance::query()
+            ->whereIn('category_finish_id', $categoryFinishIds)
+            ->when($warehouseId, fn ($query) => $query->where('warehouse_id', $warehouseId))
+            ->groupBy('category_finish_id')
+            ->selectRaw('category_finish_id, SUM(weight) as weight')
+            ->pluck('weight', 'category_finish_id');
+        $values = StockCostLayer::query()
+            ->whereIn('category_finish_id', $categoryFinishIds)
+            ->when($warehouseId, fn ($query) => $query->where('warehouse_id', $warehouseId))
+            ->groupBy('category_finish_id')
+            ->selectRaw('category_finish_id, SUM(remaining_value) as value')
+            ->pluck('value', 'category_finish_id');
+        $levels = [];
+
+        foreach ($categoryFinishIds as $groupId) {
+            $total = $this->total($pieces[$groupId] ?? []);
+            $total['weight'] = round((float) ($kg[$groupId] ?? 0), 4);
+            $total['value'] = round((float) ($values[$groupId] ?? 0), 4);
+
+            if ($total['variations'] > 0 || $total['weight'] != 0.0 || $total['value'] != 0.0) {
+                $levels[$groupId] = $total;
+            }
+        }
+
+        return $levels;
     }
 
     /**

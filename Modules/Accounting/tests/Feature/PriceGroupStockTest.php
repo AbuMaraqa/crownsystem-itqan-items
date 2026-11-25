@@ -18,8 +18,9 @@ use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
 /**
- * رصيد الكيلو على (التصنيف × اللون) بدل الصنف الرئيسي الوهمي: مجموع ألوان المقاطع في المجموعة،
- * وصفحة الارصدة تُفلتر بالمجموعة وتعرض ألوانها وسطر مجموعها. الصنف الاب (المقطع) يجمع ألوانه.
+ * رصيد الكيلو على (التصنيف × اللون) بدل الصنف الرئيسي الوهمي، كما في اتقان: الكيلو وقيمته على
+ * المجموعة، وعدد القطع على ألوانها. صفحة الارصدة تُفلتر بالمجموعة وتعرض ألوانها وسطر مجموعها،
+ * والصنف الاب (المقطع) يجمع عدد ألوانه.
  *
  * W45 أبيض: 6.5 × 1.25 = 8.125 كغم للقطعة. W60 أبيض: 6.5 × 2 = 13 كغم للقطعة.
  */
@@ -43,10 +44,13 @@ class PriceGroupStockTest extends TestCase
         $this->warehouse->save();
     }
 
-    private function receive(Product $product, float $quantity, float $weight, float $total): void
+    /**
+     * @param  array<string, int>  $key  ['product_id' => ..] او ['category_finish_id' => ..]
+     */
+    private function receive(array $key, float $quantity, float $weight, float $total): void
     {
-        app(StockLedgerService::class)->receive([
-            'product_id' => $product->id, 'warehouse_id' => $this->warehouse->id, 'quantity' => $quantity, 'weight' => $weight,
+        app(StockLedgerService::class)->receive($key + [
+            'warehouse_id' => $this->warehouse->id, 'quantity' => $quantity, 'weight' => $weight,
             'unit_cost' => $total / $quantity, 'total_cost' => $total, 'type' => StockMovementType::RECEIPT, 'date' => now()->toDateString(),
         ]);
     }
@@ -57,9 +61,10 @@ class PriceGroupStockTest extends TestCase
     private function stockedWhite(): array
     {
         $groups = $this->alpineGroups();
-        // 10 × 8.125 = 81.25 كغم بـ 1625، و 5 × 13 = 65 كغم بـ 1300.
-        $this->receive($groups['whiteW45'], 10, 81.25, 1625);
-        $this->receive($groups['whiteW60'], 5, 65, 1300);
+        // الكيلو على المجموعة: 146.25 كغم بـ 2925. والقطع بلا قيمة: 10 × W45 (81.25 محسوب) و 5 × W60 (65).
+        $this->receive(['category_finish_id' => $groups['white']->id], 146.25, 146.25, 2925);
+        $this->receive(['product_id' => $groups['whiteW45']->id], 10, 81.25, 0);
+        $this->receive(['product_id' => $groups['whiteW60']->id], 5, 65, 0);
 
         return $groups;
     }
@@ -98,14 +103,15 @@ class PriceGroupStockTest extends TestCase
         $groups = $this->alpineGroups();
         $groups['whiteW45']->update(['parent_id' => $parent->id]);
         $groups['meshW45']->update(['parent_id' => $parent->id]);
-        $this->receive($groups['whiteW45'], 10, 81.25, 1625);
-        $this->receive($groups['meshW45'], 2, 16.25, 390);
+        $this->receive(['product_id' => $groups['whiteW45']->id], 10, 81.25, 0);
+        $this->receive(['product_id' => $groups['meshW45']->id], 2, 16.25, 0);
 
         $levels = app(StockLevelService::class)->parentLevels([$parent->id])[$parent->id];
 
         $this->assertSame(12.0, $levels['on_hand']);
         $this->assertSame(97.5, $levels['weight']);
-        $this->assertSame(2015.0, $levels['value']);
+        // القيمة على مجموعة السعر لا على ألوان المقطع.
+        $this->assertSame(0.0, $levels['value']);
         $this->assertSame(2, $levels['variations']);
     }
 }
