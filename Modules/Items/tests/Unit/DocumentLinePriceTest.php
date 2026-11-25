@@ -181,27 +181,6 @@ class DocumentLinePriceTest extends TestCase
         $this->assertSame('60.0000', $this->salePrice($party->id));
     }
 
-    public function test_a_weight_line_is_priced_on_its_main_item(): void
-    {
-        $main = ConsolidatedTestFactory::product('weight');
-        $piece = ConsolidatedTestFactory::product('weight');
-        $piece->update(['main_product_id' => $main->id]);
-
-        $list = PriceList::create(['name' => 'رئيسي']);
-        ProductPrice::create(['price_list_id' => $list->id, 'product_id' => $main->id, 'sell_price' => 7, 'buy_price' => 6]);
-        $party = User::factory()->create(['price_list_id' => $list->id]);
-
-        $payloads = ProductSearch::salesItemPayloads([$main->id, $piece->id], null, LinePriceContext::for($party->id));
-
-        $this->assertSame('7.0000', $payloads[$main->id]['unit_price']);
-        $this->assertSame('7.0000', $payloads[$piece->id]['unit_price']);
-
-        $this->salesInvoice($party->fresh(), 9, null, null, 1, $main);
-        $party->update(['use_last_price' => true]);
-
-        $this->assertSame('9.0000', ProductSearch::salesItemPayload($piece->id, null, LinePriceContext::for($party->id))['unit_price']);
-    }
-
     public function test_a_price_list_used_by_a_party_cannot_be_deleted(): void
     {
         $list = PriceList::create(['name' => 'مستعملة']);

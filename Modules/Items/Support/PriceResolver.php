@@ -50,7 +50,7 @@ final class PriceResolver
      *  2. قائمة اسعار الطرف: جهة البيع للمبيعات والشراء للمشتريات، ان لم يكن صفراً.
      *  3. $fallback: السعر الاساسي او متوسط التكلفة + هامش الزبون (ProductSearch)، تراجع مقصود حتى
      *     لا يتغير سعر الزبائن الحاليين الذين لم تُضبط لهم قائمة.
-     * بلا طرف لا سعر تلقائي. سعر سطر الوزن للصنف الرئيسي، فالمقطع يأخذ سعر رئيسيه.
+     * بلا طرف لا سعر تلقائي. لون المقطع (صنف وزن في مجموعة سعر) يأخذ سعر كيلو مجموعته (KgPriceResolver).
      *
      * @param  iterable<Product>  $products
      * @param  Closure(Product): float  $fallback
@@ -64,14 +64,10 @@ final class PriceResolver
             return $products->mapWithKeys(fn (Product $product): array => [(int) $product->id => 0.0])->all();
         }
 
-        $mains = Product::query()
-            ->whereIn('id', $products->filter(fn (Product $product): bool => self::isPiece($product))->pluck('main_product_id')->unique()->values()->all())
-            ->get()
-            ->keyBy('id');
-        $owners = $products->mapWithKeys(fn (Product $product): array => [
-            (int) $product->id => self::isPiece($product) ? ($mains->get($product->main_product_id) ?? $product) : $product,
-        ]);
-        $ownerIds = $owners->map(fn (Product $owner): int => (int) $owner->id)->unique()->values()->all();
+        $colours = $products->filter(fn (Product $product): bool => self::isGroupColour($product));
+        $kgPrices = $colours->isEmpty() ? [] : KgPriceResolver::forGroups($colours->pluck('category_finish_id')->unique()->values()->all(), $context, $side);
+        $owners = $products->reject(fn (Product $product): bool => self::isGroupColour($product))->keyBy('id');
+        $ownerIds = $owners->keys()->map(fn ($id): int => (int) $id)->all();
 
         ['use_last_price' => $useLastPrice, 'price_list' => $list] = PartyPricing::for($context->partyId);
 
@@ -80,7 +76,7 @@ final class PriceResolver
             : [];
         $listPrices = $list ? self::resolveMany($ownerIds, $list, $side) : [];
 
-        return $owners->map(function (Product $owner) use ($lastPrices, $listPrices, $context, $fallback): float {
+        $prices = $owners->map(function (Product $owner) use ($lastPrices, $listPrices, $context, $fallback): float {
             $last = $lastPrices[(int) $owner->id] ?? null;
 
             // السعر بعملة مستنده: يُحوَّل الى عملة الاساس ثم الى عملة المستند الجديد.
@@ -92,11 +88,17 @@ final class PriceResolver
 
             return $listPrice > 0 ? round($listPrice / $context->exchangeRate, 4) : $fallback($owner);
         })->all();
+
+        foreach ($colours as $colour) {
+            $prices[(int) $colour->id] = (float) ($kgPrices[(int) $colour->category_finish_id] ?? 0.0);
+        }
+
+        return $prices;
     }
 
-    private static function isPiece(Product $product): bool
+    private static function isGroupColour(Product $product): bool
     {
-        return $product->pricing_type === 'weight' && filled($product->main_product_id);
+        return $product->pricing_type === 'weight' && filled($product->category_finish_id);
     }
 
     /**

@@ -10,6 +10,7 @@ use Modules\Items\Entities\CategoryFinish;
 use Modules\Items\Entities\CategoryFinishPrice;
 use Modules\Items\Entities\Finish;
 use Modules\Items\Entities\PriceList;
+use Modules\Items\Entities\Product;
 use Modules\Items\Support\KgPriceResolver;
 use Modules\Items\Support\LinePriceContext;
 use Modules\Items\Support\PriceResolver;
@@ -92,5 +93,18 @@ class KgPriceResolverTest extends TestCase
     public function test_the_price_follows_the_document_currency(): void
     {
         $this->assertSame(5.0, $this->resolve($this->party(null), PriceResolver::SELL, 4.0));
+    }
+
+    /**
+     * لون المقطع في المستند يُسعَّر بسعر كيلو مجموعته، لا بصنف آخر.
+     */
+    public function test_a_colour_variation_is_priced_from_its_price_group_kg_price(): void
+    {
+        $variation = new Product(['slug' => 'v-'.Str::lower(Str::random(6)), 'base_price' => 3, 'pricing_type' => 'weight', 'length' => 6.5, 'weight_per_meter' => 1.25, 'category_finish_id' => $this->group->id, 'finish_id' => $this->group->finish_id]);
+        $variation->save();
+
+        $prices = PriceResolver::forDocumentLines([$variation], new LinePriceContext($this->party($this->cash), 1.0), PriceResolver::SELL, fn () => 99.0);
+
+        $this->assertSame(20.0, $prices[$variation->id]);
     }
 }
