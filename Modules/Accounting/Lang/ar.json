@@ -1792,5 +1792,6 @@
     "Load a price group...": "تحميل مجموعة سعر...",
     "Colours": "الألوان",
     "The item holds no stock of its own; its balance is the total of its colours.": "لا رصيد للصنف نفسه؛ رصيده مجموع أرصدة ألوانه.",
-    "Sub-items belong to a price group line; pick the colour group first.": "القطع تكون داخل سطر مجموعة سعر؛ اختر مجموعة اللون أولًا."
+    "Sub-items belong to a price group line; pick the colour group first.": "القطع تكون داخل سطر مجموعة سعر؛ اختر مجموعة اللون أولًا.",
+    ":item is a colour of a price group; add it inside the line of its group.": ":item لون في مجموعة سعر؛ أضفه داخل سطر مجموعته."
 }

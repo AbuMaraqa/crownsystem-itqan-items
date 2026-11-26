@@ -251,23 +251,6 @@ class InvoiceStockFlowTest extends TestCase
         $this->assertSame(0, JournalEntry::query()->where('sourceable_type', $draft::class)->where('sourceable_id', $draft->id)->whereIn('status', [2, 3])->count());
     }
 
-    public function test_weight_sub_item_invoiced_by_kilogram_is_stocked_in_pieces(): void
-    {
-        $main = $this->product('المنيوم سبير', 'MAIN', 'weight');
-        $sub = $this->product('عليون K3317', 'W1', 'weight', $main->id, 1.5, 6);
-
-        // 90 كغ ÷ (6 م × 1.5 كغ/م) = 10 قطع؛ الكغم وقيمته 90 × 3 = 270 على صنفه الرئيسي.
-        $this->postPurchaseInvoice([['product_id' => $sub->id, 'quantity' => 90, 'unit_price' => 3]]);
-
-        $ledger = app(StockLedgerService::class);
-        $this->assertSame(10.0, $ledger->onHand($sub->id));
-        $this->assertSame(0.0, $ledger->averageCost($sub->id));
-        $this->assertSame(90.0, (float) $sub->refresh()->stock_weight);
-        $this->assertSame(90.0, $ledger->onHand($main->id));
-        $this->assertSame(3.0, $ledger->averageCost($main->id));
-        $this->assertSame(270.0, $this->balance($this->warehouseAccount()));
-    }
-
     public function test_a_main_item_without_pieces_is_stocked_in_kg_from_an_invoice_without_order(): void
     {
         $main = $this->product('المنيوم سبير', 'MAIN', 'weight');

@@ -13,6 +13,7 @@ use Modules\Items\Services\Itqan\ItqanCatalogStage;
 use Modules\Items\Services\Itqan\ItqanPricesStage;
 use Modules\Items\Console\Commands\LinkMainProducts;
 use Modules\Items\Console\Commands\RebuildSearchIndex;
+use Modules\Items\Console\Commands\ResetCatalog;
 use Modules\Items\Entities\BrandTranslation;
 use Modules\Items\Entities\Category;
 use Modules\Items\Entities\CategoryTranslation;
@@ -108,6 +109,7 @@ class ItemsServiceProvider extends ServiceProvider
             ItqanCategoryMap::class,
             LinkMainProducts::class,
             RebuildSearchIndex::class,
+            ResetCatalog::class,
         ]);
     }
 

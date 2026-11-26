@@ -30,6 +30,19 @@ class GroupLinesOnlyTest extends TestCase
         ]]);
     }
 
+    /**
+     * لون مقطع وحده كسطر صنف يضيع قيمته (الكيلو وقيمته على مجموعته)، فيُطلب ادخاله في سطر مجموعته.
+     */
+    public function test_a_colour_alone_as_a_line_is_sent_to_its_group_line(): void
+    {
+        $w45 = $this->alpineGroups()['whiteW45'];
+
+        $this->expectException(DomainException::class);
+        $this->expectExceptionMessage(__(':item is a colour of a price group; add it inside the line of its group.', ['item' => $w45->name]));
+
+        ItemsGrid::ensureWeightLines([['product_id' => $w45->id, 'quantity' => 90, 'unit_price' => 3]]);
+    }
+
     public function test_a_price_group_line_with_its_colours_is_accepted(): void
     {
         ['white' => $white, 'whiteW45' => $w45] = $this->alpineGroups();

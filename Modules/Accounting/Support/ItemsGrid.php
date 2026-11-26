@@ -425,6 +425,25 @@ final class ItemsGrid
         if ($withPieces) {
             throw new DomainException(__('Sub-items belong to a price group line; pick the colour group first.'));
         }
+
+        // لون مقطع وحده سطر صنف: كيلوه وقيمته على مجموعته، فيُدخل في سطرها لا وحده.
+        $productIds = collect($items)
+            ->filter(fn ($item): bool => is_array($item) && GridLine::groupId($item) === null && filled($item['product_id'] ?? null))
+            ->map(fn (array $item): int => (int) $item['product_id'])
+            ->unique()
+            ->values()
+            ->all();
+        $colour = $productIds === [] ? null : Product::query()
+            ->with('translations')
+            ->whereIn('id', $productIds)
+            ->where('pricing_type', 'weight')
+            ->whereNotNull('category_finish_id')
+            ->whereRaw('COALESCE(length, 0) * COALESCE(weight_per_meter, 0) > 0')
+            ->first();
+
+        if ($colour) {
+            throw new DomainException(__(':item is a colour of a price group; add it inside the line of its group.', ['item' => $colour->name]));
+        }
     }
 
     /**
