@@ -18,9 +18,9 @@ use Modules\Accounting\Enums\SalesQuotationStatus;
 use Modules\Accounting\tests\Feature\Concerns\PriceGroupFixtures;
 use Modules\Core\Entities\Currency;
 use Modules\Core\Entities\User;
+use Modules\Items\Entities\CategoryFinishPrice;
 use Modules\Items\Entities\PriceList;
 use Modules\Items\Entities\Product;
-use Modules\Items\Entities\ProductPrice;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -92,33 +92,34 @@ class SalesQuotationPagesTest extends TestCase
     }
 
     /**
-     * سعر الكيلو من قائمة اسعار الطرف، كما يعطيه الجدول عند اختيار الصنف.
+     * سعر كيلو مجموعة السعر من قائمة اسعار الطرف، كما يعطيه الجدول عند اختيار لونها.
      */
-    private function partyPrice(Product $product, float $sell): string
+    private function partyPrice(Product $colour, float $sell): string
     {
         $list = new PriceList(['same_buy_sell' => false, 'is_active' => true, 'sort_order' => 1]);
         $list->save();
         $list->translateOrNew(app()->getLocale())->name = 'قائمة العروض';
         $list->save();
-        ProductPrice::create(['price_list_id' => $list->id, 'product_id' => $product->id, 'sell_price' => $sell, 'buy_price' => 0]);
+        CategoryFinishPrice::create(['price_list_id' => $list->id, 'category_finish_id' => $colour->category_finish_id, 'sell_price' => $sell, 'buy_price' => 0]);
         $this->customer->update(['price_list_id' => $list->id]);
 
         return $this->getJson(route('accounting.items-grid.item', [
             'document' => 'sales-quotation',
-            'product_id' => $product->id,
+            'product_id' => $colour->id,
             'party_id' => $this->customer->id,
-        ]))->assertOk()->json('unit_price');
+        ]))->assertOk()->json('group.unit_price');
     }
 
     /**
-     * سطر صنف رئيسي بقطعه كما يرسله جدول Vue (مع حقول العرض التي يتجاهلها الحفظ).
+     * سطر مجموعة السعر بقطع لونها كما يرسله جدول Vue (مع حقول العرض التي يتجاهلها الحفظ).
      */
     private function weightLine(string $price, ?float $actual = 15): array
     {
         return [
             '_key' => 'row-a',
             'row_type' => 'item',
-            'product_id' => $this->product('DEMO-1025')->id,
+            'product_id' => null,
+            'category_finish_id' => $this->product('DEMO-1025-01')->category_finish_id,
             'product_label' => 'بدون دهان 1025',
             'pricing_type' => 'weight',
             'quantity' => 1,
@@ -156,7 +157,7 @@ class SalesQuotationPagesTest extends TestCase
 
     private function storedQuotation(): SalesQuotation
     {
-        $price = $this->partyPrice($this->product('DEMO-1025'), 20);
+        $price = $this->partyPrice($this->product('DEMO-1025-01'), 20);
         $this->post(route('accounting.sales-quotations.store'), $this->data([
             $this->weightLine($price),
             // صف فارغ وصف مجموعة لا يُحفظان.
@@ -211,7 +212,7 @@ class SalesQuotationPagesTest extends TestCase
         $this->assertSame(SalesQuotationStatus::DRAFT, $quotation->status);
     }
 
-    public function test_a_new_main_item_without_sub_items_is_refused(): void
+    public function test_a_new_price_group_line_without_pieces_is_refused(): void
     {
         $line = $this->weightLine('20');
         $line['pieces'] = [];
@@ -310,7 +311,7 @@ class SalesQuotationPagesTest extends TestCase
         $this->post(route('accounting.sales-quotations.cancel', $quotation->id))->assertForbidden();
         $this->delete(route('accounting.sales-quotations.destroy', $quotation->id))->assertForbidden();
         $this->get(route('accounting.sales-quotations.pdf', $quotation->id))->assertForbidden();
-        $this->getJson(route('accounting.items-grid.item', ['document' => 'sales-quotation', 'product_id' => $this->product('DEMO-1025')->id]))->assertForbidden();
+        $this->getJson(route('accounting.items-grid.item', ['document' => 'sales-quotation', 'product_id' => $this->product('DEMO-1025-01')->id]))->assertForbidden();
 
         $this->signIn([]);
         $this->get(route('accounting.sales-quotations.index'))->assertForbidden();

@@ -76,7 +76,7 @@ class PurchaseOrderService
      */
     public function save(?PurchaseOrder $order, array $data, array $attachments = [], array $removedAttachments = [], array $attachmentOrder = []): PurchaseOrder
     {
-        ItemsGrid::ensureMainItemsHaveSubItems($data['items'] ?? []);
+        ItemsGrid::ensureWeightLines($data['items'] ?? []);
 
         if ($order && $order->goodsReceipts()->exists()) {
             $data = array_replace($data, [

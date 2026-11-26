@@ -92,39 +92,6 @@ class PurchaseOrderSubItemSearchTest extends TestCase
         $this->assertTrue(PurchaseOrderMainItems::search($main, '', 'abc')['visible']);
     }
 
-    public function test_a_sub_item_entered_alone_is_shown_inside_its_main_product(): void
-    {
-        $mainProduct = ConsolidatedTestFactory::product('weight');
-        $mainProduct->update(['sku' => '00301']);
-        $mainProduct->translateOrNew('ar')->name = 'المنيوم سبير sapir 1200';
-        $mainProduct->save();
-
-        $subProduct = ConsolidatedTestFactory::product('weight');
-        $subProduct->update(['main_product_id' => $mainProduct->id, 'weight_per_meter' => 1.873]);
-
-        $line = ConsolidatedTestFactory::purchaseOrder()->items()->create([
-            'product_id' => $subProduct->id,
-            'description' => 'ثابت 3 مجاري 9000 كلبس 4500 K4593',
-            'barcode' => 'K4593',
-            'quantity' => 10,
-            'length' => 6,
-            'unit_price' => 21,
-            'line_total' => 0,
-            'total_weight' => 0,
-            'actual_weight' => 20,
-        ])->load(['product', 'pieces']);
-
-        $main = PurchaseOrderMainItems::for([$line])[$line->id];
-
-        $this->assertSame('المنيوم سبير sapir 1200', $main['name']);
-        $this->assertSame('00301', $main['code']);
-        $this->assertFalse($main['line_is_main']);
-        $this->assertSame('ثابت 3 مجاري 9000 كلبس 4500 K4593', $main['sub_items'][0]['name']);
-        $this->assertSame(10.0, $main['sub_items'][0]['count']);
-        $this->assertSame(6.0, $main['sub_items'][0]['length']);
-        $this->assertSame(1.873, $main['sub_items'][0]['weight_per_meter']);
-    }
-
     public function test_a_weight_line_under_a_purchase_order_group_uses_the_group_as_its_main_item(): void
     {
         $category = Category::create(['slug' => 'napco-'.uniqid(), 'status' => 1]);

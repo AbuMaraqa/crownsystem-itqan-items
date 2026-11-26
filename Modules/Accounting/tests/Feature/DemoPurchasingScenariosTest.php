@@ -61,17 +61,13 @@ class DemoPurchasingScenariosTest extends TestCase
             'DEMO-LOCK' => [40, 0, 20, 280],
             // طلبية عرضها مسودة: 1000 قيد الوصول؛ والمخزون من الشراء المباشر 500 بـ 0.04.
             'DEMO-SCREW' => [500, 0, 1000, 20],
-            // المقطع بعدده ووزنه المحسوب وبلا قيمة.
+            // لون المقطع بعدده ووزنه المحسوب وبلا قيمة؛ الكغم وقيمته على مجموعة السعر (الاختبار التالي).
             // 10 قطع × 6 م × 1.2 = 72 كغم + شراء مباشر 5 قطع = 36 كغم.
             'DEMO-1025-01' => [15, 108, 0, 0],
             // 8 قطع × 6 م × 0.9 = 43.2 كغم.
             'DEMO-1025-02' => [8, 43.2, 0, 0],
-            // 12 من 20 قطعة (8 قيد الوصول) + فاتورة مباشرة 4 قطع.
+            // 12 من 20 قطعة (8 قيد الوصول) + فاتورة مباشرة 4 قطع: 16 × 6.5 × 1.5 = 156 كغم.
             'DEMO-4500-01' => [16, 156, 8, 0],
-            // الرئيسي بكغمه وقيمته: (72 + 43.2) كغم بـ 12 = 1382.4 + 36 كغم بـ 11.5 = 414.
-            'DEMO-1025' => [23, 151.2, 0, 1796.4],
-            // 12 من 20 قطعة × 9.75 = 117 كغم بـ 15 = 1755 + 39 كغم بـ 14 = 546.
-            'DEMO-4500' => [16, 156, 8, 2301],
         ];
 
         $report = collect(app(DemoPurchasingSeeder::class)->stockReport())->keyBy(0);
@@ -83,13 +79,25 @@ class DemoPurchasingScenariosTest extends TestCase
         }
     }
 
-    public function test_a_main_item_shows_the_sum_of_its_sub_items(): void
+    public function test_a_price_group_holds_the_kg_and_value_and_counts_its_colours(): void
     {
-        $main = Product::query()->where('sku', 'DEMO-1025')->firstOrFail();
-        $levels = app(StockLevelService::class)->productLevels($main->id)['levels'];
+        $group1025 = (int) $this->product('DEMO-1025-01')->category_finish_id;
+        $group4500 = (int) $this->product('DEMO-4500-01')->category_finish_id;
+        $levels = app(StockLevelService::class)->groupLevels([$group1025, $group4500]);
 
-        $this->assertSame(23.0, (float) $levels['on_hand']);
-        $this->assertSame(151.2, (float) $levels['weight']);
+        // [قطع ألوانها، كغم، قيد الوصول، قيمة]
+        $expected = [
+            // 15 + 8 قطع؛ (72 + 43.2) كغم بـ 12 = 1382.4 + 36 كغم بـ 11.5 = 414: 151.2 كغم بـ 1796.4.
+            $group1025 => [23, 151.2, 0, 1796.4],
+            // 12 من 20 قطعة × 9.75 = 117 كغم بـ 15 = 1755 + 39 كغم بـ 14 = 546: 156 كغم بـ 2301.
+            $group4500 => [16, 156, 8, 2301],
+        ];
+
+        foreach ($expected as $groupId => [$onHand, $weight, $incoming, $value]) {
+            $this->assertSame([(float) $onHand, (float) $weight, (float) $incoming, (float) $value], [
+                (float) $levels[$groupId]['on_hand'], (float) $levels[$groupId]['weight'], (float) $levels[$groupId]['incoming'], (float) $levels[$groupId]['value'],
+            ], "Stock of group {$groupId}");
+        }
     }
 
     public function test_ledger_balances_match_the_cases(): void
@@ -106,7 +114,7 @@ class DemoPurchasingScenariosTest extends TestCase
     public function test_an_invoice_from_a_quotation_carries_the_order_sub_items(): void
     {
         $order = PurchaseOrder::query()->where('notes', DemoPurchasingSeeder::NOTE_PREFIX.'Full cycle')->firstOrFail();
-        $line = $order->purchaseInvoices()->firstOrFail()->items()->with('pieces')->get()->firstWhere('product_id', Product::query()->where('sku', 'DEMO-1025')->value('id'));
+        $line = $order->purchaseInvoices()->firstOrFail()->items()->with('pieces')->get()->firstWhere('category_finish_id', $this->product('DEMO-1025-01')->category_finish_id);
 
         // 72 + 43.2 كغم بـ 12 للكغم.
         $this->assertCount(2, $line->pieces);
@@ -124,6 +132,11 @@ class DemoPurchasingScenariosTest extends TestCase
         $orders = PurchaseOrder::query()->count();
         $this->seed(DemoPurchasingSeeder::class);
         $this->assertSame($orders, PurchaseOrder::query()->count());
+    }
+
+    private function product(string $sku): Product
+    {
+        return Product::query()->where('sku', $sku)->firstOrFail();
     }
 
     private function account(string $code): int

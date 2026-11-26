@@ -77,7 +77,7 @@ class PurchaseOrderPagesTest extends TestCase
         $this->assertSame(PurchaseOrderStatus::DRAFT, $order->status);
         // 8 كغم فعلي × 11 = 88، و10 × 4 = 40.
         $this->assertSame(128.0, (float) $order->total_amount);
-        $this->assertCount(1, $order->items->firstWhere('product_id', $this->demoProduct('DEMO-1025')->id)->pieces);
+        $this->assertCount(1, $order->items->firstWhere('category_finish_id', $this->demoProduct('DEMO-1025-02')->category_finish_id)->pieces);
         $this->assertSame(2.5, (float) $order->items->firstWhere('product_id', $this->demoProduct('DEMO-HINGE')->id)->length);
         $this->assertCount(1, $order->getMedia('attachments'));
 
@@ -89,7 +89,7 @@ class PurchaseOrderPagesTest extends TestCase
                 ->has('attachments', 1)
                 ->where('record.editable', true));
 
-        $items = $order->items->map(fn ($item) => ['id' => $item->id, 'product_id' => $item->product_id, 'quantity' => 1, 'unit_price' => 4, 'actual_weight' => $item->actual_weight, 'pieces' => $item->pieces->map(fn ($piece) => ['id' => $piece->id, 'product_id' => $piece->product_id, 'piece_count' => $piece->piece_count, 'piece_length' => $piece->piece_length, 'weight_per_meter' => $piece->weight_per_meter])->all()])->all();
+        $items = $order->items->map(fn ($item) => ['id' => $item->id, 'product_id' => $item->product_id, 'category_finish_id' => $item->category_finish_id, 'quantity' => 1, 'unit_price' => 4, 'actual_weight' => $item->actual_weight, 'pieces' => $item->pieces->map(fn ($piece) => ['id' => $piece->id, 'product_id' => $piece->product_id, 'piece_count' => $piece->piece_count, 'piece_length' => $piece->piece_length, 'weight_per_meter' => $piece->weight_per_meter])->all()])->all();
 
         $this->put(route('accounting.purchase-orders.update', $order->id), [
             ...$this->header(),
@@ -106,7 +106,7 @@ class PurchaseOrderPagesTest extends TestCase
         $this->assertSame(36.0, (float) $order->total_amount);
     }
 
-    public function test_a_new_main_item_without_sub_items_or_weight_is_refused(): void
+    public function test_a_new_price_group_line_without_pieces_or_weight_is_refused(): void
     {
         $line = $this->weightLine();
 

@@ -42,7 +42,6 @@ const scan = grid.scan;
                 @click="grid.pickScanned(match)"
             >
                 <span class="block truncate">{{ match.label }}</span>
-                <span v-if="match.main_label" class="block truncate text-xs text-muted">{{ match.main_label }}</span>
             </button>
         </div>
 

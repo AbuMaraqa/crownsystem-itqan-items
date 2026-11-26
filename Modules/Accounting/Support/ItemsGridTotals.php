@@ -24,7 +24,7 @@ final class ItemsGridTotals
         $items = array_values(array_filter($items, fn ($item): bool => is_array($item) && GridLine::hasOwner($item)));
         $products = Product::query()
             ->whereIn('id', array_filter(array_map(fn (array $item): int => (int) ($item['product_id'] ?? 0), $items)))
-            ->get(['id', 'pricing_type', 'main_product_id', 'length', 'weight_per_meter', 'barcode'])
+            ->get(['id', 'pricing_type', 'length', 'weight_per_meter', 'barcode'])
             ->keyBy('id');
 
         $lines = [];

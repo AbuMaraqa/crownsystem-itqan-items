@@ -182,7 +182,6 @@ export interface SearchResult {
      * `category`: a category; picked, it becomes a group header and its items are added under it.
      */
     kind?: 'item' | 'group' | 'category';
-    main_label?: string | null;
     /** A colour variation: the group line it goes into. */
     group_label?: string | null;
     barcode?: string | null;
@@ -196,14 +195,6 @@ export interface GroupPayload {
     pricing_type: PricingType;
 }
 
-export interface MainProductPayload {
-    id: number;
-    label: string;
-    barcode: string | null;
-    description: string | null;
-    unit_price: string;
-    pricing_type: PricingType;
-}
 
 /** Support\ItemsGrid::productPayload(). */
 export interface ProductPayload {
@@ -217,8 +208,6 @@ export interface ProductPayload {
     weight_per_meter: string | null;
     image: string | null;
     piece_count: string | null;
-    has_sub_products: boolean;
-    main_product: MainProductPayload | null;
     /** A colour variation goes inside the line of its price group. */
     group: GroupPayload | null;
     accessories?: AccessoryPayload[];
@@ -232,7 +221,6 @@ export interface AccessoryPayload {
 export interface BarcodeMatch {
     id: number;
     label: string;
-    main_label: string | null;
     pack_quantity: string;
 }
 
@@ -241,10 +229,6 @@ export interface BarcodeResult {
     add_url: string | null;
 }
 
-export interface MatchPiecesResult {
-    matched: { source_id: number; product: ProductPayload }[];
-    unmatched: string[];
-}
 
 /** Support\ItemsGrid::itemStock(). */
 /** The item details window (`items-grid.details`): ItemCardData::product() + ItemCardData::summary() over all warehouses. */
@@ -308,8 +292,3 @@ export interface Suggestion {
 }
 
 /** A weight line whose main item changed: its pieces wait for the user's choice. */
-export interface PieceChoice {
-    pieces: GridPiece[];
-    unmatched: string[];
-    decided: boolean;
-}

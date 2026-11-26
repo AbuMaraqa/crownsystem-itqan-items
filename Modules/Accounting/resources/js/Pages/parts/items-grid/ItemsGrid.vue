@@ -152,23 +152,6 @@ const priceFields = ['discount_rate', 'discount_amount'] as const;
                                     @mode="grid.setSearchMode(rowIndex, $event as 'item' | 'category')"
                                 />
 
-                                <!-- The main item changed: its pieces were kept (Itqan); the user may match or clear them. -->
-                                <div
-                                    v-if="grid.pieceChoices.value[row._key]"
-                                    class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-warning-200 bg-warning-50 px-2.5 py-1.5 text-xs text-warning-800 dark:border-warning-500/25 dark:bg-warning-500/10 dark:text-warning-300"
-                                >
-                                    <template v-if="!grid.pieceChoices.value[row._key].decided">
-                                        <span>{{ t('The main item changed; its pieces were kept.') }}</span>
-                                        <button type="button" class="font-semibold underline" @click="grid.matchPieces(rowIndex)">{{ t('Match by name') }}</button>
-                                        <button type="button" class="font-semibold underline" @click="grid.clearPieces(rowIndex)">{{ t('Clear the pieces') }}</button>
-                                        <button type="button" class="font-semibold underline" @click="grid.dismissPieceChoice(rowIndex)">{{ t('Keep them') }}</button>
-                                    </template>
-                                    <template v-else>
-                                        <span v-if="grid.pieceChoices.value[row._key].unmatched.length">{{ t('No match under the new main item:') }} {{ grid.pieceChoices.value[row._key].unmatched.join('، ') }}</span>
-                                        <span v-else>{{ t('All pieces were matched by name.') }}</span>
-                                        <button type="button" class="font-semibold underline" @click="grid.dismissPieceChoice(rowIndex)">{{ t('Close') }}</button>
-                                    </template>
-                                </div>
                             </td>
 
                             <!-- Quantity, or the total weight of the sub-items for a weight item -->

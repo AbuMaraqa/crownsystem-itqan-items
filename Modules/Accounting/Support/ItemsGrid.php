@@ -61,7 +61,7 @@ final class ItemsGrid
      * - ثم الاصناف. مقطع الوزن الذي له ألوان تحل محله ألوانه (يُباع اللون لا المقطع)، مع اسم مجموعتها.
      * - داخل صف مجموعة تصنيف قديم يقتصر البحث على اصناف التصنيف وفروعه.
      *
-     * @return array<int, array{id: int, label: string, kind: 'category'|'group'|'item', main_label: ?string, group_label: ?string}>
+     * @return array<int, array{id: int, label: string, kind: 'category'|'group'|'item', group_label: ?string}>
      */
     public static function searchProducts(string $term, mixed $categoryId = null): array
     {
@@ -70,11 +70,11 @@ final class ItemsGrid
         $results = [];
 
         foreach ($categories as $id => $label) {
-            $results[] = ['id' => (int) $id, 'label' => $label, 'kind' => 'category', 'main_label' => null, 'group_label' => null];
+            $results[] = ['id' => (int) $id, 'label' => $label, 'kind' => 'category', 'group_label' => null];
         }
 
         foreach ($groups as $groupId => $label) {
-            $results[] = ['id' => (int) $groupId, 'label' => $label, 'kind' => 'group', 'main_label' => null, 'group_label' => null];
+            $results[] = ['id' => (int) $groupId, 'label' => $label, 'kind' => 'group', 'group_label' => null];
         }
 
         return [...$results, ...self::searchItems($term, $categoryId)];
@@ -84,7 +84,7 @@ final class ItemsGrid
      * اصناف البضاعة كما يختارها المستخدم في المستندات (وفي مواد أمر الانتاج): مقطع الوزن الذي له
      * ألوان تحل محله ألوانه مع اسم مجموعتها، والصنف الفرعي القديم مع اسم صنفه الرئيسي.
      *
-     * @return list<array{id: int, label: string, kind: 'item', main_label: ?string, group_label: ?string}>
+     * @return list<array{id: int, label: string, kind: 'item', group_label: ?string}>
      */
     public static function searchItems(string $term, mixed $categoryId = null): array
     {
@@ -97,12 +97,11 @@ final class ItemsGrid
 
         $colours = self::colourVariations(array_keys($options));
         // الصنف الفرعي القديم يظهر مع اسم صنفه الرئيسي لانه سيُضاف داخله.
-        $mainLabels = ProductSearch::mainProductLabels(array_keys($options));
         $results = [];
 
         foreach ($options as $productId => $label) {
             foreach ($colours[$productId] ?? [[$productId, $label, null]] as [$id, $itemLabel, $groupLabel]) {
-                $results[] = ['id' => (int) $id, 'label' => $itemLabel, 'kind' => 'item', 'main_label' => $mainLabels[$id] ?? null, 'group_label' => $groupLabel];
+                $results[] = ['id' => (int) $id, 'label' => $itemLabel, 'kind' => 'item', 'group_label' => $groupLabel];
             }
         }
 
@@ -193,7 +192,7 @@ final class ItemsGrid
      *
      * @return array<int, array{id: int, label: string}>
      */
-    public static function searchPieceOutputs(mixed $sourceProductId, string $term, mixed $mainProductId = null, mixed $groupId = null): array
+    public static function searchPieceOutputs(mixed $sourceProductId, string $term, mixed $groupId = null): array
     {
         // داخل سطر مجموعة سعر: مقاطع التصنيف الموجودة بهذا اللون فقط.
         if (blank($sourceProductId) && filled($groupId)) {
@@ -201,10 +200,6 @@ final class ItemsGrid
         }
 
         if (blank($sourceProductId)) {
-            if (filled($mainProductId) && ProductSearch::idsWithSubProducts([(int) $mainProductId]) !== []) {
-                return self::optionResults(ProductSearch::subProductOptions($mainProductId, $term, 25));
-            }
-
             return self::optionResults(ProductSearch::options($term, 25, 'weight'));
         }
 
@@ -305,8 +300,6 @@ final class ItemsGrid
             return null;
         }
 
-        $mainPayload = filled($payload['main_product_id'] ?? null) ? $this->payloadOf((int) $payload['main_product_id']) : null;
-
         return [
             'id' => $productId,
             'label' => $payload['label'] ?? ProductSearch::label($productId),
@@ -320,17 +313,8 @@ final class ItemsGrid
             'piece_count' => filled($sourceProductId)
                 ? ProductSearch::cuttingRecipePiecesPerUnit($sourceProductId, $productId)
                 : null,
-            'has_sub_products' => (bool) ($payload['has_sub_products'] ?? false),
             // لون مقطع: يُضاف داخل سطر مجموعة سعره، وعليها سعر الكيلو.
             'group' => filled($payload['category_finish_id'] ?? null) ? $this->groupPayload($payload['category_finish_id']) : null,
-            'main_product' => $mainPayload ? [
-                'id' => (int) $mainPayload['id'],
-                'label' => $mainPayload['label'] ?? ProductSearch::label($mainPayload['id']),
-                'barcode' => $mainPayload['barcode'] ?? null,
-                'description' => $mainPayload['description'] ?? null,
-                'unit_price' => $mainPayload['unit_price'] ?? '0.0000',
-                'pricing_type' => $mainPayload['pricing_type'] ?? 'weight',
-            ] : null,
         ];
     }
 
@@ -349,58 +333,15 @@ final class ItemsGrid
 
         $ids = $resolved->map(fn (ResolvedBarcode $match): int => (int) $match->product->id)->all();
         $labels = ProductSearch::labels($ids);
-        $mainLabels = ProductSearch::mainProductLabels($ids);
 
         return [
             'matches' => $resolved->map(fn (ResolvedBarcode $match): array => [
                 'id' => (int) $match->product->id,
                 'label' => $labels[(int) $match->product->id] ?? $match->product->name,
-                'main_label' => $mainLabels[(int) $match->product->id] ?? null,
                 'pack_quantity' => $match->packQuantity,
             ])->all(),
             'add_url' => $ids === [] && auth()->user()?->can('Product Create') ? route('products.add') : null,
         ];
-    }
-
-    /**
-     * مطابقة مقاطع السطر بالاسم تحت الصنف الرئيسي الجديد. كل مقطع يأخذ مطابقاً واحداً،
-     * وما لم يجد يُعاد باسمه ليُعرض للمستخدم.
-     *
-     * @param  array<int, mixed>  $pieceProductIds
-     * @return array{matched: array<int, array{source_id: int, product: array<string, mixed>}>, unmatched: array<int, string>}
-     */
-    public function matchPiecesByName(mixed $mainProductId, array $pieceProductIds): array
-    {
-        $candidates = Product::query()
-            ->with('translations')
-            ->where('main_product_id', (int) $mainProductId)
-            ->orderBy('sku')
-            ->get()
-            ->groupBy(fn (Product $product): string => trim((string) $product->name))
-            ->map(fn ($group) => $group->pluck('id')->all())
-            ->all();
-
-        $sources = Product::query()->with('translations')->whereIn('id', $pieceProductIds)->get()->keyBy('id');
-        $matched = [];
-        $unmatched = [];
-
-        foreach ($pieceProductIds as $sourceId) {
-            $name = trim((string) $sources->get((int) $sourceId)?->name);
-
-            if (empty($candidates[$name])) {
-                $unmatched[] = $name;
-
-                continue;
-            }
-
-            $payload = $this->productPayload(array_shift($candidates[$name]));
-
-            if ($payload) {
-                $matched[] = ['source_id' => (int) $sourceId, 'product' => $payload];
-            }
-        }
-
-        return ['matched' => $matched, 'unmatched' => $unmatched];
     }
 
     /**
@@ -418,8 +359,8 @@ final class ItemsGrid
             return null;
         }
 
-        // لون المقطع (متغيّر مجموعة سعر) يُعدّ بالقطع كالمقطع القديم.
-        $isMain = $product->pricing_type === 'weight' && blank($product->main_product_id) && blank($product->category_finish_id);
+        // صنف الوزن بلا قياس قطعة يُعدّ بالكغم، ولون المقطع بالقطع.
+        $isMain = app(StockLedgerService::class)->storesByWeight($product);
         $isPiece = $product->pricing_type === 'weight' && ! $isMain;
         $warehouseId = filled($warehouseId) ? (int) $warehouseId : null;
 
@@ -466,51 +407,23 @@ final class ItemsGrid
     }
 
     /**
-     * صنف الوزن صنف رئيسي لا يكتمل بلا اصناف فرعية، وكل صنف فرعي جديد له وزن (عدد القطع ×
-     * طول القطعة × وزن المتر). البنود والاصناف الفرعية المحفوظة سابقاً (لها id) تُترك، لان
-     * تحويل عرض السعر الى طلبية ينشئ بنوداً بلا اصناف فرعية. الخدمة (ولو سُعِّرت بالكيلوغرام)
-     * ليست صنفاً رئيسياً: تُسعَّر بكميتها.
+     * سطور الوزن بلا صنف رئيسي: القطع (ألوان المقاطع) لا تكون الا داخل سطر مجموعة سعر (التصنيف × اللون)،
+     * وسطر المجموعة لا يُحفظ بلا قطع من ألوانها لها وزن. الخدمة ليست سطر وزن.
      *
-     * @param  array<int, array<string, mixed>>  $items
+     * @param  array<int, mixed>  $items
      *
      * @throws DomainException
      */
-    public static function ensureMainItemsHaveSubItems(array $items): void
+    public static function ensureWeightLines(array $items): void
     {
         self::ensureGroupLinesHaveTheirColours($items);
 
-        $items = collect($items)->filter(fn ($item): bool => is_array($item) && filled($item['product_id'] ?? null));
+        $withPieces = collect($items)->first(fn ($item): bool => is_array($item)
+            && GridLine::groupId($item) === null
+            && collect($item['pieces'] ?? [])->contains(fn ($piece): bool => is_array($piece) && filled($piece['product_id'] ?? null)));
 
-        $weightIds = Product::query()
-            ->whereIn('id', $items->pluck('product_id')->map(fn ($id): int => (int) $id)->unique()->values()->all())
-            ->where('pricing_type', 'weight')
-            ->where(fn ($query) => $query->whereNull('item_type')->orWhere('item_type', '!=', ItemType::SERVICE->value))
-            ->pluck('id')
-            ->map(fn ($id): int => (int) $id)
-            ->all();
-
-        foreach ($items as $item) {
-            if (! in_array((int) $item['product_id'], $weightIds, true)) {
-                continue;
-            }
-
-            $subItems = collect($item['pieces'] ?? [])->filter(fn ($piece): bool => is_array($piece) && filled($piece['product_id'] ?? null));
-            $label = fn (): ?string => $item['product_label'] ?? ProductSearch::label($item['product_id']);
-
-            if (blank($item['id'] ?? null) && $subItems->isEmpty()) {
-                throw new DomainException(__('Add the sub-items of the main item ":item"; its total weight is the sum of their weights.', [
-                    'item' => $label(),
-                ]));
-            }
-
-            $weightless = $subItems->first(fn (array $piece): bool => blank($piece['id'] ?? null) && WeightPieces::weight($piece) <= 0);
-
-            if ($weightless) {
-                throw new DomainException(__('The sub-item ":sub" in ":item" has no weight; enter its piece count, piece length and weight per meter.', [
-                    'sub' => $weightless['product_label'] ?? ProductSearch::label($weightless['product_id']),
-                    'item' => $label(),
-                ]));
-            }
+        if ($withPieces) {
+            throw new DomainException(__('Sub-items belong to a price group line; pick the colour group first.'));
         }
     }
 

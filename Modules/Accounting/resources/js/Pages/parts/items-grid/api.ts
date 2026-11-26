@@ -5,7 +5,6 @@ import type {
     GridContext,
     GroupPayload,
     ItemDetails,
-    MatchPiecesResult,
     ProductPayload,
     SearchResult,
     ServerTotals,
@@ -98,9 +97,9 @@ export function createGridApi(document: string, context: () => GridContext) {
         searchProducts: (q: string, categoryId: number | null, signal?: AbortSignal) =>
             getJson<SearchResult[]>(url('products', { q, category_id: categoryId ?? undefined }), signal),
         searchCategories: (q: string, signal?: AbortSignal) => getJson<SearchResult[]>(url('categories', { q }), signal),
-        searchPieceOutputs: (q: string, sourceProductId: number | null, mainProductId: number | null, signal?: AbortSignal, groupId: number | null = null) =>
+        searchPieceOutputs: (q: string, sourceProductId: number | null, signal?: AbortSignal, groupId: number | null = null) =>
             getJson<SearchResult[]>(
-                url('piece-outputs', { q, source_product_id: sourceProductId ?? undefined, main_product_id: mainProductId ?? undefined, group_id: groupId ?? undefined }),
+                url('piece-outputs', { q, source_product_id: sourceProductId ?? undefined, group_id: groupId ?? undefined }),
                 signal,
             ),
         group: (groupId: number) => getJson<GroupPayload | null>(url('group', priced({ group_id: groupId }))),
@@ -108,8 +107,6 @@ export function createGridApi(document: string, context: () => GridContext) {
         item: (productId: number, sourceProductId: number | null = null) =>
             getJson<ProductPayload | null>(url('item', priced({ product_id: productId, source_product_id: sourceProductId ?? undefined }))),
         barcode: (code: string) => getJson<BarcodeResult>(url('barcode', { code })),
-        matchPieces: (mainProductId: number, pieceIds: number[]) =>
-            getJson<MatchPiecesResult>(url('match-pieces', priced({ main_product_id: mainProductId, piece_ids: pieceIds }))),
         stock: (productId: number, warehouseId: number | string | null | undefined) =>
             getJson<StockInfo | null>(url('stock', { product_id: productId, warehouse_id: warehouseId || undefined })),
         details: (productId: number) => getJson<ItemDetails>(url('details', { product_id: productId })),

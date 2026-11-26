@@ -17,6 +17,9 @@ use Modules\Accounting\Services\PurchaseQuotationService;
 use Modules\Accounting\Services\StockLedgerService;
 use Modules\Accounting\Services\StockLevelService;
 use Modules\Core\Entities\User;
+use Modules\Items\Entities\Category;
+use Modules\Items\Entities\CategoryFinish;
+use Modules\Items\Entities\Finish;
 use Modules\Items\Entities\Product;
 use Spatie\Permission\Models\Role;
 
@@ -50,6 +53,9 @@ class DemoPurchasingSeeder extends Seeder
 
     /** @var array<string, Product> */
     private array $products = [];
+
+    /** @var array<string, CategoryFinish> مجموعات السعر بمفتاحها (DEMO-1025، DEMO-4500) */
+    private array $groups = [];
 
     public function run(): void
     {
@@ -184,10 +190,10 @@ class DemoPurchasingSeeder extends Seeder
 
     private function directInvoice(): void
     {
-        // صنف الوزن بلا طلبية يُفوتر بالكغم ويُستلم قطعا: 36 كغم ÷ (6 م × 1.2) = 5 قطع.
+        // سطر مجموعة بلا طلبية بالكغم: 5 قطع × 6 م × 1.2 = 36 كغم بـ 11.5.
         $this->postDirectInvoice('Direct purchase invoice', [
             ['product_id' => $this->products['DEMO-SCREW']->id, 'quantity' => 500, 'unit_price' => 0.04],
-            ['product_id' => $this->products['DEMO-1025-01']->id, 'quantity' => 36, 'unit_price' => 11.5],
+            array_merge($this->weightLine('DEMO-1025', [['DEMO-1025-01', 5]]), ['unit_price' => 11.5]),
         ]);
     }
 
@@ -246,14 +252,15 @@ class DemoPurchasingSeeder extends Seeder
     }
 
     /**
-     * سطر صنف وزن: الصنف الرئيسي، وتحته قطع اصنافه الفرعية بطولها ووزن مترها.
+     * سطر وزن: مجموعة السعر (التصنيف × اللون)، وتحته قطع ألوانها بطولها ووزن مترها.
      *
-     * @param  array<int, array{0:string, 1:float}>  $pieces  [رمز الصنف الفرعي، عدد القطع]
+     * @param  array<int, array{0:string, 1:float}>  $pieces  [رمز اللون، عدد القطع]
      */
-    private function weightLine(string $mainSku, array $pieces): array
+    private function weightLine(string $groupKey, array $pieces): array
     {
         return [
-            'product_id' => $this->products[$mainSku]->id,
+            'product_id' => null,
+            'category_finish_id' => $this->groups[$groupKey]->id,
             'quantity' => 1,
             // مبلغ سطر الوزن بالوزن الفعلي، وبدونه صفر؛ هنا بقدر الوزن المحسوب.
             'actual_weight' => round(array_sum(array_map(fn (array $piece): float => $piece[1] * (float) $this->products[$piece[0]]->length * (float) $this->products[$piece[0]]->weight_per_meter, $pieces)), 4),
@@ -272,13 +279,14 @@ class DemoPurchasingSeeder extends Seeder
     private function quote(PurchaseOrder $order, array $prices): PurchaseQuotation
     {
         $bySku = collect($this->products)->mapWithKeys(fn (Product $product, string $sku) => [$product->id => $sku]);
+        $byGroup = collect($this->groups)->mapWithKeys(fn (CategoryFinish $group, string $key) => [$group->id => $key]);
 
         return app(PurchaseQuotationService::class)->createFromOrder($order, [
             'quotation_date' => now()->toDateString(),
             'currency_id' => $this->currencyId,
             'items' => $order->items()->get()->map(fn ($item) => [
                 'purchase_order_item_id' => $item->id,
-                'unit_price' => $prices[$bySku[$item->product_id]] ?? 0,
+                'unit_price' => $prices[$item->product_id ? $bySku[$item->product_id] : $byGroup[$item->category_finish_id]] ?? 0,
             ])->all(),
         ]);
     }
@@ -396,13 +404,20 @@ class DemoPurchasingSeeder extends Seeder
             ]],
         ];
 
-        foreach ($weightItems as $mainSku => [$name, $kgCost, $subItems]) {
-            $main = $this->products[$mainSku] = $this->product($mainSku, $name, ['pricing_type' => 'weight', 'cost_price' => $kgCost, 'sale_price' => $kgCost + 4]);
+        // كل مجموعة سعر (التصنيف × اللون) وألوان مقاطعها؛ لا صنف رئيسي.
+        $category = Category::query()->firstOrCreate(['slug' => 'demo-aluminium'], ['status' => 1, 'pricing_type' => 'weight']);
+        $category->translateOrNew('ar')->name = 'ألمنيوم تجريبي';
+        $category->save();
+
+        foreach ($weightItems as $groupKey => [$name, $kgCost, $subItems]) {
+            $finish = Finish::query()->firstOrCreate(['name' => $name], ['is_active' => true]);
+            $group = $this->groups[$groupKey] = CategoryFinish::query()->firstOrCreate(['category_id' => $category->id, 'finish_id' => $finish->id], ['is_active' => true]);
 
             foreach ($subItems as $sku => [$subName, $length, $weightPerMeter]) {
                 $this->products[$sku] = $this->product($sku, $subName, [
                     'pricing_type' => 'weight',
-                    'main_product_id' => $main->id,
+                    'category_finish_id' => $group->id,
+                    'finish_id' => $finish->id,
                     'length' => $length,
                     'weight_per_meter' => $weightPerMeter,
                 ]);

@@ -108,7 +108,7 @@ trait SalesDocumentFixtures
     }
 
     /**
-     * سطر صنف رئيسي بقطعه كما يرسله جدول Vue: قطع × 6 م × 1.2 كغم/م، بوزن فعلي = النظري.
+     * سطر مجموعة سعر بقطع ألوانها كما يرسله جدول Vue: قطع × 6 م × 1.2 كغم/م، بوزن فعلي = النظري.
      *
      * @return array<string, mixed>
      */
@@ -117,7 +117,8 @@ trait SalesDocumentFixtures
         return [
             '_key' => 'row-'.Str::random(5),
             'row_type' => 'item',
-            'product_id' => $this->product('DEMO-1025')->id,
+            'product_id' => null,
+            'category_finish_id' => $this->product('DEMO-1025-01')->category_finish_id,
             'product_label' => 'بدون دهان 1025',
             'pricing_type' => 'weight',
             'quantity' => 1,

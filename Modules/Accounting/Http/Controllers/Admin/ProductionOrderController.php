@@ -270,11 +270,11 @@ class ProductionOrderController extends Controller
      */
     public function materials(Request $request): JsonResponse
     {
-        // كاصناف طلبيات البيع والشراء: المقطع بألوانه (مع مجموعة اللون)، والصنف الفرعي مع صنفه الرئيسي.
+        // كاصناف طلبيات البيع والشراء: المقطع بألوانه، مع مجموعة اللون.
         return response()->json(collect(ItemsGrid::searchItems($request->string('q')->toString()))
             ->map(fn (array $item): array => [
                 'value' => $item['id'],
-                'label' => $item['label'].(filled($item['group_label'] ?? $item['main_label']) ? ' · '.($item['group_label'] ?? $item['main_label']) : ''),
+                'label' => $item['label'].(filled($item['group_label']) ? ' · '.$item['group_label'] : ''),
             ])
             ->all());
     }

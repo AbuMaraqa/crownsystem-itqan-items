@@ -276,7 +276,8 @@ class UnifiedItemsGridTest extends TestCase
     private function weightLine(int $pieces, float $price): array
     {
         return [
-            'product_id' => $this->product('DEMO-1025')->id,
+            'product_id' => null,
+            'category_finish_id' => $this->product('DEMO-1025-01')->category_finish_id,
             'unit_price' => $price,
             'actual_weight' => round($pieces * 6 * 1.2, 4),
             'pieces' => [['product_id' => $this->product('DEMO-1025-01')->id, 'piece_count' => $pieces, 'piece_length' => 6, 'weight_per_meter' => 1.2]],

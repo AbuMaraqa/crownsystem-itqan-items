@@ -515,20 +515,6 @@ class InvoiceStockService
 
             [$quantity, $weight] = $this->stockQuantity($product, (float) $item->quantity);
 
-            // مقطع مفوتر مباشرة بالكغم: الوزن والقيمة على صنفه الرئيسي، والعدد عليه.
-            if ($product->pricing_type === 'weight' && filled($product->main_product_id)) {
-                $lines[] = [
-                    'item_id' => (int) $item->id,
-                    'product_id' => (int) $product->main_product_id,
-                    'quantity' => round((float) $item->quantity, 4),
-                    'weight' => round((float) $item->quantity, 4),
-                    'amount' => $amount,
-                ];
-                $lines[] = ['item_id' => (int) $item->id, 'product_id' => (int) $product->id, 'quantity' => $quantity, 'weight' => $weight, 'amount' => 0.0];
-
-                continue;
-            }
-
             $lines[] = [
                 'item_id' => (int) $item->id,
                 'product_id' => (int) $product->id,

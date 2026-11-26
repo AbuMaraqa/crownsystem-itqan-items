@@ -13,7 +13,6 @@ use Modules\Accounting\Entities\FiscalYear;
 use Modules\Accounting\Entities\PurchaseInvoice;
 use Modules\Accounting\Entities\SalesInvoice;
 use Modules\Accounting\Entities\SalesOrder;
-use Modules\Accounting\Entities\StockBalance;
 use Modules\Accounting\Entities\Warehouse;
 use Modules\Accounting\Enums\AccountingPeriodStatus;
 use Modules\Accounting\Services\SalesInvoiceService;
@@ -74,10 +73,14 @@ class DocumentEntryLayoutTest extends TestCase
         return Product::query()->where('sku', $sku)->firstOrFail();
     }
 
+    /**
+     * سطر مجموعة السعر (DEMO-1025) بقطع لونها DEMO-1025-02.
+     */
     private function weightLine(float $actual = 16.2): array
     {
         return [
-            'product_id' => $this->product('DEMO-1025')->id,
+            'product_id' => null,
+            'category_finish_id' => $this->product('DEMO-1025-02')->category_finish_id,
             'pricing_type' => 'weight',
             'unit_price' => 10,
             'actual_weight' => $actual,
@@ -149,7 +152,7 @@ class DocumentEntryLayoutTest extends TestCase
         $this->assertSame(162.0, (float) $invoice->items()->firstOrFail()->line_total);
     }
 
-    public function test_a_manual_main_item_without_pieces_is_refused_on_the_add_page(): void
+    public function test_a_manual_price_group_line_without_pieces_is_refused_on_the_add_page(): void
     {
         $this->salesPages();
         $before = SalesInvoice::query()->count();
@@ -167,24 +170,29 @@ class DocumentEntryLayoutTest extends TestCase
     public function test_changing_the_party_keeps_manual_lines_and_announces_the_change(): void
     {
         $this->salesPages();
-        $main = $this->product('DEMO-1025');
-        $party = $this->partyWithPrice($main, 11);
+        $hinge = $this->product('DEMO-HINGE');
+        $party = $this->partyWithPrice($hinge, 11);
 
-        $this->getJson(route('accounting.items-grid.prices', ['document' => 'sales-invoice', 'ids' => [$main->id], 'party_id' => $party->id]))
+        $this->getJson(route('accounting.items-grid.prices', ['document' => 'sales-invoice', 'ids' => [$hinge->id], 'party_id' => $party->id]))
             ->assertOk()
-            ->assertJsonPath((string) $main->id, '11.0000');
+            ->assertJsonPath((string) $hinge->id, '11.0000');
 
-        $this->post(route('accounting.sales-invoices.store'), $this->salesInvoiceForm($party->id, [$this->weightLine()]))->assertSessionHas('success');
-        $this->assertSame($main->id, (int) SalesInvoice::query()->latest('id')->firstOrFail()->items()->value('product_id'));
+        // البند اليدوي يُحفظ بسعره المكتوب (9) لا بسعر الطرف (11).
+        $this->post(route('accounting.sales-invoices.store'), $this->salesInvoiceForm($party->id, [
+            $this->weightLine(),
+            ['product_id' => $hinge->id, 'quantity' => 2, 'unit_price' => 9],
+        ]))->assertSessionHas('success');
+        $line = SalesInvoice::query()->latest('id')->firstOrFail()->items()->where('product_id', $hinge->id)->sole();
+        $this->assertSame(9.0, (float) $line->unit_price);
     }
 
     public function test_line_prices_follow_the_new_party(): void
     {
         $this->salesPages();
-        $main = $this->product('DEMO-1025');
-        $cash = $this->partyWithPrice($main, 11);
-        $cheques = $this->partyWithPrice($main, 12.5);
-        $prices = fn (User $party) => $this->getJson(route('accounting.items-grid.prices', ['document' => 'sales-invoice', 'ids' => [$main->id], 'party_id' => $party->id]))->json((string) $main->id);
+        $hinge = $this->product('DEMO-HINGE');
+        $cash = $this->partyWithPrice($hinge, 11);
+        $cheques = $this->partyWithPrice($hinge, 12.5);
+        $prices = fn (User $party) => $this->getJson(route('accounting.items-grid.prices', ['document' => 'sales-invoice', 'ids' => [$hinge->id], 'party_id' => $party->id]))->json((string) $hinge->id);
 
         $this->assertEquals(11, $prices($cash));
         $this->assertEquals(12.5, $prices($cheques));
@@ -197,8 +205,7 @@ class DocumentEntryLayoutTest extends TestCase
     {
         $this->salesPages();
         auth()->user()->givePermissionTo(Permission::findOrCreate('Sales Invoice View List', 'web'));
-        $main = $this->product('DEMO-1025');
-        $party = $this->partyWithPrice($main, 11);
+        $party = $this->partyWithPrice($this->product('DEMO-HINGE'), 11);
         $order = app(SalesOrderService::class)->create([
             'client_id' => $party->id,
             'order_date' => now()->toDateString(),
@@ -236,36 +243,11 @@ class DocumentEntryLayoutTest extends TestCase
         $this->assertCount(1, $invoice->items);
     }
 
-    public function test_the_line_stock_shows_weight_for_a_main_item_and_count_for_a_piece(): void
-    {
-        $this->salesPages();
-        Permission::firstOrCreate(['name' => 'Stock View List', 'guard_name' => 'web']);
-        Permission::firstOrCreate(['name' => 'Product Update', 'guard_name' => 'web']);
-        auth()->user()->givePermissionTo(['Stock View List', 'Product Update']);
-        auth()->user()->refresh();
-
-        $main = $this->product('DEMO-1025');
-        $piece = $this->product('DEMO-1025-02');
-        $warehouse = Warehouse::query()->value('id');
-        $stock = fn (Product $product) => $this->getJson(route('accounting.items-grid.stock', ['document' => 'sales-invoice', 'product_id' => $product->id, 'warehouse_id' => $warehouse]))->assertOk()->json();
-
-        $pieceIds = Product::query()->where('main_product_id', $main->id)->pluck('id');
-        $mainStock = $stock($main);
-        $pieceStock = $stock($piece);
-
-        $this->assertEquals(round((float) StockBalance::query()->whereIn('product_id', $pieceIds)->sum('weight'), 2), (float) $mainStock['all']);
-        $this->assertSame(__('kg'), $mainStock['unit']);
-        $this->assertNotNull($mainStock['cost']);
-        $this->assertEquals(round((float) StockBalance::query()->where('product_id', $piece->id)->sum('quantity'), 2), (float) $pieceStock['all']);
-        $this->assertNotNull($pieceStock['here']);
-        $this->assertNull($pieceStock['cost']);
-    }
-
     public function test_the_line_stock_needs_the_stock_permission_and_cost_needs_the_item_permission(): void
     {
         $this->salesPages();
-        $main = $this->product('DEMO-1025');
-        $url = route('accounting.items-grid.stock', ['document' => 'sales-invoice', 'product_id' => $main->id]);
+        $hinge = $this->product('DEMO-HINGE');
+        $url = route('accounting.items-grid.stock', ['document' => 'sales-invoice', 'product_id' => $hinge->id]);
 
         $this->assertSame('null', $this->getJson($url)->assertOk()->getContent());
 

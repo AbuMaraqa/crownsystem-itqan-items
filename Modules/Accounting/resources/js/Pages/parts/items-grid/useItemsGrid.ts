@@ -12,7 +12,6 @@ import type {
     GroupPayload,
     GridRow,
     LineNotice,
-    PieceChoice,
     ProductPayload,
     SearchResult,
     StockInfo,
@@ -185,7 +184,6 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
         () => rows.value,
         () => {
             seed();
-            pieceChoices.value = {};
             suggestions.value = {};
         },
     );
@@ -901,7 +899,6 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
 
     async function chooseProduct(rowIndex: number, option: SearchResult): Promise<void> {
         const row = rows.value[rowIndex];
-        const previousPieces = row.product_id && Number(row.product_id) !== Number(option.id) ? row.pieces.filter((piece) => piece.product_id) : [];
 
         // The accessories of the item this row had no longer belong to it.
         delete suggestions.value[row._key];
@@ -932,16 +929,9 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
             return;
         }
 
-        // A sub-item is never a line of its own: it goes inside its main item's line.
-        if (product.main_product) {
-            const target = placeSubItem(rowIndex, product);
-            setSuggestions(rows.value[target], product.accessories);
-
-            return;
-        }
-
         Object.assign(row, {
-            has_sub_products: Boolean(product.has_sub_products),
+            has_sub_products: false,
+            pieces: [],
             barcode: product.barcode ?? null,
             description: product.description ?? null,
             unit_price: product.unit_price ?? '0.0000',
@@ -953,17 +943,9 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
             discount_amount: '0.0000',
         });
 
-        offerPieces(row, previousPieces);
         setSuggestions(row, product.accessories);
 
         await nextTick();
-
-        // A weight item is a main item: its sub-items are picked straight away.
-        if (row.pricing_type === 'weight') {
-            openSubItems(rowIndex);
-
-            return;
-        }
 
         const active = document.activeElement as HTMLElement | null;
 
@@ -972,72 +954,6 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
         }
     }
 
-    /**
-     * A sub-item goes into its main item's line in the same group, or the current row becomes that
-     * main item's line (with its kg price). Then the sub-items open on its piece count.
-     */
-    function placeSubItem(rowIndex: number, product: ProductPayload, pieceCount: number | string = 1): number {
-        const row = rows.value[rowIndex];
-        const main = product.main_product!;
-        const sameGroup = (other: GridRow): boolean => (other.category_id ?? null) === (row.category_id ?? null);
-
-        let target = rows.value.findIndex((other, index) => index !== rowIndex && isItem(other) && Number(other.product_id) === Number(main.id) && sameGroup(other));
-
-        if (target === -1) {
-            Object.assign(row, {
-                product_id: main.id,
-                product_label: main.label,
-                product_search: main.label,
-                barcode: main.barcode ?? null,
-                description: main.description ?? null,
-                unit_price: main.unit_price ?? '0.0000',
-                pricing_type: main.pricing_type || 'weight',
-                has_sub_products: true,
-                quantity: 1,
-                actual_weight: null,
-                discount_mode: 'rate',
-                discount_rate: 0,
-                discount_amount: '0.0000',
-                pieces: [],
-            });
-            target = rowIndex;
-        } else {
-            // The row the search was typed in is no longer needed.
-            rows.value.splice(rowIndex, 1);
-
-            if (target > rowIndex) target--;
-            if (rows.value.length === 0) rows.value.push(blankRow());
-        }
-
-        const mainRow = rows.value[target];
-        const piece = normalizePiece({
-            product_id: product.id,
-            product_label: product.label,
-            barcode: product.barcode ?? null,
-            description: product.description ?? null,
-            piece_count: pieceCount,
-            piece_length: product.length ?? '0.0000',
-            weight_per_meter: product.weight_per_meter ?? '0.0000',
-            image_url: product.image ?? null,
-        });
-
-        // An empty sub-item row waiting for a choice is filled instead of adding one.
-        let pieceIndex = mainRow.pieces.findIndex((other) => !other.product_id);
-
-        if (pieceIndex === -1) {
-            mainRow.pieces.push(piece);
-            pieceIndex = mainRow.pieces.length - 1;
-        } else {
-            mainRow.pieces.splice(pieceIndex, 1, piece);
-        }
-
-        mainRow.collapsed = false;
-        focusPieceCell(target, pieceIndex, 'piece_count');
-
-        return target;
-    }
-
-    /** The row becomes a price-group line: priced per kg, its pieces picked from that colour's profiles. */
     async function chooseGroup(rowIndex: number, option: SearchResult): Promise<void> {
         const row = rows.value[rowIndex];
 
@@ -1130,55 +1046,6 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
         return target;
     }
 
-    /* ---------- pieces of a line whose main item changed ---------- */
-
-    const pieceChoices = ref<Record<string, PieceChoice>>({});
-
-    /** Kept by default (as in Itqan); the user may match them by name under the new main item or clear them. */
-    function offerPieces(row: GridRow, previousPieces: GridPiece[]): void {
-        if (row.pricing_type !== 'weight' || previousPieces.length === 0) return;
-
-        row.pieces = previousPieces;
-        pieceChoices.value[row._key] = { pieces: previousPieces, unmatched: [], decided: false };
-    }
-
-    function clearPieces(rowIndex: number): void {
-        const row = rows.value[rowIndex];
-
-        row.pieces = [];
-        delete pieceChoices.value[row._key];
-    }
-
-    async function matchPieces(rowIndex: number): Promise<void> {
-        const row = rows.value[rowIndex];
-        const choice = pieceChoices.value[row._key];
-
-        if (!choice || !row.product_id) return;
-
-        const result = await api.matchPieces(row.product_id, choice.pieces.map((piece) => Number(piece.product_id)));
-
-        row.pieces = result.matched.map((match) => {
-            const source = choice.pieces.find((piece) => Number(piece.product_id) === Number(match.source_id));
-
-            return normalizePiece({
-                product_id: match.product.id,
-                product_label: match.product.label,
-                barcode: match.product.barcode ?? null,
-                description: match.product.description ?? null,
-                piece_count: source?.piece_count ?? 1,
-                piece_length: source?.piece_length ?? match.product.length ?? '0.0000',
-                weight_per_meter: match.product.weight_per_meter ?? '0.0000',
-            });
-        });
-
-        // What found no match is listed, never dropped silently.
-        pieceChoices.value[row._key] = { pieces: [], unmatched: result.unmatched, decided: true };
-    }
-
-    function dismissPieceChoice(rowIndex: number): void {
-        delete pieceChoices.value[rows.value[rowIndex]._key];
-    }
-
     /* ---------- sub-item search ---------- */
 
     let pieceTimer: ReturnType<typeof setTimeout> | undefined;
@@ -1227,7 +1094,7 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
         try {
             const results =
                 which === 'output'
-                    ? await api.searchPieceOutputs(needle, piece.source_product_id, row.product_id, pieceRequest.signal, row.product_id ? null : row.category_finish_id)
+                    ? await api.searchPieceOutputs(needle, piece.source_product_id, pieceRequest.signal, row.product_id ? null : row.category_finish_id)
                     : await api.searchProducts(needle, null, pieceRequest.signal);
 
             if (token !== pieceSearchToken || pieceSearch.rowIndex !== rowIndex || pieceSearch.pieceIndex !== pieceIndex) return;
@@ -1382,16 +1249,6 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
             return;
         }
 
-        if (product.main_product) {
-            const mainIndex = lineOf(product.main_product.id);
-            const existing = mainIndex === -1 ? null : rows.value[mainIndex].pieces.find((piece) => Number(piece.product_id) === Number(product.id));
-
-            if (existing) existing.piece_count = num(existing.piece_count) + pack;
-            else placeSubItem(emptyRowIndex(), product, pack);
-
-            return;
-        }
-
         const lineIndex = lineOf(product.id);
 
         if (lineIndex !== -1) {
@@ -1407,7 +1264,7 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
             product_id: product.id,
             product_label: product.label,
             product_search: product.label,
-            has_sub_products: Boolean(product.has_sub_products),
+            has_sub_products: false,
             barcode: product.barcode ?? null,
             description: product.description ?? null,
             unit_price: product.unit_price ?? '0.0000',
@@ -1472,14 +1329,6 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
         blank.category_id = row.category_id ?? null;
         blank.category_label = row.category_label ?? '';
 
-        if (product.main_product) {
-            rows.value.splice(insertAt, 0, blank);
-            const target = placeSubItem(insertAt, product, quantity);
-            accessoryOf[rows.value[target]._key] = row._key;
-
-            return;
-        }
-
         const existing = rows.value.find((other) => other !== row && isItem(other) && Number(other.product_id) === Number(product.id) && sameGroup(other));
 
         if (existing) {
@@ -1497,7 +1346,7 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
             unit_price: product.unit_price ?? '0.0000',
             pricing_type: product.pricing_type || 'simple',
             length: product.length ?? null,
-            has_sub_products: Boolean(product.has_sub_products),
+            has_sub_products: false,
             quantity,
         });
 
@@ -1687,10 +1536,6 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
         pieceSearchOpenFor,
         choosePieceProduct,
         // pieces of a changed main item
-        pieceChoices,
-        clearPieces,
-        matchPieces,
-        dismissPieceChoice,
         // barcode
         scan,
         scanBarcode,

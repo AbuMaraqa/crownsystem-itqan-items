@@ -26,11 +26,10 @@ class ItemsGridState
             ->merge($items->flatMap(fn ($item) => $item->pieces->pluck('product_id')))
             ->filter()->map(fn ($id): int => (int) $id)->unique()->values()->all();
         $labels = ProductSearch::labels($productIds);
-        $mainIds = array_flip(ProductSearch::idsWithSubProducts($productIds));
         // سطر مجموعة السعر (بلا صنف): اسمه «التصنيف — اللون»، وهو سطر وزن قطعه ألوان مقاطعه.
         $groupLabels = PriceGroupSearch::labels($items->filter(fn ($item) => $item->product_id === null)->pluck('category_finish_id')->filter()->all());
 
-        return $items->map(function ($item) use ($labels, $mainIds, $groupLabels, $rowKeys, $pieceKeys, $extraPiece, $quantityIsWeight): array {
+        return $items->map(function ($item) use ($labels, $groupLabels, $rowKeys, $pieceKeys, $extraPiece, $quantityIsWeight): array {
             $groupId = $item->product_id === null && $item->category_finish_id ? (int) $item->category_finish_id : null;
             $label = $groupId ? ($groupLabels[$groupId] ?? (string) $item->description) : ($labels[$item->product_id] ?? ProductSearch::label($item->product_id));
             $pricingType = $groupId ? 'weight' : ($item->product?->pricing_type ?? 'simple');
@@ -49,8 +48,8 @@ class ItemsGridState
                 'product_label' => $label,
                 'product_search' => $label,
                 'pricing_type' => $pricingType,
-                // داخل الصنف الرئيسي او مجموعة السعر يقتصر بحث القطع على اصنافه الفرعية.
-                'has_sub_products' => $groupId !== null || isset($mainIds[(int) $item->product_id]),
+                // داخل سطر مجموعة السعر يقتصر بحث القطع على ألوانها.
+                'has_sub_products' => $groupId !== null,
                 'barcode' => $item->barcode,
                 'description' => $item->description,
                 // سطر وزن بقطعه وبلا وزن فعلي كميته المفوترة صفر؛ كمية صف الوزن لا تُكتب في

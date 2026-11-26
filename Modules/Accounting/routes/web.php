@@ -384,7 +384,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
                         Route::get('/group', 'group')->name('group');
                         Route::get('/group-prices', 'groupPrices')->name('group-prices');
                         Route::get('/barcode', 'barcode')->name('barcode');
-                        Route::get('/match-pieces', 'matchPieces')->name('match-pieces');
                         Route::get('/stock', 'stock')->name('stock');
                         Route::get('/details', 'details')->name('details')->can('Stock View List');
                         Route::get('/services', 'services')->name('services');

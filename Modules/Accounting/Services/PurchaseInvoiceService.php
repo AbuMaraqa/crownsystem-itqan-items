@@ -136,7 +136,7 @@ class PurchaseInvoiceService
         $manual = $invoice ? blank($invoice->purchase_order_id) : blank($data['purchase_order_id'] ?? null);
 
         if ($manual) {
-            ItemsGrid::ensureMainItemsHaveSubItems($data['items'] ?? []);
+            ItemsGrid::ensureWeightLines($data['items'] ?? []);
         }
 
         return $invoice ? $this->update($invoice, $data) : $this->create($data);

@@ -2,10 +2,8 @@
 
 namespace Modules\Accounting\Support;
 
-use Illuminate\Support\Collection;
 use Modules\Accounting\Entities\ConsolidatedPurchaseOrderItem;
 use Modules\Accounting\Entities\PurchaseOrderItem;
-use Modules\Items\Entities\Product;
 use Modules\Items\Support\CategorySearch;
 
 /**
@@ -32,17 +30,10 @@ final class PurchaseOrderMainItems
     {
         $lines = collect($lines);
 
-        $mainProducts = Product::query()
-            ->select(['id', 'sku', 'barcode'])
-            ->with('translations')
-            ->whereIn('id', $lines->map(fn ($line) => $line->product?->main_product_id)->filter()->unique()->values()->all())
-            ->get()
-            ->keyBy('id');
-
         $categoryLabels = CategorySearch::labels($lines->map(fn ($line) => self::categoryId($line))->filter()->unique()->values()->all());
 
         return $lines
-            ->mapWithKeys(fn ($line): array => [(int) $line->id => self::mainItemFor($line, $mainProducts, $categoryLabels)])
+            ->mapWithKeys(fn ($line): array => [(int) $line->id => self::mainItemFor($line, $categoryLabels)])
             ->all();
     }
 
@@ -137,11 +128,10 @@ final class PurchaseOrderMainItems
     }
 
     /**
-     * @param  Collection<int, Product>  $mainProducts
      * @param  array<int, string>  $categoryLabels
      * @return array<string, mixed>
      */
-    private static function mainItemFor(PurchaseOrderItem|ConsolidatedPurchaseOrderItem $line, Collection $mainProducts, array $categoryLabels): array
+    private static function mainItemFor(PurchaseOrderItem|ConsolidatedPurchaseOrderItem $line, array $categoryLabels): array
     {
         $isWeightPriced = $line->isWeightPricedLine();
         $weights = self::weights($line);
@@ -165,14 +155,13 @@ final class PurchaseOrderMainItems
             return $main;
         }
 
-        $mainProduct = $mainProducts->get($line->product?->main_product_id);
         $categoryId = self::categoryId($line);
 
-        // البند صنف فرعي أُدخل وحده: رأسه صنفه الرئيسي، وهو صنفه الفرعي الوحيد.
-        if ($mainProduct || ($isWeightPriced && isset($categoryLabels[$categoryId]))) {
-            $main['name'] = $mainProduct ? (string) $mainProduct->name : $categoryLabels[$categoryId];
-            $main['code'] = $mainProduct?->sku;
-            $main['barcode'] = $mainProduct?->barcode;
+        // بند وزن تحت تصنيف في الطلبية: رأسه التصنيف، وهو صنفه الوحيد.
+        if ($isWeightPriced && isset($categoryLabels[$categoryId])) {
+            $main['name'] = $categoryLabels[$categoryId];
+            $main['code'] = null;
+            $main['barcode'] = null;
             $main['line_is_main'] = false;
             $main['sub_items'] = [[
                 'name' => (string) $line->description,

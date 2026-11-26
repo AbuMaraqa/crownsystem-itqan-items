@@ -105,7 +105,7 @@ class SalesInvoiceService
         $fromOrder = filled($invoice ? $invoice->sales_order_id : ($data['sales_order_id'] ?? null));
 
         if (! $fromOrder) {
-            ItemsGrid::ensureMainItemsHaveSubItems($items);
+            ItemsGrid::ensureWeightLines($items);
         }
 
         $data['items'] = SalesServiceLine::merge($items, $data['services'] ?? []);

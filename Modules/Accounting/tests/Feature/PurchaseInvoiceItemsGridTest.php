@@ -67,12 +67,13 @@ class PurchaseInvoiceItemsGridTest extends TestCase
         });
     }
 
-    public function test_a_manual_main_item_without_sub_items_is_not_saved(): void
+    public function test_a_manual_price_group_line_without_pieces_is_not_saved(): void
     {
         $invoice = $this->emptyInvoice();
 
         $this->put(route('accounting.purchase-invoices.update', $invoice->id), $this->payload([[
-            'product_id' => Product::query()->where('sku', 'DEMO-1025')->value('id'),
+            'product_id' => null,
+            'category_finish_id' => Product::query()->where('sku', 'DEMO-1025-01')->value('category_finish_id'),
             'pricing_type' => 'weight',
             'quantity' => 30,
             'unit_price' => 10,

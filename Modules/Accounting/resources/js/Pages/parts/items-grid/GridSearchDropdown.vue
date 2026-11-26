@@ -66,7 +66,6 @@ const emit = defineEmits<{ choose: [result: SearchResult]; hover: [index: number
                             <span v-if="result.kind === 'category'" class="block truncate text-[11px] text-muted">{{ t('Category · pick it, then add its items under it') }}</span>
                             <span v-else-if="result.kind === 'group'" class="block truncate text-[11px] text-muted">{{ t('Category · by weight: its profiles go inside it') }}</span>
                             <span v-else-if="result.group_label" class="block truncate text-[11px] text-muted">{{ t('Goes into:') }} {{ result.group_label }}</span>
-                            <span v-else-if="result.main_label" class="block truncate text-[11px] text-muted">{{ t('Inside main item:') }} {{ result.main_label }}</span>
                         </span>
                     </span>
                     <span v-if="result.barcode" class="shrink-0 font-mono text-xs text-muted" dir="ltr">{{ result.barcode }}</span>

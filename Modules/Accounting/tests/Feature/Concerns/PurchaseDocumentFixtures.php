@@ -127,7 +127,8 @@ trait PurchaseDocumentFixtures
     protected function weightLine(float $actual = 16.2, float $price = 10): array
     {
         return [
-            'product_id' => $this->demoProduct('DEMO-1025')->id,
+            'product_id' => null,
+            'category_finish_id' => $this->demoProduct('DEMO-1025-02')->category_finish_id,
             'pricing_type' => 'weight',
             'quantity' => 1,
             'unit_price' => $price,

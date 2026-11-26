@@ -48,7 +48,7 @@ class DirectPurchaseOrderDraft
                 '_key' => 'sales-order-item-'.$item->id,
                 'id' => null,
                 'row_type' => 'item',
-                'has_sub_products' => $isGroup || (bool) ($payload['has_sub_products'] ?? false),
+                'has_sub_products' => $isGroup,
                 'product_id' => $item->product_id,
                 'category_finish_id' => $item->category_finish_id,
                 'product_label' => $label,

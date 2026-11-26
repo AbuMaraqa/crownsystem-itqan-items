@@ -50,11 +50,10 @@ class ItemsGridController extends Controller
         $data = $request->validate([
             'q' => ['nullable', 'string', 'max:255'],
             'source_product_id' => ['nullable', 'integer'],
-            'main_product_id' => ['nullable', 'integer'],
             'group_id' => ['nullable', 'integer'],
         ]);
 
-        return response()->json(ItemsGrid::searchPieceOutputs($data['source_product_id'] ?? null, (string) ($data['q'] ?? ''), $data['main_product_id'] ?? null, $data['group_id'] ?? null));
+        return response()->json(ItemsGrid::searchPieceOutputs($data['source_product_id'] ?? null, (string) ($data['q'] ?? ''), $data['group_id'] ?? null));
     }
 
     /**
@@ -97,17 +96,6 @@ class ItemsGridController extends Controller
         return response()->json(ItemsGrid::resolveBarcode($data['code']));
     }
 
-    public function matchPieces(Request $request, string $document): JsonResponse
-    {
-        $data = $request->validate([
-            'main_product_id' => ['required', 'integer'],
-            'piece_ids' => ['array'],
-            'piece_ids.*' => ['integer'],
-        ]);
-
-        return response()->json($this->grid($request, $document)->matchPiecesByName($data['main_product_id'], $data['piece_ids'] ?? []));
-    }
-
     /**
      * رصيد السطر الذي عليه المؤشر؛ null لمن لا يرى المخزون.
      */
@@ -126,7 +114,7 @@ class ItemsGridController extends Controller
     public function details(Request $request, ItemStockCardService $cards): JsonResponse
     {
         $data = $request->validate(['product_id' => ['required', 'integer']]);
-        $product = Product::query()->with(['translations', 'mainProduct.translations', 'media'])->findOrFail($data['product_id']);
+        $product = Product::query()->with(['translations', 'media'])->findOrFail($data['product_id']);
 
         return $this->nullable([
             'product' => ItemCardData::product($product),

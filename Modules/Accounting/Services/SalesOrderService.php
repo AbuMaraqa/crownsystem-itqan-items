@@ -119,7 +119,7 @@ class SalesOrderService
     {
         $items = array_values($data['items'] ?? []);
 
-        ItemsGrid::ensureMainItemsHaveSubItems(array_values(array_filter(
+        ItemsGrid::ensureWeightLines(array_values(array_filter(
             $items,
             fn ($item): bool => is_array($item) && blank($item['sales_quotation_item_id'] ?? null),
         )));

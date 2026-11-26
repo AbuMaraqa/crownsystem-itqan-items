@@ -13,16 +13,14 @@ use Modules\Accounting\Entities\FiscalYear;
 use Modules\Accounting\Enums\AccountingPeriodStatus;
 use Modules\Core\Entities\Currency;
 use Modules\Core\Entities\User;
-use Modules\Items\Entities\PriceList;
 use Modules\Items\Entities\Product;
 use Modules\Items\Entities\ProductBarcode;
-use Modules\Items\Entities\ProductPrice;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
- * نقاط جدول الاصناف (items-grid/{document}/*): البحث، تفاصيل الصنف بسعر الطرف وصنفه الرئيسي،
+ * نقاط جدول الاصناف (items-grid/{document}/*): البحث وبحث قطع مجموعة السعر،
  * الباركود بكمية العبوة، مبالغ السطور وتنبيهاتها، الرصيد، والصلاحيات.
  */
 class ItemsGridEndpointsTest extends TestCase
@@ -100,33 +98,6 @@ class ItemsGridEndpointsTest extends TestCase
         $this->get('/admin/accounting/items-grid/not-a-document/products')->assertNotFound();
     }
 
-    public function test_a_sub_item_payload_carries_its_main_item_and_the_party_price(): void
-    {
-        $main = $this->product('DEMO-1025');
-        $sub = $this->product('DEMO-1025-01');
-
-        // سعر الطرف من قائمة اسعاره، وسعر سطر الوزن للصنف الرئيسي.
-        $list = new PriceList(['same_buy_sell' => false, 'is_active' => true, 'sort_order' => 1]);
-        $list->save();
-        $list->translateOrNew(app()->getLocale())->name = 'قائمة الجدول';
-        $list->save();
-        ProductPrice::create(['price_list_id' => $list->id, 'product_id' => $main->id, 'sell_price' => 17.5, 'buy_price' => 0]);
-        $this->customer->update(['price_list_id' => $list->id]);
-
-        $payload = $this->getJson($this->url('item', ['product_id' => $sub->id, 'party_id' => $this->customer->id]))->assertOk()->json();
-
-        $this->assertSame($sub->id, $payload['id']);
-        $this->assertSame($main->id, $payload['main_product']['id']);
-        $this->assertSame('17.5000', $payload['main_product']['unit_price']);
-        $this->assertSame('weight', $payload['main_product']['pricing_type']);
-
-        // بلا طرف لا سعر تلقائي، كما في اتقان.
-        $this->assertSame('0.0000', $this->getJson($this->url('item', ['product_id' => $main->id]))->json('unit_price'));
-
-        $prices = $this->getJson($this->url('prices', ['ids' => [$main->id], 'party_id' => $this->customer->id]))->assertOk()->json();
-        $this->assertEquals(17.5, $prices[$main->id]);
-    }
-
     public function test_the_barcode_returns_every_match_with_its_pack_quantity(): void
     {
         $hinge = $this->product('DEMO-HINGE');
@@ -145,13 +116,17 @@ class ItemsGridEndpointsTest extends TestCase
         $this->assertNotNull($this->getJson($this->url('barcode', ['code' => 'NO-SUCH-CODE']))->json('add_url'));
     }
 
-    public function test_the_search_and_the_sub_item_search_inside_a_main_item(): void
+    public function test_the_search_and_the_piece_search_inside_a_price_group(): void
     {
-        $main = $this->product('DEMO-1025');
         $sub = $this->product('DEMO-1025-01');
+        // لون المقطع متغيّر من صنف مقطعه (الاب)، وبحث القطع داخل المجموعة يعرض ألوانها المتغيّرة فقط.
+        $profile = new Product(['slug' => 'demo-profile-1025', 'base_price' => 0, 'pricing_type' => 'weight', 'length' => 6, 'weight_per_meter' => 1.2]);
+        $profile->save();
+        $sub->update(['parent_id' => $profile->id]);
 
-        $outputs = collect($this->getJson($this->url('piece-outputs', ['main_product_id' => $main->id]))->assertOk()->json())->pluck('id');
+        $outputs = collect($this->getJson($this->url('piece-outputs', ['group_id' => $sub->category_finish_id]))->assertOk()->json())->pluck('id');
         $this->assertTrue($outputs->contains($sub->id));
+        $this->assertFalse($outputs->contains($this->product('DEMO-4500-01')->id));
 
         $results = collect($this->getJson($this->url('products', ['q' => 'DEMO-HINGE']))->assertOk()->json())->pluck('id');
         $this->assertTrue($results->contains($this->product('DEMO-HINGE')->id));
@@ -159,11 +134,11 @@ class ItemsGridEndpointsTest extends TestCase
 
     public function test_totals_price_a_weight_line_by_its_actual_weight_only(): void
     {
-        $main = $this->product('DEMO-1025');
         $sub = $this->product('DEMO-1025-01');
         $line = fn (?float $actual): array => [
             'key' => 'row-1',
-            'product_id' => $main->id,
+            'product_id' => null,
+            'category_finish_id' => $sub->category_finish_id,
             'unit_price' => 20,
             'actual_weight' => $actual,
             'discount_mode' => 'rate',
@@ -190,18 +165,19 @@ class ItemsGridEndpointsTest extends TestCase
 
     public function test_the_stock_hint_is_for_who_sees_stock_and_cost_for_who_edits_items(): void
     {
-        $main = $this->product('DEMO-1025');
+        $hinge = $this->product('DEMO-HINGE');
 
         // null: who cannot see stock gets no hint.
-        $this->assertSame('null', $this->getJson($this->url('stock', ['product_id' => $main->id]))->assertOk()->getContent());
+        $this->assertSame('null', $this->getJson($this->url('stock', ['product_id' => $hinge->id]))->assertOk()->getContent());
 
         $this->signIn(['Sales Quotation Create', 'Stock View List']);
-        $stock = $this->getJson($this->url('stock', ['product_id' => $main->id]))->assertOk()->json();
-        $this->assertSame(__('kg'), $stock['unit']);
+        $stock = $this->getJson($this->url('stock', ['product_id' => $hinge->id]))->assertOk()->json();
+        // 100 من الدورة الكاملة + 40 من العرض الجديد.
+        $this->assertEquals(140, (float) $stock['all']);
         $this->assertNull($stock['cost']);
 
         $this->signIn(['Sales Quotation Create', 'Stock View List', 'Product Update']);
-        $this->assertNotNull($this->getJson($this->url('stock', ['product_id' => $main->id]))->json('cost'));
+        $this->assertNotNull($this->getJson($this->url('stock', ['product_id' => $hinge->id]))->json('cost'));
     }
 
     public function test_the_party_field_lists_customers_of_a_sales_document(): void

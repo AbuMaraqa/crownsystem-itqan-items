@@ -22,7 +22,7 @@ class SalesQuotationService
      */
     public function create(array $data): SalesQuotation
     {
-        ItemsGrid::ensureMainItemsHaveSubItems($data['items'] ?? []);
+        ItemsGrid::ensureWeightLines($data['items'] ?? []);
 
         return DB::transaction(function () use ($data) {
             $items = $this->normalizeItems($data['items'] ?? []);
@@ -44,7 +44,7 @@ class SalesQuotationService
     }
 
     /**
-     * صنف الوزن الجديد لا يُحفظ بلا اصناف فرعية لها وزن (ItemsGrid::ensureMainItemsHaveSubItems).
+     * سطر الوزن الجديد سطر مجموعة سعر بقطع من ألوانها لها وزن (ItemsGrid::ensureWeightLines).
      * القاعدة لشاشة الادخال: تحويل العرض الى طلبية لا يمر بها.
      */
     public function update(SalesQuotation $quotation, array $data): SalesQuotation
@@ -53,7 +53,7 @@ class SalesQuotationService
             throw new DomainException(__('Only editable sales quotations can be updated.'));
         }
 
-        ItemsGrid::ensureMainItemsHaveSubItems($data['items'] ?? []);
+        ItemsGrid::ensureWeightLines($data['items'] ?? []);
 
         return DB::transaction(function () use ($quotation, $data) {
             $items = $this->normalizeItems($data['items'] ?? []);
