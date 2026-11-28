@@ -142,6 +142,12 @@ export function documentWeight(materialsWeight: number, rows: GridRow[]): number
     return round4(total);
 }
 
+/**
+ * A price-group line («التصنيف — اللون», no item): its kg is the actual weight and its colours are the
+ * sub-items. A weight item outside a price group is a plain kg line: its quantity is in kg, with no sub-items.
+ */
+export const isGroupLine = (row: GridRow): boolean => row.pricing_type === 'weight' && !row.product_id && Boolean(row.category_finish_id);
+
 export const blankRow = (): GridRow => normalizeRow({ id: null, product_id: null, quantity: 1, unit_price: '0.0000', pieces: [] });
 
 const emptyTotals = (): DocumentTotals => ({ sub_total: 0, items_discount: 0, document_discount: 0, tax_amount: 0, total_amount: 0 });
@@ -510,12 +516,13 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
     function itemColumns(row: GridRow): Column[] {
         const columns: Column[] = ['product'];
 
-        if (row.pricing_type === 'weight') {
+        if (isGroupLine(row)) {
             if (config.value.showLength) columns.push('length');
             columns.push('actual_weight');
         } else {
             columns.push('quantity');
             if (config.value.showLength) columns.push('length');
+            if (row.pricing_type === 'weight') columns.push('actual_weight');
         }
 
         return columns;
@@ -526,7 +533,10 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
         const c = config.value;
 
         if (!c.editable) {
-            const columns: Column[] = row.pricing_type === 'weight' ? (c.actualWeightEditable ? ['actual_weight'] : []) : c.quantitiesEditable ? ['quantity'] : [];
+            const columns: Column[] = [
+                ...(!isGroupLine(row) && c.quantitiesEditable ? (['quantity'] as Column[]) : []),
+                ...(row.pricing_type === 'weight' && c.actualWeightEditable ? (['actual_weight'] as Column[]) : []),
+            ];
             const open = columns.concat(c.showPrices && c.pricesEditable ? priceColumns() : []);
 
             return open.length ? open : ['product'];
@@ -1275,7 +1285,7 @@ export function useItemsGrid(rows: Ref<GridRow[]>, configSource: () => GridConfi
 
         await nextTick();
 
-        if (rows.value[index].pricing_type === 'weight') openSubItems(index);
+        if (isGroupLine(rows.value[index])) openSubItems(index);
     }
 
     /* ---------- suggested accessories ---------- */

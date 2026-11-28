@@ -11,7 +11,7 @@ import ItemDetailsModal from './ItemDetailsModal.vue';
 import PiecesPanel from './PiecesPanel.vue';
 import StockPanel from './StockPanel.vue';
 import type { DocumentTotals, GridConfig, GridContext, GridRow } from './types';
-import { gridKey, money, quantityLabel, useItemsGrid } from './useItemsGrid';
+import { gridKey, isGroupLine, money, quantityLabel, useItemsGrid } from './useItemsGrid';
 
 /**
  * The one items grid of every trade document (quotations, orders, invoices, returns…): a main
@@ -124,7 +124,7 @@ const priceFields = ['discount_rate', 'discount_amount'] as const;
                             <!-- Item: search by name, code or barcode -->
                             <td class="px-2 py-1.5" :class="row.category_id ? 'ps-6' : ''">
                                 <div class="flex items-center gap-2">
-                                    <Package v-if="row.pricing_type === 'weight'" class="size-4 shrink-0 text-brand-500" :title="t('Main Item')" />
+                                    <Package v-if="isGroupLine(row)" class="size-4 shrink-0 text-brand-500" :title="t('Price Group')" />
                                     <input
                                         v-model="row.product_label"
                                         type="text"
@@ -154,9 +154,9 @@ const priceFields = ['discount_rate', 'discount_amount'] as const;
 
                             </td>
 
-                            <!-- Quantity, or the total weight of the sub-items for a weight item -->
+                            <!-- Quantity (kg for a weight item), or the total weight of the colours of a price-group line -->
                             <td class="px-2 py-1.5 align-top">
-                                <template v-if="row.pricing_type !== 'weight'">
+                                <template v-if="!isGroupLine(row)">
                                     <input
                                         v-model="row.quantity"
                                         type="text"
@@ -168,6 +168,7 @@ const priceFields = ['discount_rate', 'discount_amount'] as const;
                                         @input="grid.clampQuantity(row)"
                                         @keydown="grid.onCellKey($event, rowIndex, 'quantity')"
                                     />
+                                    <span v-if="row.pricing_type === 'weight'" class="mt-0.5 block text-end text-[10px] text-muted">{{ t('kg') }}</span>
                                     <span v-if="c.quantityLimitLabel && row.max_quantity !== undefined && row.max_quantity !== null" class="mt-0.5 block text-end text-[10px] text-muted">
                                         {{ c.quantityLimitLabel }}: {{ quantityLabel(row.max_quantity) }}
                                     </span>
@@ -251,7 +252,7 @@ const priceFields = ['discount_rate', 'discount_amount'] as const;
                             <td class="px-2 py-1.5 align-top">
                                 <div class="flex items-center justify-center gap-0.5">
                                     <button
-                                        v-if="row.pricing_type === 'weight'"
+                                        v-if="isGroupLine(row)"
                                         type="button"
                                         :class="iconButton"
                                         :aria-label="t('Sub Items')"
@@ -275,7 +276,7 @@ const priceFields = ['discount_rate', 'discount_amount'] as const;
                             </td>
                         </tr>
 
-                        <tr v-if="row.pricing_type === 'weight' && !row.collapsed">
+                        <tr v-if="isGroupLine(row) && !row.collapsed">
                             <td :colspan="columnCount" class="p-0"><PiecesPanel :row-index="rowIndex" /></td>
                         </tr>
 
