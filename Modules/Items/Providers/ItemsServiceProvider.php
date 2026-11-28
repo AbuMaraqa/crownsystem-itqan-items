@@ -11,6 +11,7 @@ use Modules\Items\Console\Commands\BackfillLegacyFields;
 use Modules\Items\Console\Commands\ItqanCategoryMap;
 use Modules\Items\Services\Itqan\ItqanCatalogStage;
 use Modules\Items\Services\Itqan\ItqanPricesStage;
+use Modules\Items\Console\Commands\AssignColourlessGroups;
 use Modules\Items\Console\Commands\LinkMainProducts;
 use Modules\Items\Console\Commands\RebuildSearchIndex;
 use Modules\Items\Console\Commands\ResetCatalog;
@@ -110,6 +111,7 @@ class ItemsServiceProvider extends ServiceProvider
             LinkMainProducts::class,
             RebuildSearchIndex::class,
             ResetCatalog::class,
+            AssignColourlessGroups::class,
         ]);
     }
 

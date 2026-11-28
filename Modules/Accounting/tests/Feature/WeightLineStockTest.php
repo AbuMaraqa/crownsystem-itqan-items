@@ -40,6 +40,7 @@ use Modules\Items\Entities\Category;
 use Modules\Items\Entities\CategoryFinish;
 use Modules\Items\Entities\Finish;
 use Modules\Items\Entities\Product;
+use Modules\Items\Support\ColourlessGroup;
 use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
@@ -144,6 +145,38 @@ class WeightLineStockTest extends TestCase
         // بلا وزن فعلي: الكغم المحسوب 7.602 × 11 = 83.622.
         $this->assertSame(1.0, $this->onHand($this->piece));
         $this->assertSame(7.602, $this->weightOf($this->piece));
+    }
+
+    /**
+     * مقطع لم يُضف له لون يدخل مجموعة «تصنيفه — بلا لون» (ColourlessGroup)، فيُشترى ويُباع كالمقاطع
+     * الملوّنة: الكيلو والقيمة على المجموعة، والعدد على المقطع، والقيود متوازنة.
+     */
+    public function test_a_profile_without_a_colour_is_bought_and_sold_through_its_no_colour_group(): void
+    {
+        $brand = Category::create(['slug' => 'alb-'.Str::lower(Str::random(6)), 'status' => 1, 'pricing_type' => 'weight']);
+        $brand->translateOrNew('ar')->name = 'الوبين';
+        $brand->save();
+        $profile = $this->product('سنة منخل CW60', ['pricing_type' => 'weight', 'base_price' => 0, 'length' => 6, 'weight_per_meter' => 0.156]);
+        $profile->categories()->attach($brand->id);
+
+        ColourlessGroup::assign();
+
+        $profile->refresh();
+        $this->group = CategoryFinish::query()->findOrFail($profile->category_finish_id);
+        $this->piece = $profile;
+        $this->assertSame((int) $brand->id, (int) $this->group->category_id);
+        $this->assertTrue((bool) Finish::query()->find($this->group->finish_id)?->is_system);
+
+        $this->buy(actual: 10, price: 20);
+        $this->assertMain(kg: 10, value: 200);
+        $this->assertSame(1.0, $this->onHand($profile));
+        $this->assertSame(0.0, $this->valueOf($profile));
+
+        $this->sell(actual: 4, price: 30);
+        $this->assertMain(kg: 6, value: 120);
+        $this->assertSame(0.0, $this->onHand($profile));
+        $this->assertSame(120.0, $this->balance($this->warehouseAccount()));
+        $this->assertSame(0.0, $this->totalBalance());
     }
 
     public function test_selling_an_actual_weight_takes_kg_and_cost_from_the_main_item(): void

@@ -23,6 +23,7 @@ use Modules\Items\Enums\ProductActive;
 use Modules\Items\Events\ProductUpdated;
 use Modules\Core\Support\LiveUpdate;
 use Modules\Items\Repositories\Contracts\ProductRepositoryInterface;
+use Modules\Items\Support\ColourlessGroup;
 use Modules\Items\Support\ItemCardRules;
 
 /**
@@ -105,6 +106,9 @@ class ProductService
                 $this->syncVariations($product, $data['variations'], $locale, $userId);
             }
 
+            // مقطع بالوزن بلا لون يدخل مجموعة «تصنيفه — بلا لون».
+            ColourlessGroup::assign([(int) $product->id]);
+
             return $product;
         });
 
@@ -132,6 +136,8 @@ class ProductService
             if (array_key_exists('variations', $data)) {
                 $this->syncVariations($product, (array) $data['variations'], $locale, $userId);
             }
+
+            ColourlessGroup::assign([(int) $product->id]);
 
             return $product;
         });

@@ -18,6 +18,7 @@ use Modules\Items\Support\Itqan\CategoryMapFile;
 use Modules\Items\Support\Itqan\CategoryMapProposer;
 use Modules\Items\Support\Itqan\ItqanCategoryNodes;
 use Modules\Items\Support\Itqan\ItqanNames;
+use Modules\Items\Support\ColourlessGroup;
 use Modules\Items\Support\ItemCode;
 use Modules\Items\Support\LegacyItemFields;
 use RuntimeException;
@@ -157,6 +158,9 @@ class CatalogImporter
             if (! $this->partial) {
                 $this->deactivateRemoved(array_column($parents, 'slug'), $childSlugs, $report);
             }
+
+            // مقطع بالوزن لم يُنشأ له لون (لم يُستعمل لون منه في إتقان) يدخل مجموعة «تصنيفه — بلا لون».
+            $report['colourless_assigned'] = ColourlessGroup::assign(array_values(array_column($parents, 'id')))['assigned'];
         });
 
         return $report;
