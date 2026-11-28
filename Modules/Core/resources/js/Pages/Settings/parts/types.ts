@@ -31,6 +31,10 @@ export interface SettingsForm {
     dashboard_font: string;
     stock_min_1_color: string;
     stock_min_2_color: string;
+    company_name: string | null;
+    company_phone: string | null;
+    company_fax: string | null;
+    company_website: string | null;
     logo: File | null;
     remove_logo: boolean;
     app_versions: AppVersionForm[];

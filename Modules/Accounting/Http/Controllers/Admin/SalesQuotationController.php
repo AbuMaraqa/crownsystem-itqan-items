@@ -51,7 +51,7 @@ class SalesQuotationController extends Controller
     {
         return Inertia::render('Accounting/SalesQuotation/Index', [
             'table' => AdminTable::for($this->quotations->tableQuery())
-                ->search(['reference_no', 'notes'], null)
+                ->search()
                 ->filters(
                     AdminFilter::text('reference_no'),
                     $this->clientFilter(),

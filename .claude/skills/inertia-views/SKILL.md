@@ -108,9 +108,18 @@ to `ar.json`; add a new icon name to `Components/layout/navIcons.ts` (unknown na
 
 PDFs stay Blade + mPDF (no Vue):
 
-- View in `Modules/<M>/resources/views/pdf/`, `dir="rtl"`, using `core::pdf.partials.{styles,header,footer}`.
-  Documents of one area share a layout: the child view extends `<module>::pdf.<area>.layout`
-  (e.g. `accounting::pdf.inventory.layout`), sets `$docTitle`, `$meta`, `$signatures` and fills `@section('items')`.
+- **One template for every printout**: the view in `Modules/<M>/resources/views/pdf/` sets its variables in `@php`,
+  then `@extends('core::pdf.document')` and fills `@section('content')` with `table.items` tables. Variables:
+  `$docTitle`, `$party` (`['name' => …, 'label' => default «السادة», 'detail' => …]` or none), `$meta` (`[[label, value], …]`,
+  dates `d/m/Y`), `$totals` (`[[label, value, grand?], …]`, boxes after the tables), `$notes`, `$signatures` (labels).
+  Extra CSS goes in `@push('styles')`. The layout prints the letterhead (`Modules\Core\Support\Letterhead`: company name,
+  logo, phone, fax, email, website from Settings → General «Print header»), the title and the info box at the top of
+  every page, and the corner graphic (`Modules/Core/resources/assets/pdf/corner.svg`) with the page number at the foot.
+  Look: `core::pdf.partials.styles` only (grey header cells, light borders, `td.start` for text, `td.ltr` for codes,
+  `tr.total-row`, `h2.section-title`). Never write `<html>`, `@page`, a header or a footer in a document view.
+- Money totals and weight totals of a trade document: `Modules\Accounting\Support\PdfTotals::money()` / `::weights()`.
+  Sub-items under a line: `accounting::pdf.partials.item-pieces` (grey sub-header row; it narrows itself to `$columns`).
+- Label sheets (barcode / shelf labels) are not documents and keep their own page size.
 - Rendered by a service extending `Modules\Core\Services\PdfService` (`AccountingPdfService`, `InventoryPdfService`,
   `ItemsPdfService`) → `streamPdf($view, $data, $filename)`.
 - Routed through a controller, never a closure, with `->can('<Entity> View List')` (or `View`). Use an array action

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Accounting\Entities\Concerns\IsInventoryDocument;
+use Modules\Core\Entities\Concerns\HasSearchIndex;
 use Modules\Core\Entities\User;
 use Spatie\Activitylog\Traits\LogsActivity;
 
@@ -15,9 +16,20 @@ use Spatie\Activitylog\Traits\LogsActivity;
  */
 class DeliveryNote extends Model
 {
+    use HasSearchIndex;
     use IsInventoryDocument;
     use LogsActivity;
     use SoftDeletes;
+
+    /**
+     * البحث في سندات التسليم: بالرقم المرجعي واسم السائق ورقم المركبة واسم المستلم.
+     *
+     * @return list<string>
+     */
+    public static function searchColumns(): array
+    {
+        return ['reference_no', 'driver_name', 'vehicle_no', 'receiver_name'];
+    }
 
     protected $fillable = [
         'reference_no',

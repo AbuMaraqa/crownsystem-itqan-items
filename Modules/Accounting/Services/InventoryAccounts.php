@@ -20,6 +20,7 @@ use Modules\Accounting\Enums\NormalBalance;
  *   تحويل:        من حـ/ مخزون المستودع المستلم  الى حـ/ مخزون المستودع المرسل
  *   رصيد افتتاحي: من حـ/ مخزون المستودع          الى حـ/ ارصدة افتتاحية
  *   جرد/تسوية:    العجز من حـ/ عجز المخزون، والزيادة الى حـ/ عجز المخزون
+ *   أمر إنتاج:     من حـ/ مخزون المستودع (المنتَج)  الى حـ/ مخزون المستودع (المدخل) و حـ/ تكاليف محمّلة (الأجور والخدمات)
  *   شحن مباشر للزبون (لا يدخل المخزن): فاتورة الشراء من حـ/ تكلفة البضاعة المباعة
  *
  * لكل مخزن حساب فرعي تحت «المخزون 1140» فتظهر قيمة كل مخزن على حدة.
@@ -43,6 +44,9 @@ class InventoryAccounts
 
     public const OPENING_KEY = 'opening_balance_equity';
 
+    // الأجور والخدمات المحمّلة على الاصناف المنتجة عند ترحيل أمر الإنتاج.
+    public const PRODUCTION_APPLIED_KEY = 'production_costs_applied';
+
     private const DEFAULT_ACCOUNT_CODES = [
         self::INVENTORY_KEY => '1140',
         self::GRNI_KEY => '2125',
@@ -51,6 +55,7 @@ class InventoryAccounts
         self::SHRINKAGE_KEY => '5140',
         self::PRICE_VARIANCE_KEY => '5115',
         self::OPENING_KEY => '3700',
+        self::PRODUCTION_APPLIED_KEY => '5170',
     ];
 
     /**

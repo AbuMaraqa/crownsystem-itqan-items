@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Accounting\Enums\PurchaseInvoiceStatus;
 use Modules\Accounting\Enums\PurchaseQuotationStatus;
 use Modules\Branch\Entities\Branch;
+use Modules\Core\Entities\Concerns\HasSearchIndex;
 use Modules\Core\Entities\Currency;
 use Modules\Core\Entities\User;
 use Spatie\Activitylog\LogOptions;
@@ -23,8 +24,19 @@ use Spatie\Activitylog\Traits\LogsActivity;
 class PurchaseQuotation extends Model
 {
     use HasFactory;
+    use HasSearchIndex;
     use LogsActivity;
     use SoftDeletes;
+
+    /**
+     * البحث في عروض اسعار الشراء: بالرقم المرجعي ورقم المورد والملاحظات.
+     *
+     * @return list<string>
+     */
+    public static function searchColumns(): array
+    {
+        return ['reference_no', 'supplier_reference', 'notes'];
+    }
 
     protected $fillable = [
         'purchase_order_id',

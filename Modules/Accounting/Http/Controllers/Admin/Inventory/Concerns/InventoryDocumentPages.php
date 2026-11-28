@@ -15,7 +15,6 @@ use Modules\Accounting\Support\StatusBadge;
 use Modules\Core\Entities\User;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
-use Modules\Core\Support\UserCellData;
 use Spatie\QueryBuilder\AllowedFilter;
 
 /**
@@ -29,8 +28,7 @@ trait InventoryDocumentPages
      * جدول القائمة: البحث في الرقم واعمدة المستند، فلاتر الحالة والمخزن والتاريخ والمنشئ،
      * ثم فلاتر المستند واعمدته الخاصة.
      *
-     * @param  list<string>  $searchColumns  اعمدة نصية في جدول المستند
-     * @param  array<string, string>  $searchRelations  علاقة => عمود (رقم الطلبية، اسم الطرف)
+     * @param  array<string, string>  $searchRelations  علاقة => عمود (رقم الطلبية، اسم الطرف)؛ اعمدة المستند نفسه من searchColumns() في موديله
      * @param  string|list<string>  $warehouseColumns  عمود المخزن، او عمودا المرسل والمستلم في التحويل
      * @param  list<AllowedFilter>  $filters
      * @param  list<string>  $sorts
@@ -40,7 +38,6 @@ trait InventoryDocumentPages
     protected function documentTable(
         Builder $query,
         string $dateColumn,
-        array $searchColumns,
         array $searchRelations,
         string|array $warehouseColumns,
         array $filters,
@@ -49,23 +46,11 @@ trait InventoryDocumentPages
     ): array {
         $canSeeCost = (bool) auth()->user()?->can('Stock Value View');
 
+        $relationColumns = array_map(fn (string $relation, string $column): string => "{$relation}.{$column}", array_keys($searchRelations), $searchRelations);
+
         return AdminTable::for($query)
+            ->search($relationColumns, translated: null)
             ->filters(
-                AllowedFilter::callback('search', function (Builder $query, mixed $value) use ($searchColumns, $searchRelations): void {
-                    $term = '%'.addcslashes(trim((string) $value), '%_\\').'%';
-
-                    $query->where(function (Builder $query) use ($searchColumns, $searchRelations, $term): void {
-                        $query->whereLike('reference_no', $term);
-
-                        foreach ($searchColumns as $column) {
-                            $query->orWhereLike($column, $term);
-                        }
-
-                        foreach ($searchRelations as $relation => $column) {
-                            $query->orWhereHas($relation, fn (Builder $related) => $related->whereLike($column, $term));
-                        }
-                    });
-                }),
                 AdminFilter::text('reference_no'),
                 AdminFilter::exact('status'),
                 AllowedFilter::callback('warehouse', function (Builder $query, mixed $value) use ($warehouseColumns): void {

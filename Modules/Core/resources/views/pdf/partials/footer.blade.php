@@ -1,8 +1,16 @@
+{{-- ذيل كل صفحة: شكل الزاوية يمينا وخط رفيع حتى طرف الصفحة، ورقم الصفحة. --}}
 @php
-    $pdfFooterGeneralSettings = app(\Modules\Core\Settings\GeneralSettings::class);
+    $letterhead ??= \Modules\Core\Support\Letterhead::data();
 @endphp
 <htmlpagefooter name="doc-footer">
-    <div style="border-top: 1px solid #e5e7eb; padding-top: 2mm; margin-top: 2mm; font-size: 8pt; color: #9ca3af; text-align: center;">
-        {{ $pdfFooterGeneralSettings->site_name }} &middot; {{ now()->format('Y-m-d H:i') }} &middot; {{ __('Page') }} {PAGENO} / {nb}
-    </div>
+    <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+            <td style="width: 24mm; vertical-align: bottom;">
+                <img src="{{ $letterhead['corner'] }}" style="width: 22mm; height: 20mm;" alt="">
+            </td>
+            <td style="vertical-align: bottom; border-bottom: 0.6pt solid #b5b5b5; text-align: left; font-size: 7.5pt; color: #9a9a9a; padding-bottom: 1mm;">
+                {PAGENO} / {nb}
+            </td>
+        </tr>
+    </table>
 </htmlpagefooter>

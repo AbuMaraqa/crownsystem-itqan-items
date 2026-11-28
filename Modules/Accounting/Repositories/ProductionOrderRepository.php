@@ -23,7 +23,7 @@ class ProductionOrderRepository extends BaseEloquentRepository implements Produc
     {
         /** @var ProductionOrder */
         return $this->query()
-            ->with(['salesOrder.client', 'client', 'currency', 'materials', 'labor.worker', 'services.serviceProvider'])
+            ->with(['salesOrder.client', 'client', 'currency', 'materials', 'labor.worker', 'services.serviceProvider', 'outputs'])
             ->findOrFail($id);
     }
 }

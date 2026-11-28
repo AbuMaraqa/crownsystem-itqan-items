@@ -549,5 +549,12 @@
     ":deleted deleted, :skipped not deleted. :reason": "حُذف :deleted، ولم يُحذف :skipped. :reason",
     "The selection is not valid. Refresh the page and try again.": "التحديد غير صالح. حدّث الصفحة وحاول مرة أخرى.",
     "Select at least one row.": "حدّد صفاً واحداً على الأقل.",
-    "Select :max rows at most.": "حدّد :max صفاً على الأكثر."
+    "Select :max rows at most.": "حدّد :max صفاً على الأكثر.",
+    "Messrs.": "السادة",
+    "Print header": "ترويسة المطبوعات",
+    "Shown at the top of every printed document, beside the site logo. The email is the contact email above.": "تظهر أعلى كل مستند مطبوع بجانب شعار الموقع، والبريد هو بريد التواصل أعلاه.",
+    "Company Name": "اسم الشركة",
+    "Leave empty to use the site name.": "اتركه فارغاً لاستخدام اسم الموقع.",
+    "Fax": "الفاكس",
+    "Website": "الموقع الإلكتروني"
 }

@@ -14,12 +14,13 @@
         [__('Reason'), $document->reason],
         [__('Created By'), $document->createdBy?->name],
     ];
+    $notes = $document->notes;
     $signatures = [__('Counted By'), __('Storekeeper'), __('Approved By')];
 @endphp
 
-@extends('accounting::pdf.inventory.layout')
+@extends('core::pdf.document')
 
-@section('items')
+@section('content')
     <table class="items">
         <thead>
             <tr>
@@ -42,8 +43,8 @@
             @foreach ($document->items as $index => $item)
                 <tr>
                     <td>{{ $index + 1 }}</td>
-                    <td style="direction: ltr; text-align: right;">{{ $item->barcode }}</td>
-                    <td>{{ $item->description }}</td>
+                    <td class="ltr">{{ $item->barcode }}</td>
+                    <td class="start">{{ $item->description }}</td>
                     <td class="num pick">{{ $item->location?->code }}</td>
                     @if ($isCount)
                         <td class="num">{{ $blankSheet ? '' : $fmt($item->system_quantity) }}</td>

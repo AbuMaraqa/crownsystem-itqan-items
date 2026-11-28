@@ -6,8 +6,8 @@ use Astrotomic\Translatable\Contracts\Translatable as TranslatableContract;
 use Astrotomic\Translatable\Translatable;
 use DomainException;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -16,8 +16,8 @@ use Modules\Core\Entities\Concerns\HasSortOrder;
 use Modules\Core\Entities\User;
 use Modules\Core\Enums\ImageQuality;
 use Modules\Core\Enums\ImageSize;
-use Modules\Core\Enums\ImageWidth;
 use Modules\Core\Services\ImageService;
+use Modules\Items\Entities\Concerns\IndexedByItemsSearch;
 use Modules\Items\Enums\CategoryStatus;
 use Modules\Items\Support\ItemCode;
 use Spatie\Activitylog\LogOptions;
@@ -27,24 +27,24 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 
 // use Modules\Items\Database\Factories\CategoryFactory;
 
-class Category extends Model implements TranslatableContract, HasMedia
+class Category extends Model implements HasMedia, TranslatableContract
 {
-    use HasSortOrder;
     use HasFactory;
+    use HasSortOrder;
+    use IndexedByItemsSearch;
     use InteractsWithMedia;
-    use Translatable;
-    use SoftDeletes;
     use LogsActivity;
+    use SoftDeletes;
+    use Translatable;
 
     /**
      * The attributes that are mass assignable.
      */
-
     public function __construct(array $attributes = [])
     {
         parent::__construct($attributes);
 
-        $this->setTable(config('items.table_prefix') . 'categories');
+        $this->setTable(config('items.table_prefix').'categories');
     }
 
     protected $fillable = [
@@ -75,7 +75,7 @@ class Category extends Model implements TranslatableContract, HasMedia
             ->logOnly($this->getFillable()) // تسجيل الحقول القابلة للتعبئة فقط
             ->logOnlyDirty() // تسجيل الحقول المُعدّلة فقط
             ->dontSubmitEmptyLogs() // عدم حفظ سجلات فارغة
-            ->setDescriptionForEvent(fn(string $eventName) => "This model has been {$eventName} and value ")
+            ->setDescriptionForEvent(fn (string $eventName) => "This model has been {$eventName} and value ")
             ->useLogName(class_basename($this));
     }
 
@@ -119,13 +119,24 @@ class Category extends Model implements TranslatableContract, HasMedia
             $locale = app()->getLocale();
             $translationData = request()->only($model->translatedAttributes);
 
-            if (!empty($translationData)) {
+            if (! empty($translationData)) {
                 $model->translateOrNew($locale)->fill($translationData);
                 $model->save();
             }
         });
     }
 
+    /**
+     * ترتيب بنية الاصناف للتصنيفات، كما في شجرة الاصناف: الترتيب اليدوي (السحب والافلات) اولاً،
+     * ثم رقم التصنيف المبني على رقم ابيه (ItemCode)، فيأتي كل تصنيف تحت ابيه وبين اخوته.
+     */
+    public function scopeCatalogOrder(Builder $query): Builder
+    {
+        return $query
+            ->orderBy($query->qualifyColumn('sort_order'))
+            ->orderBy($query->qualifyColumn('code'))
+            ->orderBy($query->qualifyColumn('id'));
+    }
 
     public function parent()
     {
@@ -149,7 +160,7 @@ class Category extends Model implements TranslatableContract, HasMedia
                 return [
                     'id' => $category->id,
                     'label' => $category->name,
-                    'children' => static::mapChildrenToTree($category->children)
+                    'children' => static::mapChildrenToTree($category->children),
                 ];
             })
             ->toArray();
@@ -161,7 +172,7 @@ class Category extends Model implements TranslatableContract, HasMedia
             return [
                 'id' => $child->id,
                 'label' => $child->name,
-                'children' => static::mapChildrenToTree($child->children)
+                'children' => static::mapChildrenToTree($child->children),
             ];
         })->toArray();
     }
@@ -201,7 +212,7 @@ class Category extends Model implements TranslatableContract, HasMedia
         try {
             $originalName = $file->getClientOriginalName();
             $extension = $file->getClientOriginalExtension();
-            $fileName = time() . '_' . Str::slug(pathinfo($originalName, PATHINFO_FILENAME)) . '.' . $extension;
+            $fileName = time().'_'.Str::slug(pathinfo($originalName, PATHINFO_FILENAME)).'.'.$extension;
 
             $media = $this
                 ->addMedia($file)
@@ -215,7 +226,8 @@ class Category extends Model implements TranslatableContract, HasMedia
 
             return $media;
         } catch (\Exception $e) {
-            \Log::error('Error uploading category image: ' . $e->getMessage());
+            \Log::error('Error uploading category image: '.$e->getMessage());
+
             return null;
         }
     }
@@ -227,7 +239,7 @@ class Category extends Model implements TranslatableContract, HasMedia
 
     public function products()
     {
-        return $this->belongsToMany(Product::class, config('items.table_prefix') . 'products_categories');
+        return $this->belongsToMany(Product::class, config('items.table_prefix').'products_categories');
     }
 
     /**

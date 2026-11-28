@@ -21,15 +21,15 @@ use Modules\Accounting\Http\Controllers\Admin\Concerns\DeletesManyDocuments;
 use Modules\Accounting\Http\Controllers\Admin\Inventory\Concerns\InventoryDocumentPages;
 use Modules\Accounting\Http\Requests\Admin\Inventory\StockAdjustmentRequest;
 use Modules\Accounting\Repositories\Contracts\StockAdjustmentRepositoryInterface;
-use Modules\Accounting\Services\StockAdjustmentService;
 use Modules\Accounting\Services\InventoryPdfService;
+use Modules\Accounting\Services\StockAdjustmentService;
 use Modules\Accounting\Support\InventoryLines;
 use Modules\Accounting\Support\SelectOptions;
 use Modules\Accounting\Support\StatusBadge;
 use Modules\Core\Support\AdminFilter;
+use Modules\Core\Support\RecordInfo;
 use Modules\Items\Entities\Product;
 use Modules\Items\Support\ProductSearch;
-use Modules\Core\Support\RecordInfo;
 
 /**
  * رصيد افتتاحي / جرد / تسوية. في الجرد يُحمَّل كشف الاصناف برصيد النظام ويُدخل العدد الفعلي،
@@ -51,7 +51,6 @@ class StockAdjustmentController extends Controller
             'table' => $this->documentTable(
                 $this->adjustments->tableQuery(),
                 'adjustment_date',
-                ['reason', 'notes'],
                 [],
                 'warehouse_id',
                 [AdminFilter::exact('type'), AdminFilter::text('reason')],

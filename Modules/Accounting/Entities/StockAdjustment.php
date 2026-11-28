@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Accounting\Entities\Concerns\IsInventoryDocument;
 use Modules\Accounting\Enums\StockAdjustmentType;
+use Modules\Core\Entities\Concerns\HasSearchIndex;
 use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
@@ -15,9 +16,20 @@ use Spatie\Activitylog\Traits\LogsActivity;
  */
 class StockAdjustment extends Model
 {
+    use HasSearchIndex;
     use IsInventoryDocument;
     use LogsActivity;
     use SoftDeletes;
+
+    /**
+     * البحث في تسويات المخزون: بالرقم المرجعي والسبب والملاحظات.
+     *
+     * @return list<string>
+     */
+    public static function searchColumns(): array
+    {
+        return ['reference_no', 'reason', 'notes'];
+    }
 
     protected $fillable = [
         'reference_no',

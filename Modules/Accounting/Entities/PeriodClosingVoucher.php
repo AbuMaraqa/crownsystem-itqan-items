@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Accounting\Enums\PeriodClosingVoucherStatus;
+use Modules\Core\Entities\Concerns\HasSearchIndex;
 use Modules\Core\Entities\User;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -17,8 +18,19 @@ use Spatie\Activitylog\Traits\LogsActivity;
 class PeriodClosingVoucher extends Model
 {
     use HasFactory;
+    use HasSearchIndex;
     use LogsActivity;
     use SoftDeletes;
+
+    /**
+     * البحث في سندات اقفال الفترات: بالرقم المرجعي.
+     *
+     * @return list<string>
+     */
+    public static function searchColumns(): array
+    {
+        return ['reference_no'];
+    }
 
     protected $fillable = [
         'fiscal_year_id',

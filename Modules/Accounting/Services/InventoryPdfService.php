@@ -70,8 +70,11 @@ class InventoryPdfService extends PdfService
             ->select($products.'.*')
             ->selectRaw('balances.quantity as stock_on_hand, balances.weight as stock_weight')
             ->when($mainProductId, fn ($q) => $q->where(fn ($w) => $w->where($products.'.main_product_id', $mainProductId)->orWhere($products.'.id', $mainProductId)))
-            ->orderBy($products.'.main_product_id')
-            ->orderBy($products.'.barcode');
+            // ترتيب بنية الاصناف (Product::scopeCatalogOrder) مع بقاء المجموعات: كل صنف برقم صنفه
+            // الرئيسي اولاً (فتأتي المجموعات بترتيب الشجرة)، ثم برقمه داخل مجموعته.
+            ->leftJoin($products.' as group_main', 'group_main.id', '=', $products.'.main_product_id')
+            ->orderByRaw('COALESCE(group_main.sku, '.$products.'.sku)')
+            ->catalogOrder();
 
         StockStatus::applyFilter($query, $status);
 
@@ -159,7 +162,7 @@ class InventoryPdfService extends PdfService
             ->with(['translations', 'media'])
             ->whereIn('id', $productIds)
             ->get()
-            ->sortBy(fn (Product $product) => optional($byProduct->get($product->id)?->first()?->location)->code.'|'.$product->barcode)
+            ->sortBy(fn (Product $product) => optional($byProduct->get($product->id)?->first()?->location)->code.'|'.$product->sku)
             ->map(function (Product $product) use ($byProduct, $locationId) {
                 $placement = $byProduct->get($product->id)?->first(fn ($p) => $locationId ? $p->location_id === $locationId : $p->is_primary)
                     ?? $byProduct->get($product->id)?->first();

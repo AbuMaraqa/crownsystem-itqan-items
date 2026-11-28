@@ -19,14 +19,15 @@ import type { Option } from '../parts/types';
 import CostSummary from './parts/CostSummary.vue';
 import LaborLines from './parts/LaborLines.vue';
 import MaterialLines from './parts/MaterialLines.vue';
+import OutputLines from './parts/OutputLines.vue';
 import ServiceLines from './parts/ServiceLines.vue';
 import type { CostPreview, MaterialLine, ProductionContext, ProductionOptions, ProductionOrderForm, ServiceLine } from './types';
 
 /**
- * The production order form, shared by the add and edit pages: the order's data, then three tabs
- * of cost lines (items, wages, services) and the cost summary. The summary and each line's total
- * come from the server (cost-preview), with the same calculation as saving. Read only once the
- * order is completed or cancelled.
+ * The production order form, shared by the add and edit pages: the order's data, then tabs like
+ * Itqan's: the input items, the wages and services (the expenses) and the produced items, and the
+ * cost summary. The summary, each line's total and each produced item's share come from the server
+ * (cost-preview), with the same calculation as saving. Read only once the order is posted or cancelled.
  */
 const props = defineProps<{
     form: InertiaForm<ProductionOrderForm>;
@@ -60,7 +61,15 @@ const counts = computed(() => ({
     materials: filled(props.form.materials, ['product_id', 'description']),
     labor: filled(props.form.labor, ['worker_id', 'worker_name', 'description']),
     services: filled(props.form.services, ['product_id', 'description']),
+    outputs: filled(props.form.outputs, ['product_id']),
 }));
+
+/** With produced items, the produced quantity is their total (as the server saves it). */
+const outputsQuantity = computed(() => props.form.outputs.reduce((sum, line) => sum + (Number(line.quantity) || 0), 0));
+
+watch(outputsQuantity, (quantity) => {
+    if (quantity > 0 && editable.value) props.form.produced_quantity = String(Math.round(quantity * 10000) / 10000);
+});
 
 const tabLabel = (label: string, count: number): string => (count ? `${label} (${count})` : label);
 const hasError = (prefix: string): boolean => Object.keys(errors.value).some((key) => key.startsWith(`${prefix}.`));
@@ -69,6 +78,7 @@ const tabs = computed(() => [
     { value: 'materials', label: tabLabel(t('Items'), counts.value.materials), hasError: hasError('materials') },
     { value: 'labor', label: tabLabel(t('Wages'), counts.value.labor), hasError: hasError('labor') },
     { value: 'services', label: tabLabel(t('Services'), counts.value.services), hasError: hasError('services') },
+    { value: 'outputs', label: tabLabel(t('Production'), counts.value.outputs), hasError: hasError('outputs') },
 ]);
 
 /* ---------------- Sales order ---------------- */
@@ -129,8 +139,9 @@ async function loadSalesOrderLines(): Promise<void> {
 
 const preview = ref<CostPreview>({
     summary: { materials_cost: 0, labor_cost: 0, services_cost: 0, total_cost: 0, unit_cost: 0, sales_amount: props.context.sales_amount, margin: 0, margin_rate: null },
+    produced_quantity: 0,
     materials_weight: 0,
-    lines: { materials: [], labor: [], services: [] },
+    lines: { materials: [], labor: [], services: [], outputs: [] },
 });
 const previewing = ref(false);
 let timer: ReturnType<typeof setTimeout> | undefined;
@@ -150,6 +161,7 @@ async function refreshPreview(): Promise<void> {
                 materials: props.form.materials,
                 labor: props.form.labor,
                 services: props.form.services,
+                outputs: props.form.outputs,
             },
             request.signal,
         );
@@ -160,7 +172,7 @@ async function refreshPreview(): Promise<void> {
 }
 
 watch(
-    () => [props.form.sales_order_id, props.form.produced_quantity, props.form.materials, props.form.labor, props.form.services],
+    () => [props.form.sales_order_id, props.form.produced_quantity, props.form.materials, props.form.labor, props.form.services, props.form.outputs],
     () => {
         clearTimeout(timer);
         timer = setTimeout(refreshPreview, 300);
@@ -215,9 +227,9 @@ onBeforeUnmount(() => {
                     min="0.0001"
                     dir="ltr"
                     :label="t('Produced Quantity')"
-                    :hint="t('Used to calculate the unit cost.')"
+                    :hint="counts.outputs ? t('The total quantity of the produced items.') : t('Used to calculate the unit cost.')"
                     required
-                    :disabled="readonly"
+                    :disabled="readonly || counts.outputs > 0"
                     :error="form.errors.produced_quantity"
                 />
                 <div class="sm:col-span-2 lg:col-span-6">
@@ -248,6 +260,9 @@ onBeforeUnmount(() => {
                         :cost-source-options="options.costSourceOptions"
                         :pricing-basis-options="options.pricingBasisOptions"
                     />
+                </template>
+                <template #outputs>
+                    <OutputLines v-model="form.outputs" :totals="preview.lines.outputs" :editable="editable" :errors="errors" />
                 </template>
             </Tabs>
         </Card>

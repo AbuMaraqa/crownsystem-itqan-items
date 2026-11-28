@@ -34,7 +34,7 @@ class PeriodClosingVoucherController extends Controller
     {
         return Inertia::render('Accounting/PeriodClosingVoucher/Index', [
             'table' => AdminTable::for($this->vouchers->tableQuery())
-                ->search(['reference_no'], null)
+                ->search()
                 ->filters(AdminFilter::exact('status'), AdminFilter::exact('fiscal_year', 'fiscal_year_id'), ...AdminFilter::dateRange('closing_date'))
                 ->sorts('reference_no', 'closing_date', 'net_profit_base', 'id')
                 ->defaultSort('-closing_date')

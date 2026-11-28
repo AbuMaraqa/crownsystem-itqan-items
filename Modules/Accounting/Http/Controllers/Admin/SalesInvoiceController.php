@@ -53,7 +53,7 @@ class SalesInvoiceController extends Controller
     {
         return Inertia::render('Accounting/SalesInvoice/Index', [
             'table' => AdminTable::for($this->invoices->tableQuery())
-                ->search(['reference_no', 'notes'], null)
+                ->search()
                 ->filters(
                     AdminFilter::text('reference_no'),
                     $this->referenceFilter('sales_order', 'salesOrder'),

@@ -1,6 +1,6 @@
 <?php
 
-namespace Modules\Items\Support\Search;
+namespace Modules\Core\Support\Search;
 
 /**
  * توحيد النص قبل الفهرسة والبحث، حتى يجد المستخدم الصنف مهما اختلفت كتابته:

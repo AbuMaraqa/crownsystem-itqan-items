@@ -14,6 +14,7 @@ use Modules\Core\Http\Controllers\Concerns\DeletesManyRecords;
 use Modules\Core\Http\Controllers\Concerns\ReordersRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
+use Modules\Core\Support\RecordInfo;
 use Modules\Core\Support\Translations;
 use Modules\Items\Entities\Category;
 use Modules\Items\Entities\Finish;
@@ -24,7 +25,6 @@ use Modules\Items\Repositories\Contracts\CategoryRepositoryInterface;
 use Modules\Items\Services\CategoryColourService;
 use Modules\Items\Services\CategoryService;
 use Modules\Items\Support\CategoryColours;
-use Modules\Core\Support\RecordInfo;
 use Modules\Items\Support\TranslatedSort;
 use Spatie\QueryBuilder\AllowedSort;
 
@@ -56,7 +56,8 @@ class CategoryController extends Controller
                     ...AdminFilter::dateRange('created_at'),
                 )
                 ->sorts(AllowedSort::custom('name', new TranslatedSort), 'code', 'slug', 'id')
-                ->reorderable()
+                // كما في Category::scopeCatalogOrder: الترتيب اليدوي ثم رقم التصنيف.
+                ->reorderable(thenBy: ['code'])
                 ->withCreator()
                 ->rows(fn (Category $category) => [
                     'id' => $category->id,

@@ -9,12 +9,13 @@
         [__('Transfer Date'), $document->transfer_date?->format('d/m/Y')],
         [__('Created By'), $document->createdBy?->name],
     ];
+    $notes = $document->notes;
     $signatures = [__('Sending Storekeeper'), __('Receiving Storekeeper'), __('Approved By')];
 @endphp
 
-@extends('accounting::pdf.inventory.layout')
+@extends('core::pdf.document')
 
-@section('items')
+@section('content')
     <table class="items">
         <thead>
             <tr>
@@ -31,8 +32,8 @@
             @foreach ($document->items as $index => $item)
                 <tr>
                     <td>{{ $index + 1 }}</td>
-                    <td style="direction: ltr; text-align: right;">{{ $item->barcode }}</td>
-                    <td>{{ $item->description }}</td>
+                    <td class="ltr">{{ $item->barcode }}</td>
+                    <td class="start">{{ $item->description }}</td>
                     <td class="big">{{ $fmt($item->quantity) }}</td>
                     <td class="num">{{ $fmt($item->weight) }}</td>
                     <td class="num pick">{{ $item->fromLocation?->code ?? '—' }}</td>

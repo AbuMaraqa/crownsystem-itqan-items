@@ -54,7 +54,7 @@ class PurchaseOrderController extends Controller
     {
         return Inertia::render('Accounting/PurchaseOrder/Index', [
             'table' => AdminTable::for($this->orders->tableQuery())
-                ->search(['reference_no', 'notes'], null)
+                ->search()
                 ->filters(
                     AdminFilter::text('reference_no'),
                     $this->partyFilter(),

@@ -51,7 +51,7 @@ class PurchaseReturnController extends Controller
     {
         return Inertia::render('Accounting/PurchaseReturn/Index', [
             'table' => AdminTable::for($this->returns->tableQuery())
-                ->search(['reference_no', 'notes'], null)
+                ->search()
                 ->filters(
                     AdminFilter::text('reference_no'),
                     $this->referenceFilter('purchase_invoice', 'purchaseInvoice'),

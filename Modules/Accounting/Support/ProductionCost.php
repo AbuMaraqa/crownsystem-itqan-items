@@ -69,6 +69,44 @@ final class ProductionCost
         ];
     }
 
+    /**
+     * نصيب كل صنف منتج من التكلفة الكلية: بالوزن ان كان لكل الاصناف المنتجة وزن (كمقاطع
+     * الالمنيوم)، والا بالكمية؛ والفرق من التقريب على آخر صنف فيبقى المجموع مساوياً للكلية.
+     *
+     * @param  iterable<int|string, array<string, mixed>>  $outputs
+     * @return list<float>
+     */
+    public static function allocate(iterable $outputs, mixed $totalCost): array
+    {
+        $outputs = array_values(collect($outputs)->all());
+        $total = round(self::number($totalCost), 4);
+        $byWeight = $outputs !== [] && collect($outputs)->every(fn (array $line): bool => self::number($line['weight'] ?? 0) > 0);
+        $bases = array_map(fn (array $line): float => self::number($byWeight ? ($line['weight'] ?? 0) : ($line['quantity'] ?? 0)), $outputs);
+        $sum = array_sum($bases);
+
+        if ($sum <= 0) {
+            return array_map(fn (int $index): float => $index === 0 ? $total : 0.0, array_keys($outputs));
+        }
+
+        $shares = array_map(fn (float $base): float => round($total * $base / $sum, 4), $bases);
+        $last = array_key_last($shares);
+        $shares[$last] = round($total - (array_sum($shares) - $shares[$last]), 4);
+
+        return $shares;
+    }
+
+    /**
+     * الكمية المنتجة: مجموع كميات الاصناف المنتجة ان وُجدت، والا ما كُتب في الأمر.
+     *
+     * @param  iterable<int|string, array<string, mixed>>  $outputs
+     */
+    public static function producedQuantity(iterable $outputs, mixed $fallback): float
+    {
+        $quantity = round(collect($outputs)->sum(fn (array $line): float => self::number($line['quantity'] ?? 0)), 4);
+
+        return $quantity > 0 ? $quantity : self::number($fallback);
+    }
+
     public static function number(mixed $value): float
     {
         if (is_string($value)) {

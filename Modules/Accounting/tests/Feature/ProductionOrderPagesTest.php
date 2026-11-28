@@ -4,28 +4,44 @@ namespace Modules\Accounting\tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia as Assert;
 use Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter;
 use Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect;
+use Modules\Accounting\database\seeders\AccountMappingSeeder;
+use Modules\Accounting\database\seeders\DefaultChartOfAccountsSeeder;
+use Modules\Accounting\Entities\Account;
+use Modules\Accounting\Entities\AccountingPeriod;
+use Modules\Accounting\Entities\FiscalYear;
 use Modules\Accounting\Entities\ProductionOrder;
 use Modules\Accounting\Entities\SalesOrder;
+use Modules\Accounting\Entities\StockMovement;
+use Modules\Accounting\Entities\Warehouse;
+use Modules\Accounting\Enums\AccountingPeriodStatus;
 use Modules\Accounting\Enums\ProductionOrderStatus;
 use Modules\Accounting\Enums\SalesOrderStatus;
+use Modules\Accounting\Enums\StockMovementType;
+use Modules\Accounting\Services\StockLedgerService;
 use Modules\Accounting\tests\Unit\ConsolidatedTestFactory;
 use Modules\Core\Entities\User;
+use Modules\Items\Entities\Product;
 use Modules\Items\Enums\ItemType;
 use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
 /**
  * شاشات قسم الإنتاج في لوحة Vue: القائمة، الاضافة من طلبية بيع، التعديل مع معاينة التكلفة،
- * ومراحل الأمر (بدء، انهاء، اعادة فتح، الغاء، حذف) وكلٌّ بصلاحيته.
+ * ومراحل الأمر (بدء، ترحيل يحرّك المخزون، اعادة فتح تعكسه، الغاء، حذف) وكلٌّ بصلاحيته.
  */
 class ProductionOrderPagesTest extends TestCase
 {
     use RefreshDatabase;
 
     private const PERMISSIONS = ['View List', 'View', 'Create', 'Update', 'Delete', 'Start', 'Complete', 'Cancel'];
+
+    private Warehouse $warehouse;
+
+    private Product $finished;
 
     protected function setUp(): void
     {
@@ -38,6 +54,42 @@ class ProductionOrderPagesTest extends TestCase
         }
 
         Permission::findOrCreate('Sales Order Update', 'web');
+
+        // الترحيل يسجّل قيداً: سنة وفترة مفتوحتان وشجرة الحسابات.
+        $year = FiscalYear::create([
+            'name' => 'FY', 'starts_at' => now()->startOfYear()->toDateString(), 'ends_at' => now()->endOfYear()->toDateString(),
+            'status' => AccountingPeriodStatus::OPEN->value(), 'is_default' => true,
+        ]);
+        AccountingPeriod::create([
+            'fiscal_year_id' => $year->id, 'name' => 'P', 'starts_at' => now()->startOfMonth()->toDateString(),
+            'ends_at' => now()->endOfMonth()->toDateString(), 'status' => AccountingPeriodStatus::OPEN->value(),
+        ]);
+        $this->seed(DefaultChartOfAccountsSeeder::class);
+        $this->seed(AccountMappingSeeder::class);
+
+        $this->warehouse = Warehouse::create(['code' => 'WH1', 'is_active' => true]);
+        $this->warehouse->translateOrNew('ar')->name = 'المخزن الرئيسي';
+        $this->warehouse->save();
+
+        $this->finished = ConsolidatedTestFactory::product();
+    }
+
+    private function stock(Product $product, float $quantity, float $unitCost, float $weight = 0): void
+    {
+        app(StockLedgerService::class)->receive([
+            'product_id' => $product->id,
+            'warehouse_id' => $this->warehouse->id,
+            'quantity' => $quantity,
+            'weight' => $weight,
+            'unit_cost' => $unitCost,
+            'type' => StockMovementType::OPENING,
+            'date' => now()->toDateString(),
+        ]);
+    }
+
+    private function onHand(Product $product): float
+    {
+        return app(StockLedgerService::class)->onHand($product->id, $this->warehouse->id);
     }
 
     private function signIn(?array $actions = null): User
@@ -47,6 +99,15 @@ class ProductionOrderPagesTest extends TestCase
         $this->actingAs($user);
 
         return $user;
+    }
+
+    /**
+     * الاجراء نجح، والا يظهر سبب رفضه في رسالة الفشل.
+     */
+    private function assertActionDone(TestResponse $response): void
+    {
+        $this->assertNull(session('error'), (string) session('error'));
+        $response->assertSessionHas('success');
     }
 
     /**
@@ -79,10 +140,12 @@ class ProductionOrderPagesTest extends TestCase
             'sales_order_id' => $salesOrder->id,
             'order_date' => now()->toDateString(),
             'currency_id' => $salesOrder->currency_id,
+            'warehouse_id' => $this->warehouse->id,
             'produced_quantity' => 4,
             'materials' => [['sales_order_item_id' => $line->id, 'product_id' => $line->product_id, 'description' => 'باب', 'pricing_type' => 'simple', 'quantity' => 4, 'weight' => 0, 'unit_cost' => 8]],
             'labor' => [['worker_name' => 'عامل', 'description' => 'تجميع', 'rate_basis' => 'hour', 'quantity' => 10, 'rate' => 15]],
             'services' => [],
+            'outputs' => [['product_id' => $this->finished->id, 'quantity' => 4]],
         ], $overrides);
     }
 
@@ -134,13 +197,32 @@ class ProductionOrderPagesTest extends TestCase
         $this->assertSame(82.0, (float) $order->total_cost, 'Lump-sum wage counts once: 32 + 50.');
         $this->assertSame(SalesOrderStatus::PREPARING, $salesOrder->refresh()->status);
 
-        $this->post(route('accounting.production-orders.complete', $order))->assertSessionHas('success');
-        $this->assertSame(ProductionOrderStatus::COMPLETED, $order->refresh()->status);
+        // الترحيل بلا رصيد يُرفض؛ ثم بالرصيد تخرج الابواب الاربعة ويدخل المنتَج بتكلفته (32 + 50).
+        $material = Product::query()->findOrFail($salesOrder->items()->value('product_id'));
+        $this->post(route('accounting.production-orders.complete', $order))->assertSessionHas('error');
+        $this->assertSame(ProductionOrderStatus::IN_PROGRESS, $order->refresh()->status);
 
-        // المكتمل للقراءة فقط: التعديل يُرفض، ويُعاد فتحه.
+        $this->stock($material, 4, 8);
+        $this->assertActionDone($this->post(route('accounting.production-orders.complete', $order)));
+        $order->refresh();
+        $this->assertSame(ProductionOrderStatus::COMPLETED, $order->status);
+        $this->assertSame(0.0, $this->onHand($material));
+        $this->assertSame(4.0, $this->onHand($this->finished));
+        $this->assertSame(82.0, (float) StockMovement::query()->where('product_id', $this->finished->id)->where('type', StockMovementType::PRODUCTION_IN->value)->sum('total_cost'));
+        $this->assertSame(20.5, (float) $order->outputs()->value('unit_cost'));
+
+        // القيد: الأجر المقطوع (50) محمّل على المنتَج من حساب التكاليف المحمّلة.
+        $this->assertNotNull($order->journal_entry_id);
+        $applied = Account::query()->where('code', '5170')->value('id');
+        $this->assertSame(50.0, (float) $order->journalEntry->lines()->where('account_id', $applied)->sum('credit'));
+
+        // المرحّل للقراءة فقط: التعديل يُرفض، واعادة الفتح تعكس المخزون والقيد.
         $this->put(route('accounting.production-orders.update', $order), $this->payload($salesOrder))->assertSessionHas('error');
         $this->post(route('accounting.production-orders.reopen', $order))->assertSessionHas('success');
         $this->assertSame(ProductionOrderStatus::IN_PROGRESS, $order->refresh()->status);
+        $this->assertNull($order->journal_entry_id);
+        $this->assertSame(4.0, $this->onHand($material));
+        $this->assertSame(0.0, $this->onHand($this->finished));
 
         $this->post(route('accounting.production-orders.cancel', $order))->assertSessionHas('success');
         $this->assertSame(ProductionOrderStatus::CANCELLED, $order->refresh()->status);
@@ -148,6 +230,59 @@ class ProductionOrderPagesTest extends TestCase
         // الملغى لا يُحذف (الحذف للمسودة فقط).
         $this->delete(route('accounting.production-orders.destroy', $order))->assertSessionHas('error');
         $this->assertNotNull(ProductionOrder::query()->find($order->id));
+    }
+
+    /**
+     * كاتقان: الموزون يخرج بالكغم (الصنف الرئيسي)، والمقطع بعدده وكغمه على صنفه الرئيسي، والصنف
+     * بالكمية بكميته؛ والتكلفة الكلية تتوزع على الاصناف المنتجة بالكمية.
+     */
+    public function test_posting_issues_weight_and_quantity_items_and_shares_the_cost(): void
+    {
+        $this->signIn();
+        $aluminium = ConsolidatedTestFactory::product('weight');
+        $piece = ConsolidatedTestFactory::product('weight', 6);
+        $piece->forceFill(['main_product_id' => $aluminium->id])->save();
+        $screws = ConsolidatedTestFactory::product();
+        $other = ConsolidatedTestFactory::product();
+
+        $this->stock($aluminium, 40, 6, 40);
+        $this->stock($piece, 2, 0, 18);
+        $this->stock($screws, 10, 4);
+
+        $this->post(route('accounting.production-orders.store'), [
+            'order_date' => now()->toDateString(),
+            'currency_id' => ConsolidatedTestFactory::currency()->id,
+            'warehouse_id' => $this->warehouse->id,
+            'produced_quantity' => 1,
+            'materials' => [
+                ['product_id' => $aluminium->id, 'pricing_type' => 'weight', 'quantity' => 1, 'weight' => 12.5],
+                // مقطع بلا وزن مكتوب: وزنه الطول × وزن المتر = 6 × 1.5 = 9 كغم.
+                ['product_id' => $piece->id, 'pricing_type' => 'weight', 'quantity' => 1, 'weight' => 0],
+                ['product_id' => $screws->id, 'pricing_type' => 'simple', 'quantity' => 3],
+            ],
+            'services' => [['description' => 'دهان', 'cost_source' => 'internal', 'pricing_basis' => 'quantity', 'quantity' => 1, 'unit_cost' => 10]],
+            'outputs' => [
+                ['product_id' => $this->finished->id, 'quantity' => 2],
+                ['product_id' => $other->id, 'quantity' => 3],
+            ],
+        ])->assertRedirect();
+
+        $order = ProductionOrder::query()->firstOrFail();
+        $this->assertSame(5.0, (float) $order->produced_quantity, 'Produced quantity is the total of the produced items.');
+
+        $this->assertActionDone($this->post(route('accounting.production-orders.complete', $order)));
+
+        // 12.5 كغم + 9 كغم للمقطع = 21.5 كغم × 6 = 129، والبراغي 3 × 4 = 12، والدهان 10.
+        $this->assertSame(18.5, $this->onHand($aluminium));
+        $this->assertSame(1.0, $this->onHand($piece));
+        $this->assertSame(7.0, $this->onHand($screws));
+        $this->assertSame(151.0, (float) $order->refresh()->total_cost);
+
+        $outputs = $order->outputs;
+        $this->assertSame(60.4, (float) $outputs[0]->total_cost);
+        $this->assertSame(90.6, (float) $outputs[1]->total_cost);
+        $this->assertSame(2.0, $this->onHand($this->finished));
+        $this->assertSame(3.0, $this->onHand($other));
     }
 
     public function test_cost_preview_matches_saving_and_the_form_endpoints_answer(): void

@@ -5,6 +5,7 @@ namespace Modules\Items\Support;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Support\Search\SearchIndex;
 use Modules\Items\Entities\Category;
 use Modules\Items\Enums\CategoryStatus;
 use Modules\Items\Support\Search\SearchCapabilities;
@@ -129,19 +130,14 @@ class CategorySearch
 
         $productsTable = config('items.table_prefix').'products';
         $pivotTable = config('items.table_prefix').'products_categories';
-        $translationsTable = config('items.table_prefix').'product_translations';
 
         return DB::table($pivotTable.' as pivot')
             ->join($productsTable.' as products', 'products.id', '=', 'pivot.product_id')
-            ->leftJoin($translationsTable.' as translations', function ($join) {
-                $join->on('translations.product_id', '=', 'products.id')
-                    ->where('translations.locale', '=', app()->getLocale());
-            })
             ->whereIn('pivot.category_id', $categoryIds)
             ->whereNull('products.parent_id')
             ->whereNull('products.deleted_at')
             ->groupBy('products.id')
-            ->orderByRaw('MIN(translations.name)')
+            ->orderBy('products.sku') // ترتيب بنية الاصناف (Product::scopeCatalogOrder)
             ->limit(max($limit, 1))
             ->pluck('products.id')
             ->map(fn ($id): int => (int) $id)
@@ -184,8 +180,7 @@ class CategorySearch
         }
 
         return $query
-            ->orderBy('sort_order')
-            ->orderBy('id')
+            ->catalogOrder()
             ->limit($limit)
             ->pluck('id')
             ->map(fn ($id): int => (int) $id)
@@ -219,11 +214,17 @@ class CategorySearch
     private static function constrain(Builder $query, SearchQuery $searchQuery): Builder
     {
         $like = '%'.SearchQuery::escapeLike($searchQuery->raw).'%';
+        // ومن محرك البحث ما يطابق مع خطأ املائي او بلغة لوحة المفاتيح الاخرى.
+        $engineIds = SearchIndex::ids(Category::class, $searchQuery->raw, 1000) ?? [];
 
-        return $query->where(function (Builder $query) use ($searchQuery, $like) {
+        return $query->where(function (Builder $query) use ($searchQuery, $like, $engineIds) {
             $query
                 ->where('code', 'like', SearchQuery::escapeLike($searchQuery->raw).'%')
                 ->orWhereHas('translations', fn (Builder $translations) => $translations->where('name', 'like', $like));
+
+            if ($engineIds !== []) {
+                $query->orWhereIntegerInRaw($query->qualifyColumn('id'), $engineIds);
+            }
 
             if (SearchCapabilities::hasCategoryIndex()) {
                 $query->orWhere(function (Builder $index) use ($searchQuery) {

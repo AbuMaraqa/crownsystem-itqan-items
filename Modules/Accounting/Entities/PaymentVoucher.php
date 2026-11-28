@@ -11,6 +11,7 @@ use Modules\Accounting\Enums\AccountingPaymentMethod;
 use Modules\Accounting\Enums\JournalEntryStatus;
 use Modules\Accounting\Enums\PaymentVoucherStatus;
 use Modules\Branch\Entities\Branch;
+use Modules\Core\Entities\Concerns\HasSearchIndex;
 use Modules\Core\Entities\Currency;
 use Modules\Core\Entities\User;
 use Spatie\Activitylog\LogOptions;
@@ -19,8 +20,19 @@ use Spatie\Activitylog\Traits\LogsActivity;
 class PaymentVoucher extends Model
 {
     use HasFactory;
+    use HasSearchIndex;
     use LogsActivity;
     use SoftDeletes;
+
+    /**
+     * البحث في سندات الصرف: بالرقم المرجعي والملاحظات ورقم الشيك.
+     *
+     * @return list<string>
+     */
+    public static function searchColumns(): array
+    {
+        return ['reference_no', 'notes', 'cheque_number'];
+    }
 
     protected $fillable = [
         'client_id',

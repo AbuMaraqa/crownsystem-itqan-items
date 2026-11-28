@@ -11,6 +11,7 @@ use Modules\Accounting\Enums\PurchaseInvoiceStatus;
 use Modules\Accounting\Enums\PurchaseOrderDeliveryType;
 use Modules\Accounting\Enums\PurchaseOrderStatus;
 use Modules\Branch\Entities\Branch;
+use Modules\Core\Entities\Concerns\HasSearchIndex;
 use Modules\Core\Entities\Currency;
 use Modules\Core\Entities\User;
 use Spatie\Activitylog\LogOptions;
@@ -21,9 +22,20 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 class PurchaseOrder extends Model implements HasMedia
 {
     use HasFactory;
+    use HasSearchIndex;
     use InteractsWithMedia;
     use LogsActivity;
     use SoftDeletes;
+
+    /**
+     * البحث في اوامر الشراء: بالرقم المرجعي والملاحظات.
+     *
+     * @return list<string>
+     */
+    public static function searchColumns(): array
+    {
+        return ['reference_no', 'notes'];
+    }
 
     protected $fillable = [
         'client_id',

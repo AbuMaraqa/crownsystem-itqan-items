@@ -10,6 +10,7 @@ use Modules\Accounting\Entities\Warehouse;
 use Modules\Accounting\Support\Number;
 use Modules\Accounting\Support\SelectOptions;
 use Modules\Core\Entities\User;
+use Modules\Core\Support\Search\SearchConstraint;
 use Spatie\QueryBuilder\AllowedFilter;
 
 /**
@@ -47,12 +48,8 @@ trait PurchaseDocumentPage
     protected function partyFilter(string $name = 'client', string $relation = 'client'): AllowedFilter
     {
         return AllowedFilter::callback($name, function (Builder $query, mixed $value) use ($relation): void {
-            $term = $this->likeTerm($value);
-
-            $query->whereHas($relation, fn (Builder $query) => $query->where(fn (Builder $query) => $query
-                ->whereLike('name', $term)
-                ->orWhereLike('phone', $term)
-                ->orWhereLike('email', $term)));
+            // في فهرس المستخدمين (يتحمل الخطأ الاملائي)، او بقاعدة البيانات اذا لم يعمل المحرك.
+            $query->whereHas($relation, fn (Builder $query) => SearchConstraint::apply($query, (string) $value, User::searchColumns()));
         });
     }
 

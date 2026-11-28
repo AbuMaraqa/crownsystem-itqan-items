@@ -7,7 +7,9 @@ use Illuminate\Support\ServiceProvider;
 use Modules\Accounting\Console\Commands\BackfillUserAccounts;
 use Modules\Accounting\Console\Commands\RebuildAccountBalances;
 use Modules\Accounting\Console\Commands\SwitchBaseCurrency;
+use Modules\Accounting\Entities;
 use Modules\Accounting\Observers\DocumentNotificationObserver;
+use Modules\Core\Support\Search\SearchIndex;
 use Nwidart\Modules\Traits\PathNamespace;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -37,6 +39,29 @@ class AccountingServiceProvider extends ServiceProvider
         $this->app->register(RouteServiceProvider::class);
         $this->app->register(RepositoryServiceProvider::class);
         $this->app->register(SidebarServiceProvider::class);
+
+        // المستندات المفهرسة في محرك البحث (اعمدتها في searchColumns() بكل موديل).
+        SearchIndex::register(
+            Entities\SalesQuotation::class,
+            Entities\SalesOrder::class,
+            Entities\SalesInvoice::class,
+            Entities\SalesReturn::class,
+            Entities\PurchaseQuotation::class,
+            Entities\PurchaseOrder::class,
+            Entities\PurchaseInvoice::class,
+            Entities\PurchaseReturn::class,
+            Entities\ConsolidatedPurchaseOrder::class,
+            Entities\ReceiptVoucher::class,
+            Entities\PaymentVoucher::class,
+            Entities\Cheque::class,
+            Entities\JournalEntry::class,
+            Entities\PeriodClosingVoucher::class,
+            Entities\GoodsReceipt::class,
+            Entities\DeliveryNote::class,
+            Entities\StockTransfer::class,
+            Entities\StockAdjustment::class,
+            Entities\ProductionOrder::class,
+        );
     }
 
     protected function registerCommands(): void

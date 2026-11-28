@@ -60,7 +60,7 @@ class SalesOrderController extends Controller
 
         return Inertia::render('Accounting/SalesOrder/Index', [
             'table' => AdminTable::for($this->orders->tableQuery())
-                ->search(['reference_no', 'notes'], null)
+                ->search()
                 ->filters(
                     AdminFilter::text('reference_no'),
                     $this->referenceFilter('sales_quotation', 'salesQuotation'),

@@ -39,7 +39,7 @@ class ChequeController extends Controller
     {
         return Inertia::render('Accounting/Cheque/Index', [
             'table' => AdminTable::for($this->cheques->tableQuery())
-                ->search(['cheque_number', 'bank_name'], null)
+                ->search()
                 ->filters(
                     AdminFilter::text('cheque_number'),
                     // الطرف بالاسم او الهاتف او البريد، كبحث حقل الطرف (PartySelect).

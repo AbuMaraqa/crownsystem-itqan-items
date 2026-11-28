@@ -5,6 +5,8 @@ namespace Modules\Core\Support;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Modules\Core\Entities\Concerns\HasSearchIndex;
+use Modules\Core\Support\Search\SearchConstraint;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -30,6 +32,9 @@ class AdminTable
 
     /** The column the rows are dragged by, or null when the table cannot be reordered. */
     private ?string $reorderColumn = null;
+
+    /** @var list<string> Columns that order rows sharing one position, before the id. */
+    private array $reorderTies = [];
 
     private function __construct(private readonly Builder $query) {}
 
@@ -72,12 +77,16 @@ class AdminTable
     }
 
     /**
-     * Rows ordered by hand (drag and drop): sorted by `$column` by default, ties by id. The model uses
+     * Rows ordered by hand (drag and drop): sorted by `$column` by default, ties by `$thenBy` (e.g. a
+     * category code, so rows never dragged keep the catalog structure) and finally by id. The model uses
      * `Modules\Core\Entities\Concerns\HasSortOrder` and its controller `ReordersRecords`.
+     *
+     * @param  list<string>  $thenBy
      */
-    public function reorderable(string $column = 'sort_order'): self
+    public function reorderable(string $column = 'sort_order', array $thenBy = []): self
     {
         $this->reorderColumn = $column;
+        $this->reorderTies = $thenBy;
         $this->defaultSort = $column;
 
         return $this;
@@ -87,39 +96,35 @@ class AdminTable
      * A free text search on the given translated column (and plain columns), case-insensitive.
      * A column on a related model is written `relation.column` (e.g. `user.name` for the customer).
      *
+     * A model with a search index (`HasSearchIndex`) is searched in the search engine (Meilisearch:
+     * typo tolerant, Arabic letters unified, best match first unless the user picked a sort) on its
+     * `searchColumns()`, plus the given columns; a related model with its own index (e.g. `client.name`)
+     * is searched in its index. When the engine is off or down, the same columns are searched in the
+     * database (`SearchConstraint`).
+     *
      * @param  list<string>  $columns
      */
     public function search(array $columns = [], ?string $translated = 'name'): self
     {
+        $model = $this->query->getModel();
+
+        if (in_array(HasSearchIndex::class, class_uses_recursive($model), true)) {
+            $columns = array_values(array_unique([...$model::searchColumns(), ...$columns]));
+            $translated = null;
+        }
+
         $this->filters[] = AdminFilter::typed(AllowedFilter::callback('search', function (Builder $query, mixed $value) use ($columns, $translated): void {
-            $term = '%'.addcslashes(trim((string) $value), '%_\\').'%';
-
-            $query->where(function (Builder $query) use ($columns, $translated, $term): void {
-                foreach ($columns as $column) {
-                    if (str_contains($column, '.')) {
-                        [$relation, $field] = [substr($column, 0, strrpos($column, '.')), substr($column, strrpos($column, '.') + 1)];
-                        $query->orWhereHas($relation, fn (Builder $query) => $query->whereLike($query->qualifyColumn($field), $term));
-
-                        continue;
-                    }
-
-                    $query->orWhereLike($column, $term);
-                }
-
-                if ($translated !== null) {
-                    $query->orWhereHas('translations', fn (Builder $query) => $query->whereLike($translated, $term));
-                }
-            });
+            SearchConstraint::apply($query, (string) $value, $columns, $translated, orderByRelevance: ! request()->filled('sort'));
         }), AdminFilter::TEXT);
 
         return $this;
     }
 
     /**
-     * @param  Closure(mixed): array<string, mixed>  $row
      * Wrong input in the link (an unknown filter, a bad date, a sort or page size the table does not have)
      * never breaks the page: it falls back to the default and its message goes out in `warnings`.
      *
+     * @param  Closure(mixed): array<string, mixed>  $row
      * @return array{data: list<array<string, mixed>>, meta: array<string, int|null>, query: array<string, mixed>, warnings: object, reorder: string|null}
      */
     public function rows(Closure $row, ?Request $request = null): array
@@ -142,6 +147,10 @@ class AdminTable
 
         if ($this->reorderColumn !== null) {
             // Equal positions (new rows, old data) still keep one stable order to drag.
+            foreach ($this->reorderTies as $column) {
+                $builder->orderBy($this->query->qualifyColumn($column));
+            }
+
             $builder->orderBy($this->query->getModel()->getQualifiedKeyName());
         }
 

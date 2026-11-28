@@ -1,55 +1,41 @@
-<!doctype html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    @include('core::pdf.partials.styles')
-    <style>
-        @page {
-            header: doc-header;
-            footer: doc-footer;
-            margin-top: 32mm;
-            margin-bottom: 14mm;
-            margin-left: 10mm;
-            margin-right: 10mm;
-        }
-    </style>
-</head>
-<body>
-    @include('core::pdf.partials.header', ['docTitle' => __('Quote Request')])
-    @include('core::pdf.partials.footer')
+{{-- طلب عرض سعر للمورد من الطلبية المجمعة: البنود بكمياتها وخانة فارغة للسعر. --}}
+@php
+    $docTitle = __('Quote Request');
+    $party = ['name' => $supplier->name];
+    $meta = [
+        [__('Date'), now()->format('d/m/Y')],
+        [__('Reference No'), $order->reference_no],
+    ];
+    $signatures = [__('Supplier Signature'), __('Employee Signature')];
+@endphp
 
-    <p>{{ now()->toDateString() }}</p>
+@extends('core::pdf.document')
 
-    <p><strong>{{ __('To') }}:</strong> {{ $supplier->name }}</p>
-
-    <h3>{{ __('New Quote Request') }} - {{ $order->reference_no }}</h3>
-
-    <p>{{ __('Please provide your best price offer for the below mentioned items:') }}</p>
+@section('content')
+    <p style="margin-bottom: 3mm;">{{ __('Please provide your best price offer for the below mentioned items:') }}</p>
 
     <table class="items">
         <thead>
             <tr>
                 <th style="width: 6%;">#</th>
-                <th>{{ __('Description') }}</th>
-                <th class="text-end" style="width: 15%;">{{ __('Quantity') }}</th>
-                <th class="text-end" style="width: 20%;">{{ __('Price') }}</th>
+                <th>{{ __('Item Name') }}</th>
+                <th style="width: 15%;">{{ __('Quantity') }}</th>
+                <th style="width: 20%;">{{ __('Unit Price') }}</th>
             </tr>
         </thead>
         <tbody>
             @forelse ($order->items as $item)
-                @php $isWeightPriced = $item->isWeightPricedLine(); @endphp
                 <tr>
                     <td>{{ $loop->iteration }}</td>
-                    <td>{{ $item->description }}</td>
-                    <td class="text-end">{{ number_format((float) ($isWeightPriced ? $item->total_weight : $item->quantity), 3) }}</td>
-                    <td class="text-end"></td>
+                    <td class="start">{{ $item->description }}</td>
+                    <td>{{ \Modules\Accounting\Support\Number::quantity($item->isWeightPricedLine() ? $item->total_weight : $item->quantity) }}</td>
+                    <td></td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="4" class="text-center">{{ __('No data available') }}</td>
+                    <td colspan="4">{{ __('No data available') }}</td>
                 </tr>
             @endforelse
         </tbody>
     </table>
-</body>
-</html>
+@endsection

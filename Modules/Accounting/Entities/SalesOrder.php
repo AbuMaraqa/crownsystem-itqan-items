@@ -12,6 +12,7 @@ use Modules\Accounting\Enums\SalesInvoiceStatus;
 use Modules\Accounting\Enums\SalesOrderFulfillmentType;
 use Modules\Accounting\Enums\SalesOrderStatus;
 use Modules\Branch\Entities\Branch;
+use Modules\Core\Entities\Concerns\HasSearchIndex;
 use Modules\Core\Entities\Currency;
 use Modules\Core\Entities\User;
 use Spatie\Activitylog\LogOptions;
@@ -20,8 +21,19 @@ use Spatie\Activitylog\Traits\LogsActivity;
 class SalesOrder extends Model
 {
     use HasFactory;
+    use HasSearchIndex;
     use LogsActivity;
     use SoftDeletes;
+
+    /**
+     * البحث في طلبيات البيع: بالرقم المرجعي والملاحظات.
+     *
+     * @return list<string>
+     */
+    public static function searchColumns(): array
+    {
+        return ['reference_no', 'notes'];
+    }
 
     protected $fillable = [
         'sales_quotation_id',

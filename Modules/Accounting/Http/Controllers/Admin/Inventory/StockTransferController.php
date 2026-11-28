@@ -19,8 +19,8 @@ use Modules\Accounting\Http\Controllers\Admin\Concerns\DeletesManyDocuments;
 use Modules\Accounting\Http\Controllers\Admin\Inventory\Concerns\InventoryDocumentPages;
 use Modules\Accounting\Http\Requests\Admin\Inventory\StockTransferRequest;
 use Modules\Accounting\Repositories\Contracts\StockTransferRepositoryInterface;
-use Modules\Accounting\Services\StockTransferService;
 use Modules\Accounting\Services\InventoryPdfService;
+use Modules\Accounting\Services\StockTransferService;
 use Modules\Accounting\Support\InventoryLines;
 use Modules\Accounting\Support\Number;
 use Modules\Accounting\Support\SelectOptions;
@@ -47,7 +47,6 @@ class StockTransferController extends Controller
             'table' => $this->documentTable(
                 $this->transfers->tableQuery(),
                 'transfer_date',
-                ['notes'],
                 [],
                 ['from_warehouse_id', 'to_warehouse_id'],
                 [AdminFilter::exact('from_warehouse', 'from_warehouse_id'), AdminFilter::exact('to_warehouse', 'to_warehouse_id')],

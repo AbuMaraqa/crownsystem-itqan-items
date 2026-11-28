@@ -41,7 +41,7 @@ class UserController extends Controller
     {
         return Inertia::render('Core/Users/Index', [
             'table' => AdminTable::for($this->users->tableQuery())
-                ->search(['name', 'email', 'phone'], null)
+                ->search()
                 ->filters(
                     AdminFilter::relation('role', 'roles'),
                     AdminFilter::relation('branch', 'branch'),

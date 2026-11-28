@@ -99,6 +99,7 @@ class StockBalancesService
             return [
                 'id' => $product->id,
                 'image' => $product->image ?: null,
+                'sku' => $product->sku,
                 'barcode' => $product->barcode,
                 'name' => $product->name,
                 'detail' => $main ? __('Total of :count sub-items', ['count' => $main['sub_items']]) : $product->mainProduct?->name,

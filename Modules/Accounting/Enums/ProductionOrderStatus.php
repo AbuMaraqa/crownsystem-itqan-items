@@ -28,7 +28,7 @@ enum ProductionOrderStatus: int implements HasLabel, HasColor
         return match ($this) {
             self::DRAFT => __('Draft'),
             self::IN_PROGRESS => __('In Production'),
-            self::COMPLETED => __('Completed'),
+            self::COMPLETED => __('Posted'),
             self::CANCELLED => __('Cancelled'),
         };
     }

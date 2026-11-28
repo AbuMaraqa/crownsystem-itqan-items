@@ -6,6 +6,7 @@ use Closure;
 use DomainException;
 use Modules\Accounting\Entities\StockBalance;
 use Modules\Accounting\Services\StockLedgerService;
+use Modules\Core\Support\Search\TextNormalizer;
 use Modules\Items\Entities\Product;
 use Modules\Items\Entities\ProductAccessory;
 use Modules\Items\Enums\ItemType;
@@ -17,7 +18,6 @@ use Modules\Items\Support\PriceGroupSearch;
 use Modules\Items\Support\PriceResolver;
 use Modules\Items\Support\ProductSearch;
 use Modules\Items\Support\ResolvedBarcode;
-use Modules\Items\Support\Search\TextNormalizer;
 
 /**
  * منطق جدول الاصناف الموحد على السيرفر: البحث، تفاصيل الصنف المختار وسعره للطرف، الباركود،
@@ -126,7 +126,7 @@ final class ItemsGrid
             ->whereIn('parent_id', $productIds)
             ->whereNotNull('category_finish_id')
             ->where('is_active', 1)
-            ->orderBy('id')
+            ->catalogOrder()
             ->get();
         $labels = ProductSearch::labels($variations->modelKeys());
         $groups = PriceGroupSearch::labels($variations->pluck('category_finish_id')->unique()->all());
@@ -225,7 +225,7 @@ final class ItemsGrid
      */
     private static function groupVariationOptions(int $groupId, string $term, int $limit = 25): array
     {
-        $ids = Product::query()->where('category_finish_id', $groupId)->where('is_active', 1)->whereNotNull('parent_id')->orderBy('id')->pluck('id')->all();
+        $ids = Product::query()->where('category_finish_id', $groupId)->where('is_active', 1)->whereNotNull('parent_id')->catalogOrder()->pluck('id')->all();
         $labels = ProductSearch::labels($ids);
         $words = TextNormalizer::words($term);
 
@@ -374,7 +374,7 @@ final class ItemsGrid
         $candidates = Product::query()
             ->with('translations')
             ->where('main_product_id', (int) $mainProductId)
-            ->orderBy('sku')
+            ->catalogOrder()
             ->get()
             ->groupBy(fn (Product $product): string => trim((string) $product->name))
             ->map(fn ($group) => $group->pluck('id')->all())

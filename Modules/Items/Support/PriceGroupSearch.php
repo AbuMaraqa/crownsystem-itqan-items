@@ -3,8 +3,8 @@
 namespace Modules\Items\Support;
 
 use Illuminate\Support\Collection;
+use Modules\Core\Support\Search\TextNormalizer;
 use Modules\Items\Entities\CategoryFinish;
-use Modules\Items\Support\Search\TextNormalizer;
 
 /**
  * بحث مجموعات السعر (التصنيف × اللون) في خانة صنف المستند: «الوبين اب» يجد «الوبين — أبيض».

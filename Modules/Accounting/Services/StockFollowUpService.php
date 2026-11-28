@@ -6,6 +6,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Modules\Accounting\Entities\DeliveryNote;
+use Modules\Accounting\Entities\ProductionOrder;
 use Modules\Accounting\Entities\SalesInvoice;
 use Modules\Accounting\Entities\SalesReturn;
 use Modules\Accounting\Entities\StockAlert;
@@ -247,7 +248,7 @@ class StockFollowUpService
     }
 
     /**
-     * المسحوب لكل صنف بين تاريخين: الاخراج للبيع (سند تسليم او فاتورة) ناقص مرتجعات البيع،
+     * المسحوب لكل صنف بين تاريخين: الاخراج للبيع (سند تسليم او فاتورة) والصرف للإنتاج ناقص مرتجعات البيع،
      * مع عكس حركات المستندات الملغاة. تعديلات الجرد والتحويل لا تدخل.
      *
      * @param  array<int, int>  $productIds
@@ -265,8 +266,10 @@ class StockFollowUpService
             ->whereIn('product_id', $productIds)
             ->whereBetween('movement_date', [$from->toDateString(), $to->toDateString()])
             ->where(fn (Builder $q) => $q
-                ->whereIn('type', [StockMovementType::DELIVERY->value, StockMovementType::SALES_RETURN->value])
-                ->orWhere(fn (Builder $q) => $q->where('type', StockMovementType::REVERSAL->value)->whereIn('sourceable_type', $salesSources)))
+                ->whereIn('type', [StockMovementType::DELIVERY->value, StockMovementType::SALES_RETURN->value, StockMovementType::PRODUCTION_OUT->value])
+                ->orWhere(fn (Builder $q) => $q->where('type', StockMovementType::REVERSAL->value)->whereIn('sourceable_type', $salesSources))
+                // عكس صرف الإنتاج (اعادة فتح الأمر) يُرجع المسحوب؛ عكس ادخال المنتَج لا يُحسب سحباً.
+                ->orWhere(fn (Builder $q) => $q->where('type', StockMovementType::REVERSAL->value)->where('sourceable_type', (new ProductionOrder)->getMorphClass())->where('quantity', '>', 0)))
             ->groupBy('product_id')
             ->selectRaw('product_id, -SUM(quantity) as withdrawn')
             ->pluck('withdrawn', 'product_id')

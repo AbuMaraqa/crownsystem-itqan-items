@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Accounting\Entities\Concerns\IsInventoryDocument;
+use Modules\Core\Entities\Concerns\HasSearchIndex;
 use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
@@ -14,9 +15,20 @@ use Spatie\Activitylog\Traits\LogsActivity;
  */
 class StockTransfer extends Model
 {
+    use HasSearchIndex;
     use IsInventoryDocument;
     use LogsActivity;
     use SoftDeletes;
+
+    /**
+     * البحث في تحويلات المخزون: بالرقم المرجعي والملاحظات.
+     *
+     * @return list<string>
+     */
+    public static function searchColumns(): array
+    {
+        return ['reference_no', 'notes'];
+    }
 
     protected $fillable = [
         'reference_no',

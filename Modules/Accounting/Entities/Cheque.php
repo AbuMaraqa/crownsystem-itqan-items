@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Accounting\Enums\ChequeDirection;
 use Modules\Accounting\Enums\ChequeStatus;
 use Modules\Branch\Entities\Branch;
+use Modules\Core\Entities\Concerns\HasSearchIndex;
 use Modules\Core\Entities\Currency;
 use Modules\Core\Entities\User;
 use Spatie\Activitylog\LogOptions;
@@ -18,8 +19,19 @@ use Spatie\Activitylog\Traits\LogsActivity;
 class Cheque extends Model
 {
     use HasFactory;
+    use HasSearchIndex;
     use LogsActivity;
     use SoftDeletes;
+
+    /**
+     * البحث في الشيكات: برقم الشيك واسم البنك.
+     *
+     * @return list<string>
+     */
+    public static function searchColumns(): array
+    {
+        return ['cheque_number', 'bank_name'];
+    }
 
     protected $fillable = [
         'chequeable_type',

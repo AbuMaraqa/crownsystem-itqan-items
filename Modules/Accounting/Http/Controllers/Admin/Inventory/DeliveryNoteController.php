@@ -24,8 +24,8 @@ use Modules\Accounting\Services\InventoryPdfService;
 use Modules\Accounting\Support\InventoryLines;
 use Modules\Accounting\Support\SelectOptions;
 use Modules\Core\Support\AdminFilter;
-use Modules\Core\Support\UserCellData;
 use Modules\Core\Support\RecordInfo;
+use Modules\Core\Support\UserCellData;
 
 /**
  * سند التسليم: يُختار طلب البيع فتظهر سطوره المتبقية مع الرصيد المتاح ومكان الصنف، ويُطبع
@@ -48,7 +48,6 @@ class DeliveryNoteController extends Controller
             'table' => $this->documentTable(
                 $this->notes->tableQuery(),
                 'delivery_date',
-                ['driver_name', 'vehicle_no', 'receiver_name'],
                 ['salesOrder' => 'reference_no', 'client' => 'name'],
                 'warehouse_id',
                 [AdminFilter::text('driver_name'), $this->relationText('sales_order', 'salesOrder', 'reference_no'), $this->relationText('party', 'client', 'name')],

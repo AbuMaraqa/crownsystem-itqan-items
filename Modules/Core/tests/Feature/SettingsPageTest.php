@@ -11,6 +11,7 @@ use Modules\Core\Entities\AppVersion;
 use Modules\Core\Entities\Currency;
 use Modules\Core\Entities\User;
 use Modules\Core\Settings\GeneralSettings;
+use Modules\Core\Support\Letterhead;
 use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
@@ -84,6 +85,32 @@ class SettingsPageTest extends TestCase
         $this->assertEquals(7.5, $settings->weight_variance_tolerance);
         $this->assertSame('#C2410C', $settings->dashboard_color);
         $this->assertSame('cairo', $settings->dashboard_font);
+    }
+
+    public function test_the_print_header_is_saved_and_feeds_every_pdf(): void
+    {
+        // بلا اسم رسمي تُطبع المستندات باسم الموقع.
+        $this->put(route('settings.update'), $this->payload())->assertRedirect(route('settings'));
+        $this->assertSame('كراون', Letterhead::data()['name']);
+        $this->assertNull(Letterhead::data()['phone']);
+
+        $this->put(route('settings.update'), $this->payload([
+            'company_name' => ' كراون سيستم لتجارة الألومنيوم ',
+            'company_phone' => '+970 2 2227928',
+            'company_fax' => '+970 2 2290901',
+            'company_website' => 'www.crownsystem.co',
+        ]))->assertRedirect(route('settings'));
+
+        app()->forgetInstance(GeneralSettings::class);
+        $letterhead = Letterhead::data();
+        $this->assertSame('كراون سيستم لتجارة الألومنيوم', $letterhead['name']);
+        $this->assertSame('+970 2 2227928', $letterhead['phone']);
+        $this->assertSame('+970 2 2290901', $letterhead['fax']);
+        $this->assertSame('www.crownsystem.co', $letterhead['website']);
+        $this->assertSame('info@example.com', $letterhead['email']);
+        $this->assertFileExists($letterhead['corner']);
+
+        $this->get(route('settings'))->assertInertia(fn (Assert $page) => $page->where('settings.company_fax', '+970 2 2290901'));
     }
 
     public function test_a_color_too_light_for_white_text_is_refused(): void

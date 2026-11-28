@@ -138,7 +138,7 @@ class ItemStockCardService
         return Product::query()
             ->with('translations')
             ->whereIn('id', array_keys($levels))
-            ->orderBy('barcode')
+            ->catalogOrder()
             ->get()
             ->map(fn (Product $sub) => ['product' => $sub, 'levels' => $levels[$sub->id]]);
     }

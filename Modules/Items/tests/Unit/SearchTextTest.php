@@ -2,11 +2,11 @@
 
 namespace Modules\Items\tests\Unit;
 
-use Modules\Items\Support\Search\KeyboardLayout;
+use Modules\Core\Support\Search\KeyboardLayout;
+use Modules\Core\Support\Search\TextNormalizer;
 use Modules\Items\Support\Search\SearchHighlighter;
 use Modules\Items\Support\Search\SearchQuery;
 use Modules\Items\Support\Search\SearchScorer;
-use Modules\Items\Support\Search\TextNormalizer;
 use PHPUnit\Framework\TestCase;
 
 /**

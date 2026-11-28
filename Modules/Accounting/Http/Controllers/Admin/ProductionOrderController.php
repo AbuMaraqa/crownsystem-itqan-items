@@ -14,6 +14,7 @@ use Inertia\Response;
 use Modules\Accounting\Entities\ProductionOrder;
 use Modules\Accounting\Entities\ProductionOrderLabor;
 use Modules\Accounting\Entities\ProductionOrderMaterial;
+use Modules\Accounting\Entities\ProductionOrderOutput;
 use Modules\Accounting\Entities\ProductionOrderServiceLine;
 use Modules\Accounting\Entities\Warehouse;
 use Modules\Accounting\Enums\LaborRateBasis;
@@ -39,9 +40,9 @@ use Modules\Items\Support\ProductSearch;
 use Spatie\QueryBuilder\AllowedFilter;
 
 /**
- * أوامر الإنتاج: أمر ينفذ طلبية بيع، ببنود تكلفة من ثلاثة انواع (اصناف، أجور، خدمات)، ومراحله
- * مسودة ← قيد الإنتاج ← مكتمل (يُعاد فتحه) او ملغى. الحساب والقواعد كلها في
- * ProductionOrderService و ProductionCost؛ الصفحة تعرض معاينة التكلفة من نقطة cost-preview.
+ * أوامر الإنتاج (كاتقان): اصناف مدخلة، أجور وخدمات، واصناف منتجة؛ ومراحله مسودة ← قيد الإنتاج ←
+ * مرحّل (يحرّك المخزون، ويُعاد فتحه) او ملغى. الحساب والقواعد كلها في ProductionOrderService
+ * و ProductionCost؛ الصفحة تعرض معاينة التكلفة من نقطة cost-preview.
  */
 class ProductionOrderController extends Controller
 {
@@ -56,7 +57,7 @@ class ProductionOrderController extends Controller
     {
         return Inertia::render('Accounting/ProductionOrder/Index', [
             'table' => AdminTable::for($this->orders->tableQuery())
-                ->search(['reference_no'], null)
+                ->search()
                 ->filters(
                     AdminFilter::exact('status'),
                     AdminFilter::text('reference_no'),
@@ -110,6 +111,7 @@ class ProductionOrderController extends Controller
             'materials' => [],
             'labor' => [],
             'services' => [],
+            'outputs' => [],
         ];
         $context = ['sales_order' => null, 'client_label' => null, 'sales_amount' => 0];
 
@@ -240,7 +242,7 @@ class ProductionOrderController extends Controller
      */
     public function costPreview(Request $request): JsonResponse
     {
-        $preview = $this->service->costPreview($request->only(['materials', 'labor', 'services', 'produced_quantity', 'sales_order_id']));
+        $preview = $this->service->costPreview($request->only(['materials', 'labor', 'services', 'outputs', 'produced_quantity', 'sales_order_id']));
 
         return response()->json($preview);
     }
@@ -405,6 +407,14 @@ class ProductionOrderController extends Controller
                 'sent_date' => $line->sent_date?->toDateString(),
                 'received_date' => $line->received_date?->toDateString(),
                 'notes' => $line->notes,
+            ])->values()->all(),
+            'outputs' => $order->outputs->map(fn (ProductionOrderOutput $line): array => [
+                'product_id' => $line->product_id,
+                'product_label' => $line->product_id ? ProductSearch::label($line->product_id) : null,
+                'description' => $line->description,
+                'pricing_type' => $line->pricing_type,
+                'quantity' => Number::clean($line->quantity),
+                'weight' => Number::clean($line->weight),
             ])->values()->all(),
         ];
     }

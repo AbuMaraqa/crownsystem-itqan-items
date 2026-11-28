@@ -2,6 +2,8 @@
 
 namespace Modules\Items\Support\Search;
 
+use Modules\Core\Support\Search\TextNormalizer;
+
 /**
  * ترتيب المرشحين بالاقرب الى ما قصده المستخدم. الاوزان من الاقوى:
  * رقم الصنف او الباركود كما كُتب، ثم بدايته، ثم الاسم كما كُتب، ثم بدايته،

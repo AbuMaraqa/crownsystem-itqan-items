@@ -20,6 +20,7 @@ use Modules\Accounting\Entities\Account;
 use Modules\Accounting\Entities\CustomerGroup;
 use Modules\Branch\Entities\Branch;
 use Modules\Core\Entities\Concerns\HasCreator;
+use Modules\Core\Entities\Concerns\HasSearchIndex;
 use Modules\Core\Support\UserCellData;
 use Modules\Items\Entities\Order;
 use Spatie\MediaLibrary\HasMedia;
@@ -86,9 +87,20 @@ class User extends Authenticatable implements HasMedia
 
     use HasCreator;
     use HasRoles;
+    use HasSearchIndex;
     use InteractsWithMedia;
     use Notifiable;
     use TwoFactorAuthenticatable;
+
+    /**
+     * البحث في المستخدمين والزبائن والموردين: بالاسم والهاتف والبريد.
+     *
+     * @return list<string>
+     */
+    public static function searchColumns(): array
+    {
+        return ['name', 'phone', 'email'];
+    }
 
     /**
      * The attributes that are mass assignable.

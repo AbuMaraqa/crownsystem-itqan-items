@@ -38,7 +38,12 @@ class SettingService
             $this->general->dashboard_font = $data['dashboard_font'] ?? $this->general->dashboard_font;
             $this->general->stock_min_1_color = strtoupper($data['stock_min_1_color'] ?? $this->general->stock_min_1_color);
             $this->general->stock_min_2_color = strtoupper($data['stock_min_2_color'] ?? $this->general->stock_min_2_color);
-            $this->general->site_logo_url = $this->settings->logoHolder()->getFirstMediaUrl('logo') ?: null;
+            foreach (['company_name', 'company_phone', 'company_fax', 'company_website'] as $key) {
+                if (array_key_exists($key, $data)) {
+                    $this->general->{$key} = filled($data[$key]) ? trim($data[$key]) : null;
+                }
+            }
+            $this->general->site_logo_url =$this->settings->logoHolder()->getFirstMediaUrl('logo') ?: null;
             $this->general->save();
 
             if (array_key_exists('app_versions', $data)) {

@@ -7,10 +7,9 @@ use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Modules\Core\Support\Itqan\ItqanStages;
+use Modules\Core\Support\Search\SearchIndex;
 use Modules\Items\Console\Commands\BackfillLegacyFields;
 use Modules\Items\Console\Commands\ItqanCategoryMap;
-use Modules\Items\Services\Itqan\ItqanCatalogStage;
-use Modules\Items\Services\Itqan\ItqanPricesStage;
 use Modules\Items\Console\Commands\LinkMainProducts;
 use Modules\Items\Console\Commands\RebuildSearchIndex;
 use Modules\Items\Entities\BrandTranslation;
@@ -21,8 +20,9 @@ use Modules\Items\Entities\Product;
 use Modules\Items\Entities\ProductBarcode;
 use Modules\Items\Entities\ProductTranslation;
 use Modules\Items\Services\ItemsPdfService;
+use Modules\Items\Services\Itqan\ItqanCatalogStage;
+use Modules\Items\Services\Itqan\ItqanPricesStage;
 use Modules\Items\Support\Search\ItemsSearchIndex;
-use Nwidart\Modules\Facades\Module;
 use Nwidart\Modules\Traits\PathNamespace;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -48,7 +48,7 @@ class ItemsServiceProvider extends ServiceProvider
         $this->loadMigrationsFrom(module_path($this->name, 'database/migrations'));
 
         $this->app->singleton(ItemsPdfService::class, function () {
-            return new ItemsPdfService();
+            return new ItemsPdfService;
         });
 
         $this->registerSearchIndex();
@@ -96,6 +96,9 @@ class ItemsServiceProvider extends ServiceProvider
         $this->app->register(RouteServiceProvider::class);
         $this->app->register(RepositoryServiceProvider::class);
         $this->app->register(SidebarServiceProvider::class);
+
+        // الاصناف والتصنيفات في محرك البحث؛ مستنداتها يرسلها ItemsSearchIndex.
+        SearchIndex::register(Product::class, Category::class);
     }
 
     /**
@@ -194,7 +197,7 @@ class ItemsServiceProvider extends ServiceProvider
 
         $this->loadViewsFrom(array_merge($this->getPublishableViewPaths(), [$sourcePath]), $this->nameLower);
 
-        Blade::componentNamespace(config('modules.namespace').'\\' . $this->name . '\\View\\Components', $this->nameLower);
+        Blade::componentNamespace(config('modules.namespace').'\\'.$this->name.'\\View\\Components', $this->nameLower);
     }
 
     /**

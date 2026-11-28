@@ -75,7 +75,7 @@ abstract class VoucherController extends Controller
     {
         return Inertia::render($this->page().'/Index', [
             'table' => AdminTable::for($this->vouchers->tableQuery())
-                ->search(['reference_no', 'notes', 'cheque_number'], null)
+                ->search()
                 ->filters(
                     AdminFilter::text('reference_no'),
                     $this->clientFilter(),

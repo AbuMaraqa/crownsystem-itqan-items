@@ -30,6 +30,22 @@ final class SearchFilters
     }
 
     /**
+     * التصفية نفسها داخل محرك البحث (حقول مستند الصنف في ItemsSearchIndex)، فلا يملأ
+     * المرشحين ما ستستبعده قاعدة البيانات.
+     *
+     * @return array<string, scalar|list<scalar>>
+     */
+    public function engineFilters(): array
+    {
+        return array_filter([
+            'pricing_type' => $this->pricingType,
+            'item_type' => $this->itemType,
+            'is_active' => $this->active,
+            'category_ids' => $this->categoryIds === null ? null : ($this->categoryIds ?: [0]),
+        ], fn (mixed $value): bool => $value !== null);
+    }
+
+    /**
      * @param  string  $table  اسم جدول الاصناف في الاستعلام (او اسمه المستعار)
      */
     public function apply(Builder|EloquentBuilder $query, string $table): void

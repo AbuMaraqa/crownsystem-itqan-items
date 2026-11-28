@@ -2,18 +2,28 @@
 
 namespace Modules\Core\Providers;
 
+use GuzzleHttp\Client as GuzzleClient;
+use Illuminate\Console\Events\CommandStarting;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Scout\EngineManager;
 use Maatwebsite\Excel\Exporter;
 use Maatwebsite\Excel\Importer;
+use Meilisearch\Client as MeilisearchClient;
 use Modules\Core\Console\Commands\ItqanImport;
+use Modules\Core\Console\Commands\SyncSearchIndex;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
+use Modules\Core\Entities\User;
 use Modules\Core\Interfaces\ExcelServiceInterface;
 use Modules\Core\Interfaces\TransactionLoggerInterface;
 use Modules\Core\Services\ExcelService;
 use Modules\Core\Services\PdfService;
 use Modules\Core\Services\TransactionLoggerService;
 use Modules\Core\Support\Itqan\ItqanStages;
+use Modules\Core\Support\Search\ResilientMeilisearchEngine;
+use Modules\Core\Support\Search\SearchIndex;
 use Nwidart\Modules\Traits\PathNamespace;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -71,6 +81,34 @@ class CoreServiceProvider extends ServiceProvider
 
         // سجل مراحل نقل إتقان: كل وحدة تضيف مراحلها اليه.
         $this->app->singleton(ItqanStages::class);
+
+        $this->registerSearchEngine();
+    }
+
+    /**
+     * محرك البحث (Scout + Meilisearch): عميل بمهلة قصيرة، ومحرك لا يُفشل الحفظ اذا توقف
+     * الخادم (ResilientMeilisearchEngine)، وجداول Core المفهرسة.
+     */
+    protected function registerSearchEngine(): void
+    {
+        $this->app->singleton(MeilisearchClient::class, fn () => new MeilisearchClient(
+            (string) config('scout.meilisearch.host'),
+            config('scout.meilisearch.key'),
+            new GuzzleClient([
+                'connect_timeout' => config('scout.meilisearch.connect_timeout', 1),
+                'timeout' => config('scout.meilisearch.timeout', 5),
+            ]),
+        ));
+
+        $this->app->resolving(EngineManager::class, function (EngineManager $manager): void {
+            $manager->extend('meilisearch', fn ($app) => new ResilientMeilisearchEngine(
+                $app->make(MeilisearchClient::class),
+                (bool) config('scout.soft_delete', false),
+                config('scout.meilisearch', []),
+            ));
+        });
+
+        SearchIndex::register(User::class);
     }
 
     /**
@@ -80,7 +118,15 @@ class CoreServiceProvider extends ServiceProvider
     {
         $this->commands([
             ItqanImport::class,
+            SyncSearchIndex::class,
         ]);
+
+        // scout:sync-index-settings يقرأ الاعدادات من config، وهي في الموديلات (SearchIndex::settings).
+        Event::listen(CommandStarting::class, function (CommandStarting $event): void {
+            if ($event->command === 'scout:sync-index-settings') {
+                config(['scout.meilisearch.index-settings' => SearchIndex::settings()]);
+            }
+        });
     }
 
     /**
@@ -88,10 +134,15 @@ class CoreServiceProvider extends ServiceProvider
      */
     protected function registerCommandSchedules(): void
     {
-        // $this->app->booted(function () {
-        //     $schedule = $this->app->make(Schedule::class);
-        //     $schedule->command('inspire')->hourly();
-        // });
+        // ما فات فهرس البحث وقت توقف خادم Meilisearch يُعاد بناؤه حين يعود.
+        $this->app->booted(function (): void {
+            if (SearchIndex::configured()) {
+                $this->app->make(Schedule::class)->command('search:sync --stale')
+                    ->everyTenMinutes()
+                    ->withoutOverlapping()
+                    ->runInBackground();
+            }
+        });
     }
 
     /**

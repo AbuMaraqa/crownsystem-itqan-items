@@ -150,21 +150,13 @@ class ProductionOrderCostingTest extends TestCase
         $this->assertSame(ProductionOrderStatus::IN_PROGRESS, $order->status);
         $this->assertSame(SalesOrderStatus::PREPARING, $salesOrder->refresh()->status);
 
-        $order = $service->complete($order);
-        $this->assertSame(ProductionOrderStatus::COMPLETED, $order->status);
-        $this->assertNotNull($order->completed_at);
-        $this->assertFalse($order->canBeEdited());
-
+        // الترحيل يحرّك المخزون، فيُرفض بلا مستودع ولا صنف منتج (المسار الكامل في ProductionOrderPagesTest).
         try {
-            $service->update($order, ['currency_id' => $order->currency_id]);
-            $this->fail('A completed production order was updated.');
+            $service->complete($order);
+            $this->fail('A production order without a warehouse and produced items was posted.');
         } catch (DomainException) {
-            $this->addToAssertionCount(1);
+            $this->assertSame(ProductionOrderStatus::IN_PROGRESS, $order->refresh()->status);
         }
-
-        $order = $service->reopen($order);
-        $this->assertSame(ProductionOrderStatus::IN_PROGRESS, $order->status);
-        $this->assertNull($order->completed_at);
     }
 
     public function test_empty_order_cannot_be_completed_and_cancelled_sales_order_cannot_be_produced(): void

@@ -41,12 +41,23 @@ function stage(name: 'start' | 'complete'): void {
     else router.post(url, {}, { preserveScroll: true });
 }
 
+/** Posting (Itqan's «ترحيل»): the input items leave the warehouse and the produced items enter it. */
 async function complete(): Promise<void> {
-    if (await confirm({ title: t('Complete production and lock its cost?'), confirmLabel: t('Complete Production'), tone: 'primary' })) stage('complete');
+    if (
+        await confirm({
+            title: t('Post this production order?'),
+            description: t('The input items leave the warehouse and the produced items enter it at their cost, then the cost is locked.'),
+            confirmLabel: t('Post Production'),
+            tone: 'primary',
+        })
+    )
+        stage('complete');
 }
 
-function reopen(): void {
-    router.post(route('accounting.production-orders.reopen', id.value), {}, { preserveScroll: true });
+async function reopen(): Promise<void> {
+    if (await confirm({ title: t('Reopen this production order?'), description: t('Its stock movements and journal entry are reversed until it is posted again.'), confirmLabel: t('Reopen'), tone: 'primary' })) {
+        router.post(route('accounting.production-orders.reopen', id.value), {}, { preserveScroll: true });
+    }
 }
 
 async function cancel(): Promise<void> {
@@ -67,7 +78,7 @@ async function remove(): Promise<void> {
         <template #actions>
             <Badge v-if="record.status" :tone="record.status.tone" dot>{{ record.status.label }}</Badge>
             <Button v-if="record.can_start && can('Production Order Start')" variant="light" :loading="form.processing" @click="stage('start')"><Play />{{ t('Start Production') }}</Button>
-            <Button v-if="record.can_complete && can('Production Order Complete')" variant="primary" :loading="form.processing" @click="complete"><CircleCheck />{{ t('Complete Production') }}</Button>
+            <Button v-if="record.can_complete && can('Production Order Complete')" variant="primary" :loading="form.processing" @click="complete"><CircleCheck />{{ t('Post Production') }}</Button>
             <Button v-if="record.can_reopen && can('Production Order Complete')" @click="reopen"><Returns />{{ t('Reopen') }}</Button>
             <Button v-if="record.can_cancel && can('Production Order Cancel')" variant="danger" @click="cancel"><X />{{ t('Cancel') }}</Button>
             <Button v-if="record.can_delete && can('Production Order Delete')" variant="ghost" :aria-label="t('Delete')" @click="remove"><Trash2 /></Button>

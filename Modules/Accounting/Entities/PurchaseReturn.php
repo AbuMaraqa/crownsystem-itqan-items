@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Accounting\Enums\JournalEntryStatus;
 use Modules\Accounting\Enums\PurchaseReturnStatus;
 use Modules\Branch\Entities\Branch;
+use Modules\Core\Entities\Concerns\HasSearchIndex;
 use Modules\Core\Entities\Currency;
 use Modules\Core\Entities\User;
 use Spatie\Activitylog\LogOptions;
@@ -18,8 +19,19 @@ use Spatie\Activitylog\Traits\LogsActivity;
 class PurchaseReturn extends Model
 {
     use HasFactory;
+    use HasSearchIndex;
     use LogsActivity;
     use SoftDeletes;
+
+    /**
+     * البحث في مرتجعات الشراء: بالرقم المرجعي والملاحظات.
+     *
+     * @return list<string>
+     */
+    public static function searchColumns(): array
+    {
+        return ['reference_no', 'notes'];
+    }
 
     protected $fillable = [
         'purchase_invoice_id',

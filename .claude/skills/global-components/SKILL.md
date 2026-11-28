@@ -43,7 +43,7 @@ Display format `d/m/Y` (datetime `d/m/Y H:i`). Store as `date`/`datetime` casts.
 ## 5. Documents & references
 
 - Reference numbers: `app(Modules\Core\Services\ReferenceNumberService::class)->generate('<SEQUENCE_CODE>', $date)` (`preview()` for the form placeholder). Never build `PO-0001` by hand.
-- PDFs: service extending `Modules\Core\Services\PdfService` → `streamPdf($view, $data, $filename)`; layout + partials in `core::pdf.partials.*` (see `inertia-views` §PDF).
+- PDFs: service extending `Modules\Core\Services\PdfService` → `streamPdf($view, $data, $filename)`; every printed document extends the ONE template `core::pdf.document` (letterhead from `Modules\Core\Support\Letterhead`, title + info box on every page, totals boxes, notes, signatures, corner graphic); trade-document totals from `Modules\Accounting\Support\PdfTotals` (see `inertia-views` §PDF).
 - Barcodes/QR: `PdfService::generateBarcodeSvg()/generateBarcodeForPdf()/generateQrCode()`, Blade `<x-core::barcode>`.
 
 ## 6. Deleting
@@ -52,8 +52,9 @@ Display format `d/m/Y` (datetime `d/m/Y H:i`). Store as `date`/`datetime` casts.
 
 ## 7. Products
 
-- Search/options/labels/payloads: `Modules\Items\Support\ProductSearch` (`options()`, `label()`, `labels()`, `salesItemPayload()`, `subProductOptions()` …). Never write a raw `like` search on products (300k rows, FULLTEXT index).
+- Search/options/labels/payloads: `Modules\Items\Support\ProductSearch` (`options()`, `label()`, `labels()`, `salesItemPayload()`, `subProductOptions()` …). Never write a raw `like` search on products (300k rows, FULLTEXT index + Meilisearch, see §9c).
 - Image: `$product->image` accessor, not `getFirstMediaUrl('product')`.
+- **Order of items and categories (the catalog structure)**: every list of items is ordered by `Product::scopeCatalogOrder()` (`->catalogOrder()`: `sku`, then id) and every list of categories by `Category::scopeCatalogOrder()` (`sort_order`, `code`, id) — the order of the item tree. A child's number is its parent's number plus a sequence (`Modules\Items\Support\ItemCode`), so text order puts each item under its category. A `DB::table` query orders by `products.sku`, `products.id`. An items table: `->defaultSort('sku')` and an «Item Number» (`t('Item Number')`) column; a reorderable categories table: `->reorderable(thenBy: ['code'])`. Never order items by `barcode` (the supplier's code), `id` or name. Search results keep their relevance order.
 - Stock on a product (perpetual inventory): quantities come ONLY from inventory documents via `StockLedgerService`. `items_products.stock_quantity` / `stock_weight` are a ledger cache and are NOT fillable — never write them from a form, API or import. Levels of one item (main item = sum of sub-items): `StockLevelService::productLevels($id, $warehouseId)`; read-only summary (levels, `StockStatus`, average cost, per-warehouse balance + primary shelf): `StockLevelService::productSummary($product)`, sent by `Modules\Items\Support\ProductStockSummary::of($product)` and shown by `Modules/Items/resources/js/Pages/Product/parts/StockSummaryPanel.vue`. Product form inventory tab + limit fields: `Pages/Product/parts/InventoryTab.vue` + `StockLimitFields.vue`.
 - Prices & cost on a product: the item card has ONE price, `base_price` (the default sale price). `sale_price`, `wholesale_price`, `discount_*` and `cost_price` are legacy columns (API/import only) — never read them for pricing or costing. Cost is always the weighted average from the purchases: `StockLedgerService::averageCost($id)` / `averageCosts($ids)` (one query); never fall back to `base_price` for a cost (it would book inventory at a selling price). Sale-side default: `ProductSearch::salesUnitPrice($product, $averageCost, $margin)`.
 - **Document items grid (ONE items table for every trade document)**: see §9 (`ItemsGrid.vue` + `Modules\Accounting\Support\ItemsGrid`). Never build another items table for a document.
@@ -123,6 +124,36 @@ The server flashes `back()->with('success'|'warning'|'error', __('...'))` (warni
 | Checkbox with its label | `resources/js/Components/form/Checkbox.vue` | a bare `<input type="checkbox">` + label |
 | A message box in a page or form (sent, saved, warning) | `resources/js/Components/ui/Alert.vue` (`tone` info/success/warning/danger) | a coloured `<p>` |
 | Sign-in screens | `GuestLayout` (form card + brand panel) and `Components/auth/AuthHeading.vue` for the title | a page-level layout or heading |
+
+## 9b. Icons (one icon set: Solar)
+
+The whole system uses the **Solar** icon set, in Vue and in Blade, so an icon looks the same everywhere.
+
+| Need | Use | Never |
+|---|---|---|
+| An icon in a Vue page | `unplugin-icons` + `@iconify-json/solar` (as the existing pages do) | another icon library, pasted `<svg>` markup |
+| An icon in a Blade view (layouts, errors, emails, PDFs) | Blade Icons (`codeat3/blade-solar-icons`): `<x-solar-home-2-linear class="w-5 h-5" />`, or `@svg('solar-home-2-linear', 'w-5 h-5')` / `svg('solar-…')` in PHP | pasted `<svg>` markup, `<img src="…svg">` for an icon, a second Blade icon package |
+
+- Names are `solar-<icon>-<style>`, with styles `linear`, `bold`, `bold-duotone`, `line-duotone`, `broken`, `outline`. The files are in `vendor/codeat3/blade-solar-icons/resources/svg`. Choose the same name and style as the matching Vue icon.
+- The colour comes from `currentColor`, so set it with a text colour class.
+- PDFs (mPDF) support only part of SVG, so check every icon in the generated PDF. Keep icon size and colour as attributes, because mPDF ignores Tailwind classes.
+- Production: run `php artisan icons:cache` on deploy (after `optimize:clear` it is rebuilt with `icons:clear` / `icons:cache`).
+
+## 9c. Search engine (Laravel Scout + Meilisearch)
+
+Free-text search goes through ONE entry point, `Modules\Core\Support\Search\SearchIndex`. The engine returns ids ordered by relevance (typo tolerant, Arabic letters unified by `Modules\Core\Support\Search\TextNormalizer`), and the database still applies every scope, filter and permission. The engine is never part of the action: when Meilisearch is down (or `SCOUT_DRIVER=null`), saving still succeeds (`ResilientMeilisearchEngine` reports once, marks the engine down for 60 s and the index stale) and searching falls back to the database.
+
+| Need | Use | Never |
+|---|---|---|
+| A table searchable in the engine | model `use Modules\Core\Entities\Concerns\HasSearchIndex` + `public static function searchColumns(): array` (columns or `relation.column`, most important first; reference/code/phone/email columns get no typo tolerance), registered in the module provider's `register()`: `SearchIndex::register(Model::class)` | `use Laravel\Scout\Searchable` directly, index settings in `config/scout.php`, a `toSearchableArray()` that skips `SearchIndex::text()` |
+| Search a list page | `AdminTable::for($query)->search()` (columns come from `searchColumns()`; extra `relation.column`s are searched in the related model's index, e.g. `client.name` in the users index); best match first unless the user picked a sort | a `search` `AllowedFilter` with `whereLike` per page |
+| Search given columns of any query (filters, pickers) | `Modules\Core\Support\Search\SearchConstraint::apply($query, $term, $columns, orderByRelevance: true)` — index where it covers the columns, `LIKE` otherwise; e.g. party filter `whereHas('client', fn ($q) => SearchConstraint::apply($q, $value, User::searchColumns()))`, `PartySelect::lookup()` | `where('name', 'like', "%$term%")` on a searchable table |
+| Ids of the matching records (custom flows) | `SearchIndex::ids($model, $term, $limit, $filters, $options)` / `SearchIndex::matching($model, $term)` — `null` means «use the database» | calling `Model::search()` directly (no fallback) |
+| Items and categories | `ProductSearch` / `CategorySearch` as before; their engine documents are built by `ItemsSearchIndex` in the same pass as the database index (trait `Modules\Items\Entities\Concerns\IndexedByItemsSearch`), with filters `is_active`, `pricing_type`, `item_type`, `category_ids` (incl. the main item's) | indexing a product on its own `saved` event, a second product document builder |
+| Build / repair the indexes | `php artisan search:sync` (settings + all tables), `--fresh`, `--settings`, `--stale` (scheduled every 10 minutes: what was missed while the server was down); `items:search-index` rebuilds the items database index and pushes to the engine too | `scout:import` for items (300k rows, use `search:sync`) |
+
+- Env: `SCOUT_DRIVER=meilisearch`, `SCOUT_PREFIX` (one per environment on a shared server), `MEILISEARCH_HOST`, `MEILISEARCH_KEY`; tests run with `SCOUT_DRIVER=null` (phpunit*.xml) and use `collection` to exercise the engine path (`Modules/Core/tests/Feature/SearchEngineTest.php`).
+- Small lookup tables (units, taxes, currencies…) stay on `AdminTable::search([...])` with `LIKE`: an index there adds nothing.
 
 ## 10. Adding a new global piece
 

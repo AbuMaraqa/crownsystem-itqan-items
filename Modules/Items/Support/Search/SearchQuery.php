@@ -2,6 +2,8 @@
 
 namespace Modules\Items\Support\Search;
 
+use Modules\Core\Support\Search\TextNormalizer;
+
 /**
  * نص البحث بعد تحليله: النص الاصلي، وصيغته الموحَّدة، وكلماته.
  *

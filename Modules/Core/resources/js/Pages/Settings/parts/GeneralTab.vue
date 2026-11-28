@@ -11,6 +11,7 @@ import Card from '@/Components/ui/Card.vue';
 import { t } from '@/lib/i18n';
 
 import DashboardThemeCard from './DashboardThemeCard.vue';
+import LetterheadCard from './LetterheadCard.vue';
 import StockColorsCard from './StockColorsCard.vue';
 import type { FontOption, SettingsForm } from './types';
 
@@ -49,7 +50,8 @@ watch(removed, (ids) => {
                 </div>
             </div>
         </Card>
-        <Card>
+        <LetterheadCard class="lg:col-span-2" :form="form" />
+        <Card class="lg:row-start-1 lg:col-start-3">
             <ImageUpload v-model="form.logo" v-model:removed="removed" :label="t('Site Logo')" :existing="logo" :error="form.errors.logo" />
         </Card>
     </div>

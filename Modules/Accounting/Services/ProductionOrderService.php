@@ -10,6 +10,8 @@ use Modules\Accounting\Entities\SalesOrderItem;
 use Modules\Accounting\Enums\LaborRateBasis;
 use Modules\Accounting\Enums\ProductionOrderStatus;
 use Modules\Accounting\Enums\SalesOrderStatus;
+use Modules\Accounting\Enums\StockMovementType;
+use Modules\Accounting\Services\Concerns\PostsInventoryJournal;
 use Modules\Accounting\Support\ProductionCost;
 use Modules\Accounting\Support\WeightPieces;
 use Modules\Core\Entities\User;
@@ -20,16 +22,19 @@ use Modules\Items\Enums\ServicePricingBasis;
 use Modules\Items\Support\ProductSearch;
 
 /**
- * قسم الإنتاج: أمر إنتاج ينفذ طلبية بيع، ببنود تكلفة من ثلاثة انواع (اصناف، أجور،
- * خدمات داخلية او خارجية). مجاميع التكلفة وتكلفة الوحدة وقيمة البيع تُحسب عند كل
- * حفظ (ProductionCost)، فلا يُدخلها المستخدم يدوياً.
+ * قسم الإنتاج كاتقان: أمر إنتاج (لطلبية بيع او بدونها) باصناف مدخلة، وأجور وخدمات داخلية او
+ * خارجية (المصاريف)، واصناف منتجة (تبويب «الإنتاج»). مجاميع التكلفة وتكلفة الوحدة وقيمة البيع
+ * تُحسب عند كل حفظ (ProductionCost)، فلا يُدخلها المستخدم يدوياً.
  *
- * المراحل: مسودة ← قيد الإنتاج (وتنتقل الطلبية الى "قيد التحضير") ← مكتمل (تُثبَّت
- * التكلفة، ويمكن اعادة فتحه للتصحيح) او ملغى.
+ * المراحل: مسودة ← قيد الإنتاج (وتنتقل الطلبية الى "قيد التحضير") ← مرحّل او ملغى.
+ * الترحيل يُخرج الاصناف المدخلة من مخزن الأمر (الموزون بالكغم، وغيره بالكمية) ويُدخل الاصناف
+ * المنتجة بنصيبها من التكلفة الكلية، مع قيده. اعادة الفتح تعكس الحركات والقيد للتصحيح.
  */
 class ProductionOrderService
 {
-    private const RELATIONS = ['salesOrder', 'client', 'branch', 'warehouse', 'currency', 'materials.product', 'labor.worker', 'services.product', 'services.serviceProvider'];
+    use PostsInventoryJournal;
+
+    private const RELATIONS = ['salesOrder', 'client', 'branch', 'warehouse', 'currency', 'materials.product', 'labor.worker', 'services.product', 'services.serviceProvider', 'outputs.product'];
 
     public function create(array $data): ProductionOrder
     {
@@ -37,7 +42,7 @@ class ProductionOrderService
             $salesOrder = $this->salesOrder($data['sales_order_id'] ?? null);
             $data = $this->normalizeData($data, $salesOrder);
             $lines = $this->normalizeLines($data);
-            unset($data['materials'], $data['labor'], $data['services']);
+            unset($data['materials'], $data['labor'], $data['services'], $data['outputs']);
 
             $data['reference_no'] = app(ReferenceNumberService::class)->generate(
                 'production_order',
@@ -78,7 +83,7 @@ class ProductionOrderService
             $data = $this->normalizeData($data, $salesOrder);
             $lines = $this->normalizeLines($data);
 
-            unset($data['materials'], $data['labor'], $data['services']);
+            unset($data['materials'], $data['labor'], $data['services'], $data['outputs']);
 
             $order->update(array_merge($data, $this->totals($lines, $data)));
             $this->syncLines($order, $lines);
@@ -97,6 +102,7 @@ class ProductionOrderService
             $order->materials()->delete();
             $order->labor()->delete();
             $order->services()->delete();
+            $order->outputs()->delete();
             $order->delete();
         });
     }
@@ -128,7 +134,8 @@ class ProductionOrderService
     }
 
     /**
-     * انهاء الإنتاج وتثبيت التكلفة، ويُشترط وجود تكلفة وكمية منتجة.
+     * ترحيل الإنتاج (كزر «ترحيل» في اتقان): تخرج الاصناف المدخلة من مخزن الأمر بتكلفتها الفعلية،
+     * وتدخل الاصناف المنتجة بنصيبها من التكلفة الكلية، ويُسجَّل القيد؛ ثم تُثبَّت التكلفة.
      */
     public function complete(ProductionOrder $order): ProductionOrder
     {
@@ -147,6 +154,16 @@ class ProductionOrderService
                 throw new DomainException(__('Produced quantity must be greater than zero.'));
             }
 
+            if (! $order->warehouse_id) {
+                throw new DomainException(__('Choose the warehouse of the production order before posting.'));
+            }
+
+            if ($order->outputs->isEmpty()) {
+                throw new DomainException(__('Add at least one produced item before posting.'));
+            }
+
+            app(StockAlertService::class)->batch(fn () => $this->postStock($order));
+
             $order->update([
                 'status' => ProductionOrderStatus::COMPLETED->value(),
                 'started_at' => $order->started_at ?? now(),
@@ -157,6 +174,9 @@ class ProductionOrderService
         });
     }
 
+    /**
+     * اعادة الفتح للتصحيح: تُعكس حركات المخزون والقيد. يُمنع ان كانت الاصناف المنتجة قد صُرفت.
+     */
     public function reopen(ProductionOrder $order): ProductionOrder
     {
         return DB::transaction(function () use ($order) {
@@ -166,10 +186,145 @@ class ProductionOrderService
                 throw new DomainException(__('Only completed production orders can be reopened.'));
             }
 
-            $order->update(['status' => ProductionOrderStatus::IN_PROGRESS->value(), 'completed_at' => null]);
+            app(StockLedgerService::class)->reverse($order, now()->toDateString());
+            $this->voidInventoryJournal($order, __('Reopening of').' '.$order->reference_no);
+
+            $order->update(['status' => ProductionOrderStatus::IN_PROGRESS->value(), 'completed_at' => null, 'journal_entry_id' => null]);
 
             return $order->refresh()->load(self::RELATIONS);
         });
+    }
+
+    /**
+     * حركات الترحيل وقيده. الاصناف المدخلة تُصرف اولاً فتُعرف تكلفتها الفعلية (FIFO)، ثم تُوزَّع
+     * التكلفة الكلية (الاصناف + الأجور + الخدمات) على الاصناف المنتجة (ProductionCost::allocate).
+     * بند صنف بلا صنف (وصف فقط) لا يتحرك، وتكلفته المكتوبة تُحمَّل مع الأجور والخدمات.
+     */
+    private function postStock(ProductionOrder $order): void
+    {
+        $ledger = app(StockLedgerService::class);
+        $layout = app(WarehouseLayoutService::class);
+        $warehouseId = (int) $order->warehouse_id;
+        $date = $order->order_date->toDateString();
+        $description = __('Production Order').' '.$order->reference_no;
+        $common = ['warehouse_id' => $warehouseId, 'date' => $date, 'source' => $order, 'reference_no' => $order->reference_no, 'description' => $description];
+
+        $stockMaterials = $order->materials->filter(fn ($line) => $line->product);
+        $issues = $stockMaterials->mapWithKeys(fn ($line) => [$line->id => $this->stockRows($line->product, (float) $line->quantity, (float) $line->weight)]);
+
+        app(StockLevelService::class)->assertAvailable($warehouseId, $issues->flatten(1)->map(fn (array $row) => [
+            'product_id' => $row['product_id'],
+            'location_id' => null,
+            'quantity' => $row['quantity'],
+        ])->values()->all());
+
+        $issuedCost = 0.0;
+
+        foreach ($stockMaterials as $line) {
+            $cost = 0.0;
+
+            foreach ($issues[$line->id] as $row) {
+                $movements = $ledger->issue(array_merge($common, [
+                    'product_id' => $row['product_id'],
+                    'location_id' => null,
+                    'quantity' => $row['quantity'],
+                    'weight' => $row['weight'],
+                    'type' => StockMovementType::PRODUCTION_OUT,
+                    'source_line_id' => $line->id,
+                ]));
+
+                $cost += -(float) $movements->sum('total_cost');
+            }
+
+            $cost = round($cost, 4);
+            $base = $line->pricing_type === 'weight' ? (float) $line->weight : (float) $line->quantity;
+            $line->update(['unit_cost' => $base > 0 ? round($cost / $base, 4) : 0, 'total_cost' => $cost]);
+            $issuedCost += $cost;
+        }
+
+        $issuedCost = round($issuedCost, 4);
+        $otherMaterials = round((float) $order->materials->reject(fn ($line) => $line->product)->sum('total_cost'), 4);
+        $applied = round($otherMaterials + (float) $order->labor_cost + (float) $order->services_cost, 4);
+        $total = round($issuedCost + $applied, 4);
+        $shares = ProductionCost::allocate($order->outputs->map(fn ($line) => ['quantity' => $line->quantity, 'weight' => $line->weight])->all(), $total);
+
+        foreach ($order->outputs->values() as $index => $line) {
+            if (! $line->product) {
+                throw new DomainException(__('Every produced item must be chosen from the items list.'));
+            }
+
+            $share = $shares[$index];
+
+            foreach ($this->stockRows($line->product, (float) $line->quantity, (float) $line->weight) as $row) {
+                $ledger->receive(array_merge($common, [
+                    'product_id' => $row['product_id'],
+                    'location_id' => $layout->primaryLocationId($row['product_id'], $warehouseId),
+                    'quantity' => $row['quantity'],
+                    'weight' => (float) $row['weight'],
+                    'unit_cost' => $row['valued'] ? round($share / $row['quantity'], 6) : 0.0,
+                    'total_cost' => $row['valued'] ? $share : 0.0,
+                    'type' => StockMovementType::PRODUCTION_IN,
+                    'source_line_id' => $line->id,
+                ]));
+            }
+
+            $line->update(['unit_cost' => (float) $line->quantity > 0 ? round($share / (float) $line->quantity, 6) : 0, 'total_cost' => $share]);
+        }
+
+        $accounts = app(InventoryAccounts::class);
+        $inventoryAccount = $accounts->warehouseAccountId($order->warehouse);
+        $journal = [
+            ['account_id' => $inventoryAccount, 'debit' => $total, 'credit' => 0],
+            ['account_id' => $inventoryAccount, 'debit' => 0, 'credit' => $issuedCost],
+        ];
+
+        if ($applied > 0) {
+            $journal[] = ['account_id' => $accounts->mapped(InventoryAccounts::PRODUCTION_APPLIED_KEY), 'debit' => 0, 'credit' => $applied];
+        }
+
+        $entry = $this->postInventoryJournal($order, 'ProductionOrder', $date, $description, $journal);
+        $producedQuantity = (float) $order->produced_quantity;
+
+        $order->update([
+            'materials_cost' => round($issuedCost + $otherMaterials, 4),
+            'total_cost' => $total,
+            'unit_cost' => $producedQuantity > 0 ? round($total / $producedQuantity, 4) : $total,
+            'journal_entry_id' => $entry?->id,
+        ]);
+    }
+
+    /**
+     * كيف يتحرك صنف في المخزن (كسند التسليم والاستلام):
+     * - المقطع (صنف وزن تحت صنف رئيسي): عدده بلا قيمة، وكغمه على صنفه الرئيسي بالقيمة.
+     * - الصنف الرئيسي الموزون: بالكغم.
+     * - غيره (صنف بالكمية، او لون مقطع يُخزَّن بالقطعة): بكميته ووزنه.
+     *
+     * @return list<array{product_id: int, quantity: float, weight: float|null, valued: bool}>
+     */
+    private function stockRows(Product $product, float $quantity, float $weight): array
+    {
+        $ledger = app(StockLedgerService::class);
+
+        if ($ledger->isPiece((int) $product->id)) {
+            $kg = $weight > 0 ? $weight : $this->stockWeight($product, $quantity);
+
+            if ($kg <= 0) {
+                throw new DomainException(__('Enter the weight of ":item".', ['item' => $product->name]));
+            }
+
+            return array_values(array_filter([
+                $quantity > 0 ? ['product_id' => (int) $product->id, 'quantity' => round($quantity, 4), 'weight' => round($kg, 4), 'valued' => false] : null,
+                ['product_id' => (int) $product->main_product_id, 'quantity' => round($kg, 4), 'weight' => round($kg, 4), 'valued' => true],
+            ]));
+        }
+
+        if ($product->pricing_type === 'weight' && $ledger->isMainItem($product)) {
+            $kg = $weight > 0 ? $weight : $quantity;
+
+            return $kg > 0 ? [['product_id' => (int) $product->id, 'quantity' => round($kg, 4), 'weight' => round($kg, 4), 'valued' => true]] : [];
+        }
+
+        return $quantity > 0 ? [['product_id' => (int) $product->id, 'quantity' => round($quantity, 4), 'weight' => $weight > 0 ? round($weight, 4) : null, 'valued' => true]] : [];
     }
 
     public function cancel(ProductionOrder $order): ProductionOrder
@@ -257,15 +412,20 @@ class ProductionOrderService
             array_values(array_filter((array) ($data['labor'] ?? []), 'is_array')),
         );
         $services = array_values(array_filter((array) ($data['services'] ?? []), 'is_array'));
+        $outputs = array_values(array_filter((array) ($data['outputs'] ?? []), 'is_array'));
         $salesOrder = filled($data['sales_order_id'] ?? null) ? SalesOrder::query()->find($data['sales_order_id']) : null;
+        $producedQuantity = ProductionCost::producedQuantity($outputs, $data['produced_quantity'] ?? 1);
+        $summary = ProductionCost::summary($materials, $labor, $services, $producedQuantity, $this->salesAmount($salesOrder, $data));
 
         return [
-            'summary' => ProductionCost::summary($materials, $labor, $services, $data['produced_quantity'] ?? 1, $this->salesAmount($salesOrder, $data)),
+            'summary' => $summary,
+            'produced_quantity' => $producedQuantity,
             'materials_weight' => self::materialsWeight($materials),
             'lines' => [
                 'materials' => array_map(fn (array $line): float => ProductionCost::materialTotal($line), $materials),
                 'labor' => array_map(fn (array $line): float => ProductionCost::laborTotal($line), $labor),
                 'services' => array_map(fn (array $line): float => ProductionCost::serviceTotal($line), $services),
+                'outputs' => ProductionCost::allocate($outputs, $summary['total_cost']),
             ],
         ];
     }
@@ -493,7 +653,9 @@ class ProductionOrderService
      */
     private function normalizeData(array $data, ?SalesOrder $salesOrder): array
     {
-        $producedQuantity = ProductionCost::number($data['produced_quantity'] ?? 1);
+        // الكمية المنتجة مجموع الاصناف المنتجة ان وُجدت، والا ما كُتب في الأمر.
+        $outputs = array_values(array_filter((array) ($data['outputs'] ?? []), 'is_array'));
+        $producedQuantity = ProductionCost::producedQuantity($outputs, $data['produced_quantity'] ?? 1);
 
         if ($producedQuantity <= 0) {
             throw new DomainException(__('Produced quantity must be greater than zero.'));
@@ -520,11 +682,12 @@ class ProductionOrderService
             'materials' => $data['materials'] ?? [],
             'labor' => $data['labor'] ?? [],
             'services' => $data['services'] ?? [],
+            'outputs' => $outputs,
         ];
     }
 
     /**
-     * @return array{materials: array<int, array<string, mixed>>, labor: array<int, array<string, mixed>>, services: array<int, array<string, mixed>>}
+     * @return array{materials: array<int, array<string, mixed>>, labor: array<int, array<string, mixed>>, services: array<int, array<string, mixed>>, outputs: array<int, array<string, mixed>>}
      */
     private function normalizeLines(array $data): array
     {
@@ -532,7 +695,42 @@ class ProductionOrderService
             'materials' => $this->normalizeMaterials($data['materials']),
             'labor' => $this->normalizeLabor($data['labor']),
             'services' => $this->normalizeServices($data['services']),
+            'outputs' => $this->normalizeOutputs($data['outputs']),
         ];
+    }
+
+    /**
+     * الاصناف المنتجة: صنف بضاعة (لا خدمة) بكميته، والموزون بوزنه. تكلفتها نصيبها من التكلفة
+     * الكلية، تُقدَّر عند الحفظ وتُثبَّت بالتكلفة الفعلية عند الترحيل.
+     */
+    private function normalizeOutputs(array $lines): array
+    {
+        $lines = collect($lines)->filter(fn ($line): bool => is_array($line) && (filled($line['product_id'] ?? null) || filled($line['description'] ?? null)))->values();
+        $products = Product::query()->with('translations')->whereIn('id', $lines->pluck('product_id')->filter()->all())->get()->keyBy('id');
+
+        return $lines->map(function (array $line, int $index) use ($products): array {
+            $product = filled($line['product_id'] ?? null) ? $products->get((int) $line['product_id']) : null;
+
+            if (! $product) {
+                throw new DomainException(__('Every produced item must be chosen from the items list.'));
+            }
+
+            if ($product->isService()) {
+                throw new DomainException(__('":item" is a service; add it in the services list.', ['item' => ProductSearch::label($product->id)]));
+            }
+
+            $pricingType = $product->pricing_type === 'weight' ? 'weight' : 'simple';
+
+            return [
+                'product_id' => $product->id,
+                'description' => filled($line['description'] ?? null) ? $line['description'] : $product->name,
+                'pricing_type' => $pricingType,
+                'quantity' => $this->nonNegative($line['quantity'] ?? 0),
+                'weight' => $pricingType === 'weight' ? $this->nonNegative($line['weight'] ?? 0) : 0,
+                'notes' => $line['notes'] ?? null,
+                'sort_order' => $index,
+            ];
+        })->all();
     }
 
     private function normalizeMaterials(array $lines): array
@@ -646,6 +844,18 @@ class ProductionOrderService
         $order->materials()->delete();
         $order->labor()->delete();
         $order->services()->delete();
+        $order->outputs()->delete();
+
+        $shares = ProductionCost::allocate($lines['outputs'], $order->total_cost);
+
+        foreach (array_values($lines['outputs']) as $index => $line) {
+            $quantity = (float) $line['quantity'];
+            $order->outputs()->create(array_merge($line, [
+                'total_cost' => $shares[$index],
+                'unit_cost' => $quantity > 0 ? round($shares[$index] / $quantity, 6) : 0,
+                'created_by' => $userId,
+            ]));
+        }
 
         foreach ($lines['materials'] as $line) {
             $order->materials()->create(array_merge($line, ['created_by' => $userId]));

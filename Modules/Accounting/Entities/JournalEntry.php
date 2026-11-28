@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Accounting\Enums\JournalEntryStatus;
+use Modules\Core\Entities\Concerns\HasSearchIndex;
 use Modules\Core\Entities\User;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -16,8 +17,19 @@ use Spatie\Activitylog\Traits\LogsActivity;
 class JournalEntry extends Model
 {
     use HasFactory;
+    use HasSearchIndex;
     use LogsActivity;
     use SoftDeletes;
+
+    /**
+     * البحث في القيود: برقم القيد والرقم المرجعي والبيان.
+     *
+     * @return list<string>
+     */
+    public static function searchColumns(): array
+    {
+        return ['entry_number', 'reference_no', 'description'];
+    }
 
     protected $fillable = [
         'entry_number',
@@ -47,7 +59,7 @@ class JournalEntry extends Model
     {
         parent::__construct($attributes);
 
-        $this->setTable(config('accounting.table_prefix') . 'journal_entries');
+        $this->setTable(config('accounting.table_prefix').'journal_entries');
     }
 
     public function getActivitylogOptions(): LogOptions
@@ -56,7 +68,7 @@ class JournalEntry extends Model
             ->logOnly($this->getFillable())
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
-            ->setDescriptionForEvent(fn(string $eventName) => "This model has been {$eventName} and value ")
+            ->setDescriptionForEvent(fn (string $eventName) => "This model has been {$eventName} and value ")
             ->useLogName(class_basename($this));
     }
 

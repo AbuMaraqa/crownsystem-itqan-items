@@ -12,7 +12,7 @@ class RebuildSearchIndex extends Command
     protected $signature = 'items:search-index
         {--chunk=500 : Number of items indexed per batch}';
 
-    protected $description = 'Rebuild the items and categories search index (items_product_search, items_categories.search_text). Run it after a bulk import or a direct database change.';
+    protected $description = 'Rebuild the items and categories search index (items_product_search, items_categories.search_text) and send the same documents to the search engine (Meilisearch) when it is enabled. Run it after a bulk import or a direct database change.';
 
     public function handle(ItemsSearchIndex $index): int
     {

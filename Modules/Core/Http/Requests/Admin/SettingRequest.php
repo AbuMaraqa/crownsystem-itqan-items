@@ -38,6 +38,12 @@ class SettingRequest extends FormRequest
             'stock_min_1_color' => ['sometimes', 'required', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'stock_min_2_color' => ['sometimes', 'required', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
 
+            // ترويسة المطبوعات (Letterhead)
+            'company_name' => ['nullable', 'string', 'max:255'],
+            'company_phone' => ['nullable', 'string', 'max:50'],
+            'company_fax' => ['nullable', 'string', 'max:50'],
+            'company_website' => ['nullable', 'string', 'max:255'],
+
             'app_versions' => ['sometimes', 'array'],
             'app_versions.*.platform' => ['required', 'string', 'max:255', 'distinct'],
             'app_versions.*.store_url' => ['required', 'url:http,https', 'max:255'],
@@ -69,6 +75,10 @@ class SettingRequest extends FormRequest
             'dashboard_font' => __('Dashboard font'),
             'stock_min_1_color' => __('Min Limit 1 color'),
             'stock_min_2_color' => __('Min Limit 2 color'),
+            'company_name' => __('Company Name'),
+            'company_phone' => __('Phone'),
+            'company_fax' => __('Fax'),
+            'company_website' => __('Website'),
             'app_versions.*.platform' => __('Platform (e.g., android, ios)'),
             'app_versions.*.store_url' => __('Store URL'),
             'app_versions.*.min_version' => __('Min Version'),

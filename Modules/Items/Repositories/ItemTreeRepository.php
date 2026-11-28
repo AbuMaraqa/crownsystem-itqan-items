@@ -5,6 +5,7 @@ namespace Modules\Items\Repositories;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Modules\Core\Repositories\BaseEloquentRepository;
+use Modules\Core\Support\Search\TextNormalizer;
 use Modules\Items\Entities\Category;
 use Modules\Items\Entities\Product;
 use Modules\Items\Repositories\Contracts\ItemTreeRepositoryInterface;
@@ -14,7 +15,6 @@ use Modules\Items\Support\ProductSearch;
 use Modules\Items\Support\Search\SearchFilters;
 use Modules\Items\Support\Search\SearchHighlighter;
 use Modules\Items\Support\Search\SearchQuery;
-use Modules\Items\Support\Search\TextNormalizer;
 
 /**
  * قراءات شجرة الاصناف كما في النظام القديم: الشجرة تُحمَّل عند الطلب (لا تُجلب فروع فئة ولا
@@ -210,7 +210,7 @@ class ItemTreeRepository extends BaseEloquentRepository implements ItemTreeRepos
             return [];
         }
 
-        $subItems = Product::query()->with(['translations', 'unit.translations'])->where('main_product_id', $product->id)->orderBy('sku')->get();
+        $subItems = Product::query()->with(['translations', 'unit.translations'])->where('main_product_id', $product->id)->catalogOrder()->get();
         $items = collect([$product])->merge($subItems);
 
         // الصنف الرئيسي: عدد القطع مجموع مقاطعه، والوزن كغمه هو؛ لا يُجمع مع الوزن المحسوب للمقاطع.
@@ -304,9 +304,7 @@ class ItemTreeRepository extends BaseEloquentRepository implements ItemTreeRepos
     {
         return Category::query()
             ->with('translations')
-            ->orderBy('sort_order')
-            ->orderBy('code')
-            ->orderBy('id');
+            ->catalogOrder();
     }
 
     /**
@@ -341,7 +339,7 @@ class ItemTreeRepository extends BaseEloquentRepository implements ItemTreeRepos
                 }
             })
             ->when($twinId, fn (Builder $query) => $query->whereKeyNot($twinId))
-            ->orderBy('sku');
+            ->catalogOrder();
     }
 
     private function subProductsQuery(int $mainProductId): Builder
@@ -350,7 +348,7 @@ class ItemTreeRepository extends BaseEloquentRepository implements ItemTreeRepos
             ->select(['id', 'sku', 'barcode', 'main_product_id', 'pricing_type', 'is_active'])
             ->with('translations:id,product_id,locale,name')
             ->where('main_product_id', $mainProductId)
-            ->orderBy('sku');
+            ->catalogOrder();
     }
 
     /**

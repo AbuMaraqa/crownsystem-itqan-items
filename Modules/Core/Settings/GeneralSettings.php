@@ -21,6 +21,11 @@ class GeneralSettings extends Settings
     // لون الرصيد عند الحد الادنى 1 او تحته، ولونه عند الحد الادنى 2 او تحته (DashboardTheme::stockColors).
     public string $stock_min_1_color = '#F79009';
     public string $stock_min_2_color = '#D92D20';
+    // ترويسة المطبوعات (Letterhead): الاسم الرسمي للشركة ووسائل التواصل؛ الاسم الفارغ يعني اسم الموقع.
+    public ?string $company_name = null;
+    public ?string $company_phone = null;
+    public ?string $company_fax = null;
+    public ?string $company_website = null;
 
     public static function group(): string
     {

@@ -1,6 +1,6 @@
 <?php
 
-namespace Modules\Items\Support\Search;
+namespace Modules\Core\Support\Search;
 
 /**
  * تصحيح لغة لوحة المفاتيح: من يكتب "hglkdon" وهو يقصد "المنيوم" نسي تبديل

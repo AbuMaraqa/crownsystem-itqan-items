@@ -5,18 +5,19 @@
         [__('Reference No'), $document->reference_no],
         [__('Status'), $document->status?->getLabel()],
         [__('Purchase Order'), $document->purchaseOrder?->reference_no],
-        [__('Supplier'), $document->client?->name],
         [__('Warehouse'), $document->warehouse?->name],
         [__('Receipt Date'), $document->receipt_date?->format('d/m/Y')],
         [__('Supplier Document No'), $document->supplier_document_no],
         [__('Container No'), $document->container_no],
     ];
+    $party = ['name' => $document->client?->name];
+    $notes = $document->notes;
     $signatures = [__('Received By').': '.($document->received_by_name ?? ''), __('Storekeeper'), __('Approved By')];
 @endphp
 
-@extends('accounting::pdf.inventory.layout')
+@extends('core::pdf.document')
 
-@section('items')
+@section('content')
     <table class="items">
         <thead>
             <tr>
@@ -33,15 +34,15 @@
             @foreach ($document->items as $index => $item)
                 <tr>
                     <td>{{ $index + 1 }}</td>
-                    <td style="direction: ltr; text-align: right;">{{ $item->barcode }}</td>
-                    <td>{{ $item->description }}</td>
+                    <td class="ltr">{{ $item->barcode }}</td>
+                    <td class="start">{{ $item->description }}</td>
                     <td class="num">{{ (float) $item->piece_length ? $fmt($item->piece_length, 3) : '' }}</td>
                     <td class="big">{{ $fmt($item->quantity) }}</td>
                     <td class="num">{{ $fmt($item->weight) }}</td>
                     <td class="num pick">{{ $item->location?->code }}</td>
                 </tr>
             @endforeach
-            <tr class="main-row">
+            <tr class="total-row">
                 <td colspan="4">{{ __('Total') }}</td>
                 <td class="num">{{ $fmt($document->total_quantity) }}</td>
                 <td class="num">{{ $fmt($document->total_weight) }}</td>

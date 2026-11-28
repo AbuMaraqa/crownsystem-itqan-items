@@ -40,6 +40,16 @@ export interface ServiceLine {
     notes: string | null;
 }
 
+/** A produced item (the «Production» tab): it enters the warehouse on posting with its share of the cost. */
+export interface OutputLine {
+    product_id: number | null;
+    product_label: string | null;
+    description: string | null;
+    pricing_type: 'simple' | 'weight';
+    quantity: string;
+    weight: string;
+}
+
 export interface ProductionOrderForm {
     sales_order_id: number | null;
     order_date: string | null;
@@ -51,6 +61,7 @@ export interface ProductionOrderForm {
     materials: MaterialLine[];
     labor: LaborLine[];
     services: ServiceLine[];
+    outputs: OutputLine[];
 }
 
 /** What the order takes from its sales order: the label, the customer and the sales value. */
@@ -98,9 +109,19 @@ export interface CostSummary {
 
 export interface CostPreview {
     summary: CostSummary;
+    produced_quantity: number;
     materials_weight: number;
-    lines: { materials: number[]; labor: number[]; services: number[] };
+    lines: { materials: number[]; labor: number[]; services: number[]; outputs: number[] };
 }
+
+export const blankOutput = (): OutputLine => ({
+    product_id: null,
+    product_label: null,
+    description: null,
+    pricing_type: 'simple',
+    quantity: '1',
+    weight: '0',
+});
 
 export const blankMaterial = (): MaterialLine => ({
     sales_order_item_id: null,

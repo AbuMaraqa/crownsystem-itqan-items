@@ -9,20 +9,33 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Accounting\Enums\ProductionOrderStatus;
 use Modules\Branch\Entities\Branch;
+use Modules\Core\Entities\Concerns\HasSearchIndex;
 use Modules\Core\Entities\Currency;
 use Modules\Core\Entities\User;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
- * أمر إنتاج لتنفيذ طلبية بيع. التكلفة الكلية = الاصناف + الأجور + الخدمات،
- * وتكلفة الوحدة = التكلفة الكلية ÷ الكمية المنتجة؛ تُحسب عند كل حفظ.
+ * أمر إنتاج (كاتقان): اصناف مدخلة + أجور وخدمات ← اصناف منتجة. التكلفة الكلية = الاصناف +
+ * الأجور + الخدمات، وتكلفة الوحدة = التكلفة الكلية ÷ الكمية المنتجة؛ تُحسب عند كل حفظ.
+ * الترحيل (الاكمال) يُخرج الاصناف المدخلة من المخزن ويُدخل المنتجة بتكلفتها، واعادة الفتح تعكسه.
  */
 class ProductionOrder extends Model
 {
     use HasFactory;
+    use HasSearchIndex;
     use LogsActivity;
     use SoftDeletes;
+
+    /**
+     * البحث في اوامر الانتاج: بالرقم المرجعي.
+     *
+     * @return list<string>
+     */
+    public static function searchColumns(): array
+    {
+        return ['reference_no'];
+    }
 
     protected $fillable = [
         'sales_order_id',
@@ -41,6 +54,7 @@ class ProductionOrder extends Model
         'total_cost',
         'unit_cost',
         'sales_amount',
+        'journal_entry_id',
         'started_at',
         'completed_at',
         'notes',
@@ -117,6 +131,22 @@ class ProductionOrder extends Model
     public function services(): HasMany
     {
         return $this->hasMany(ProductionOrderServiceLine::class, 'production_order_id')->orderBy('sort_order');
+    }
+
+    /**
+     * الاصناف المنتجة (تبويب «الإنتاج»)، تدخل المخزن عند الترحيل.
+     */
+    public function outputs(): HasMany
+    {
+        return $this->hasMany(ProductionOrderOutput::class, 'production_order_id')->orderBy('sort_order');
+    }
+
+    /**
+     * قيد الترحيل: الاصناف المنتجة الى المخزون، من المخزون (الاصناف المدخلة) ومن تكاليف الإنتاج المحمّلة.
+     */
+    public function journalEntry(): BelongsTo
+    {
+        return $this->belongsTo(JournalEntry::class, 'journal_entry_id');
     }
 
     public function createdBy(): BelongsTo

@@ -92,6 +92,7 @@ class StockMovement extends Model
             (new PurchaseInvoice)->getMorphClass() => 'accounting.purchase-invoices.edit',
             (new SalesReturn)->getMorphClass() => 'accounting.sales-returns.edit',
             (new PurchaseReturn)->getMorphClass() => 'accounting.purchase-returns.edit',
+            (new ProductionOrder)->getMorphClass() => 'accounting.production-orders.edit',
             default => null,
         };
 

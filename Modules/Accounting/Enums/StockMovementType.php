@@ -18,6 +18,8 @@ enum StockMovementType: string implements HasLabel, HasColor
     case PURCHASE_RETURN = 'purchase_return';
     case SALES_RETURN = 'sales_return';
     case INVOICE_ADJUSTMENT = 'invoice_adjustment';
+    case PRODUCTION_OUT = 'production_out';
+    case PRODUCTION_IN = 'production_in';
 
     public static function options(): array
     {
@@ -40,14 +42,16 @@ enum StockMovementType: string implements HasLabel, HasColor
             self::PURCHASE_RETURN => __('Purchase Return'),
             self::SALES_RETURN => __('Sales Return'),
             self::INVOICE_ADJUSTMENT => __('Invoice Adjustment'),
+            self::PRODUCTION_OUT => __('Production Consumption'),
+            self::PRODUCTION_IN => __('Production Output'),
         };
     }
 
     public function getColor(): string|array|null
     {
         return match ($this) {
-            self::RECEIPT, self::TRANSFER_IN, self::OPENING, self::ADJUSTMENT_IN, self::SALES_RETURN => 'success',
-            self::DELIVERY, self::TRANSFER_OUT, self::ADJUSTMENT_OUT => 'danger',
+            self::RECEIPT, self::TRANSFER_IN, self::OPENING, self::ADJUSTMENT_IN, self::SALES_RETURN, self::PRODUCTION_IN => 'success',
+            self::DELIVERY, self::TRANSFER_OUT, self::ADJUSTMENT_OUT, self::PRODUCTION_OUT => 'danger',
             self::REVERSAL, self::INVOICE_ADJUSTMENT => 'gray',
             self::PURCHASE_RETURN => 'danger',
         };

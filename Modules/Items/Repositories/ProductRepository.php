@@ -12,8 +12,8 @@ use Modules\Items\Entities\Addon;
 use Modules\Items\Entities\AddonOption;
 use Modules\Items\Entities\Attribute;
 use Modules\Items\Entities\AttributeValue;
-use Modules\Items\Entities\Brand;
 use Modules\Items\Entities\BranchPrice;
+use Modules\Items\Entities\Brand;
 use Modules\Items\Entities\Category;
 use Modules\Items\Entities\ItemTypeProfile;
 use Modules\Items\Entities\Label;
@@ -99,7 +99,7 @@ class ProductRepository extends BaseEloquentRepository implements ProductReposit
         $pairs = fn (array $map) => collect($map)->map(fn ($label, $value) => ['value' => $value, 'label' => (string) $label])->values()->all();
 
         return [
-            'categories' => $named(Category::query()->with('translations')->orderBy('id')->get()),
+            'categories' => $named(Category::query()->with('translations')->catalogOrder()->get()),
             'brands' => $named(Brand::query()->with('translations')->orderBy('id')->get()),
             'units' => $named(Unit::query()->with('translations')->orderBy('id')->get()),
             'manufacturers' => $named(Manufacturer::query()->with('translations')->orderBy('id')->get()),

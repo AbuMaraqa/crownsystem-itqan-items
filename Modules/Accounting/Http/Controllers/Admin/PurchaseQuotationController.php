@@ -52,7 +52,7 @@ class PurchaseQuotationController extends Controller
     {
         return Inertia::render('Accounting/PurchaseQuotation/Index', [
             'table' => AdminTable::for($this->quotations->tableQuery())
-                ->search(['reference_no', 'supplier_reference', 'notes'], null)
+                ->search()
                 ->filters(
                     AdminFilter::text('reference_no'),
                     $this->referenceFilter('purchase_order', 'purchaseOrder'),

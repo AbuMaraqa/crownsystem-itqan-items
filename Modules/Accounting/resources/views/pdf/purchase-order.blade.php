@@ -1,100 +1,50 @@
-<!doctype html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    @include('core::pdf.partials.styles')
-    <style>
-        @page {
-            header: doc-header;
-            footer: doc-footer;
-            margin-top: 32mm;
-            margin-bottom: 14mm;
-            margin-left: 10mm;
-            margin-right: 10mm;
-        }
-    </style>
-</head>
-<body>
-    @include('core::pdf.partials.header', ['docTitle' => __('Purchase Order')])
-    @include('core::pdf.partials.footer')
+{{-- طلبية شراء للمورد: البنود باصنافها الفرعية واوزانها، بلا اسعار. --}}
+@php
+    $quantity = fn ($value) => \Modules\Accounting\Support\Number::quantity($value);
+    $lines = $order->items;
 
-    <div class="meta">
-        <table>
-            <tr>
-                <td>
-                    <span class="label">{{ __('Reference No') }}:</span>
-                    {{ $order->reference_no }}
-                </td>
-                <td>
-                    <span class="label">{{ __('Supplier') }}:</span>
-                    {{ $order->client?->name }}
-                </td>
-            </tr>
-            <tr>
-                <td>
-                    <span class="label">{{ __('Order Date') }}:</span>
-                    {{ $order->order_date?->toDateString() }}
-                </td>
-                <td>
-                    <span class="label">{{ __('Expected Delivery Date') }}:</span>
-                    {{ $order->expected_delivery_date?->toDateString() ?? '-' }}
-                </td>
-            </tr>
-            <tr>
-                <td>
-                    <span class="label">{{ __('Warehouse') }}:</span>
-                    {{ $order->warehouse?->name }}
-                </td>
-                <td>
-                    <span class="label">{{ __('Status') }}:</span>
-                    {{ $order->status?->getLabel() }}
-                </td>
-            </tr>
-        </table>
-    </div>
+    $docTitle = __('Purchase Order');
+    $party = ['name' => $order->client?->name];
+    $meta = [
+        [__('Order Date'), $order->order_date?->format('d/m/Y')],
+        [__('Expected Delivery Date'), $order->expected_delivery_date?->format('d/m/Y')],
+        [__('Order No'), $order->reference_no],
+        [__('Warehouse'), $order->warehouse?->name],
+        [__('Status'), $order->status?->getLabel()],
+    ];
+    $totals = \Modules\Accounting\Support\PdfTotals::weights($lines);
+    $notes = $order->notes;
+    $signatures = [__('Supplier Signature'), __('Employee Signature')];
+@endphp
 
+@extends('core::pdf.document')
+
+@section('content')
     <table class="items">
         <thead>
             <tr>
-                <th style="width: 4%;">#</th>
-                <th>{{ __('Item') }}</th>
-                <th style="width: 12%;">{{ __('Barcode') }}</th>
-                <th class="text-end" style="width: 14%;">{{ __('Quantity') }} / {{ __('Total Weight') }}</th>
-                <th class="text-end" style="width: 14%;">{{ __('Actual Weight') }}</th>
+                <th style="width: 6%;">#</th>
+                <th style="width: 14%;">{{ __('Barcode') }}</th>
+                <th style="width: 12%;">{{ __('Total Quantity') }}</th>
+                <th>{{ __('Item Name') }}</th>
+                <th style="width: 12%;">{{ __('Approx. Weight') }}</th>
+                <th style="width: 12%;">{{ __('Actual Weight') }}</th>
             </tr>
         </thead>
         <tbody>
-            @foreach ($order->items as $item)
-                @php $isWeightPriced = $item->isPriceGroupLine() || $item->product?->pricing_type === 'weight'; @endphp
+            @foreach ($lines as $item)
+                @php $weighed = $item->isWeightPricedLine(); @endphp
                 <tr class="main-row">
                     <td>{{ $loop->iteration }}</td>
-                    <td>{{ $item->description }}</td>
-                    <td>{{ $item->barcode }}</td>
-                    <td class="text-end">{{ number_format((float) ($isWeightPriced ? $item->total_weight : $item->quantity), 3) }}</td>
-                    <td class="text-end">{{ $isWeightPriced ? number_format((float) $item->actual_weight, 3) : '-' }}</td>
+                    <td class="ltr">{{ $item->barcode }}</td>
+                    <td>{{ $quantity($weighed ? $item->total_weight : $item->quantity) }}</td>
+                    <td class="start">{{ $item->description }}</td>
+                    <td>{{ $weighed ? $quantity($item->total_weight) : '-' }}</td>
+                    <td>{{ $weighed ? ((float) $item->actual_weight ? $quantity($item->actual_weight) : '.....') : '-' }}</td>
                 </tr>
 
-                @include('accounting::pdf.partials.item-pieces', ['item' => $item, 'number' => $loop->iteration, 'columns' => 5])
+                @include('accounting::pdf.partials.item-pieces', ['item' => $item, 'number' => $loop->iteration, 'columns' => 6])
             @endforeach
         </tbody>
     </table>
-
-    @if ($order->notes)
-        <div class="notes">
-            <div class="label">{{ __('Notes') }}</div>
-            <div>{{ $order->notes }}</div>
-        </div>
-    @endif
-
-    <table class="signatures">
-        <tr>
-            <td class="spacer"></td>
-            <td class="spacer"></td>
-        </tr>
-        <tr>
-            <td>{{ __('Client Signature') }}</td>
-            <td>{{ __('Employee Signature') }}</td>
-        </tr>
-    </table>
-</body>
-</html>
+@endsection

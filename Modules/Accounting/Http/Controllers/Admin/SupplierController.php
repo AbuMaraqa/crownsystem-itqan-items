@@ -26,7 +26,7 @@ class SupplierController extends Controller
     {
         return Inertia::render('Accounting/Supplier/Index', [
             'table' => AdminTable::for($this->suppliers->tableQuery())
-                ->search(['name', 'email', 'phone'], null)
+                ->search()
                 ->filters(
                     AdminFilter::text('name'),
                     AdminFilter::text('email'),

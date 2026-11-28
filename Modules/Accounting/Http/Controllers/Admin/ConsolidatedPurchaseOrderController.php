@@ -72,7 +72,7 @@ class ConsolidatedPurchaseOrderController extends Controller
     {
         return Inertia::render('Accounting/ConsolidatedPurchaseOrder/Index', [
             'table' => AdminTable::for($this->orders->tableQuery())
-                ->search(['reference_no'], null)
+                ->search()
                 ->filters(
                     AdminFilter::text('reference_no'),
                     $this->supplierFilter(),

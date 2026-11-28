@@ -25,8 +25,8 @@ use Modules\Accounting\Support\InventoryLines;
 use Modules\Accounting\Support\Number;
 use Modules\Accounting\Support\SelectOptions;
 use Modules\Core\Support\AdminFilter;
-use Modules\Core\Support\UserCellData;
 use Modules\Core\Support\RecordInfo;
+use Modules\Core\Support\UserCellData;
 
 /**
  * سند الاستلام: يُختار طلب الشراء فتظهر سطوره المتبقية (الصنف الموزون بقطعه)، ويُدخل امين
@@ -49,7 +49,6 @@ class GoodsReceiptController extends Controller
             'table' => $this->documentTable(
                 $this->receipts->tableQuery(),
                 'receipt_date',
-                ['container_no', 'supplier_document_no'],
                 ['purchaseOrder' => 'reference_no', 'client' => 'name'],
                 'warehouse_id',
                 [AdminFilter::text('container_no'), $this->relationText('purchase_order', 'purchaseOrder', 'reference_no'), $this->relationText('party', 'client', 'name')],

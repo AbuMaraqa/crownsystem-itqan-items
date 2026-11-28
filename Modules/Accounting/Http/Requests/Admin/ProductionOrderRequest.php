@@ -9,8 +9,8 @@ use Modules\Items\Enums\ServiceCostSource;
 use Modules\Items\Enums\ServicePricingBasis;
 
 /**
- * أمر الإنتاج: الرأس وبنود التكلفة الثلاثة (اصناف، أجور، خدمات). المجاميع وتكلفة الوحدة وقيمة
- * البيع يحسبها ProductionOrderService عند الحفظ؛ هنا الشكل فقط.
+ * أمر الإنتاج: الرأس وبنود التكلفة الثلاثة (اصناف، أجور، خدمات) والاصناف المنتجة. المجاميع
+ * وتكلفة الوحدة وقيمة البيع يحسبها ProductionOrderService عند الحفظ؛ هنا الشكل فقط.
  */
 class ProductionOrderRequest extends FormRequest
 {
@@ -62,6 +62,12 @@ class ProductionOrderRequest extends FormRequest
             'services.*.sent_date' => ['nullable', 'date'],
             'services.*.received_date' => ['nullable', 'date'],
             'services.*.notes' => ['nullable', 'string', 'max:255'],
+            'outputs' => ['nullable', 'array'],
+            'outputs.*.product_id' => ['required', 'integer', $products],
+            'outputs.*.description' => ['nullable', 'string', 'max:255'],
+            'outputs.*.quantity' => ['required', 'numeric', 'min:0'],
+            'outputs.*.weight' => ['nullable', 'numeric', 'min:0'],
+            'outputs.*.notes' => ['nullable', 'string', 'max:255'],
         ];
     }
 
@@ -94,6 +100,10 @@ class ProductionOrderRequest extends FormRequest
             'services.*.unit_cost' => __('Unit Cost'),
             'services.*.sent_date' => __('Sent Date'),
             'services.*.received_date' => __('Received Date'),
+            'outputs.*.product_id' => __('Item'),
+            'outputs.*.description' => __('Description'),
+            'outputs.*.quantity' => __('Quantity'),
+            'outputs.*.weight' => __('Weight'),
         ];
     }
 }

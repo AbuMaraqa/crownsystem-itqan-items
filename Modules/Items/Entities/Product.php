@@ -4,13 +4,12 @@ namespace Modules\Items\Entities;
 
 use Astrotomic\Translatable\Contracts\Translatable as TranslatableContract;
 use Astrotomic\Translatable\Translatable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
-use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -19,9 +18,8 @@ use Modules\Branch\Entities\Branch;
 use Modules\Core\Entities\User;
 use Modules\Core\Enums\ImageQuality;
 use Modules\Core\Enums\ImageSize;
-use Modules\Core\Enums\ImageWidth;
 use Modules\Core\Services\ImageService;
-use Modules\Items\Enums\CategoryStatus;
+use Modules\Items\Entities\Concerns\IndexedByItemsSearch;
 use Modules\Items\Enums\ItemType;
 use Modules\Items\Enums\ProductStatus;
 use Modules\Items\Enums\ProfileThickness;
@@ -33,22 +31,22 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 
 // use Modules\Items\Database\Factories\ProductFactory;
 
-class Product extends Model implements TranslatableContract, HasMedia
+class Product extends Model implements HasMedia, TranslatableContract
 {
+    use IndexedByItemsSearch;
     use InteractsWithMedia;
-    use Translatable;
-    use SoftDeletes;
     use LogsActivity;
+    use SoftDeletes;
+    use Translatable;
 
     /**
      * The attributes that are mass assignable.
      */
-
     public function __construct(array $attributes = [])
     {
         parent::__construct($attributes);
 
-        $this->setTable(config('items.table_prefix') . 'products');
+        $this->setTable(config('items.table_prefix').'products');
     }
 
     protected $fillable = [
@@ -127,7 +125,7 @@ class Product extends Model implements TranslatableContract, HasMedia
             ->logOnly($this->getFillable()) // تسجيل الحقول القابلة للتعبئة فقط
             ->logOnlyDirty() // تسجيل الحقول المُعدّلة فقط
             ->dontSubmitEmptyLogs() // عدم حفظ سجلات فارغة
-            ->setDescriptionForEvent(fn(string $eventName) => "This model has been {$eventName} and value ")
+            ->setDescriptionForEvent(fn (string $eventName) => "This model has been {$eventName} and value ")
             ->useLogName(class_basename($this));
     }
 
@@ -153,7 +151,7 @@ class Product extends Model implements TranslatableContract, HasMedia
             $locale = app()->getLocale();
             $translationData = request()->only($model->translatedAttributes);
 
-            if (!empty($translationData)) {
+            if (! empty($translationData)) {
                 $model->translateOrNew($locale)->fill($translationData);
                 $model->save();
             }
@@ -203,7 +201,7 @@ class Product extends Model implements TranslatableContract, HasMedia
         try {
             $originalName = $file->getClientOriginalName();
             $extension = $file->getClientOriginalExtension();
-            $fileName = time() . '_' . Str::slug(pathinfo($originalName, PATHINFO_FILENAME)) . '.' . $extension;
+            $fileName = time().'_'.Str::slug(pathinfo($originalName, PATHINFO_FILENAME)).'.'.$extension;
 
             $media = $this
                 ->addMedia($file)
@@ -212,12 +210,13 @@ class Product extends Model implements TranslatableContract, HasMedia
 
             $size = ImageSize::MEDIUM;
 
-            ImageService::optimize($media->getPath() , ImageQuality::HIGH->value);
-            ImageService::resize($media->getPath() , $size->width(), $size->height());
+            ImageService::optimize($media->getPath(), ImageQuality::HIGH->value);
+            ImageService::resize($media->getPath(), $size->width(), $size->height());
 
             return $media;
         } catch (\Exception $e) {
-            \Log::error('Error uploading product image: ' . $e->getMessage());
+            \Log::error('Error uploading product image: '.$e->getMessage());
+
             return null;
         }
     }
@@ -225,7 +224,7 @@ class Product extends Model implements TranslatableContract, HasMedia
     public function addGalleryImage($files)
     {
         // التأكد من أن المدخل هو مصفوفة
-        if (!is_array($files)) {
+        if (! is_array($files)) {
             $files = [$files];
         }
 
@@ -238,7 +237,7 @@ class Product extends Model implements TranslatableContract, HasMedia
 
                 $originalName = $file->getClientOriginalName();
                 $extension = $file->getClientOriginalExtension();
-                $fileName = time() . '_' . uniqid() . '_' . Str::slug(pathinfo($originalName, PATHINFO_FILENAME)) . '.' . $extension;
+                $fileName = time().'_'.uniqid().'_'.Str::slug(pathinfo($originalName, PATHINFO_FILENAME)).'.'.$extension;
 
                 $media = $this
                     ->addMedia($file)
@@ -253,7 +252,8 @@ class Product extends Model implements TranslatableContract, HasMedia
 
             return true;
         } catch (\Exception $e) {
-            \Log::error('Error uploading product gallery images: ' . $e->getMessage());
+            \Log::error('Error uploading product gallery images: '.$e->getMessage());
+
             return null;
         }
     }
@@ -278,7 +278,7 @@ class Product extends Model implements TranslatableContract, HasMedia
 
     public function categories()
     {
-        return $this->belongsToMany(Category::class, config('items.table_prefix') . 'products_categories');
+        return $this->belongsToMany(Category::class, config('items.table_prefix').'products_categories');
     }
 
     public function parent(): BelongsTo
@@ -286,10 +286,10 @@ class Product extends Model implements TranslatableContract, HasMedia
         return $this->belongsTo(Product::class, 'parent_id');
     }
 
-//    public function attributeValue(): BelongsToMany
-//    {
-//        return $this->belongsToMany(AttributeValue::class, config('items.table_prefix') . 'product_variations', 'product_id', 'attribute_value_id');
-//    }
+    //    public function attributeValue(): BelongsToMany
+    //    {
+    //        return $this->belongsToMany(AttributeValue::class, config('items.table_prefix') . 'product_variations', 'product_id', 'attribute_value_id');
+    //    }
 
     public function variations(): HasMany
     {
@@ -418,15 +418,13 @@ class Product extends Model implements TranslatableContract, HasMedia
      */
     public function suppliers(): BelongsToMany
     {
-        return $this->belongsToMany(User::class, config('items.table_prefix') . 'products_suppliers', 'product_id', 'supplier_id')
+        return $this->belongsToMany(User::class, config('items.table_prefix').'products_suppliers', 'product_id', 'supplier_id')
             ->withTimestamps();
     }
 
     /*************  ✨ Windsurf Command ⭐  *************/
     /**
      * Generate a unique SKU
-     *
-     * @return string
      */
     /*******  650b6af4-fb5c-48f4-87f1-be182d251b22  *******/
     /**
@@ -449,7 +447,7 @@ class Product extends Model implements TranslatableContract, HasMedia
     public static function generateUniqueSku()
     {
         do {
-            $sku = 'SKU-' . strtoupper(Str::random(8));
+            $sku = 'SKU-'.strtoupper(Str::random(8));
         } while (self::where('sku', $sku)->exists());
 
         return $sku;
@@ -457,12 +455,12 @@ class Product extends Model implements TranslatableContract, HasMedia
 
     public function tags(): BelongsToMany
     {
-        return $this->belongsToMany(Tag::class, config('items.table_prefix') . 'products_tags' , 'product_id', 'tag_id');
+        return $this->belongsToMany(Tag::class, config('items.table_prefix').'products_tags', 'product_id', 'tag_id');
     }
 
     public function labels(): BelongsToMany
     {
-        return $this->belongsToMany(Label::class, config('items.table_prefix') . 'products_labels');
+        return $this->belongsToMany(Label::class, config('items.table_prefix').'products_labels');
     }
 
     public function brand(): BelongsTo
@@ -527,7 +525,7 @@ class Product extends Model implements TranslatableContract, HasMedia
 
     public function manufacturers(): BelongsToMany
     {
-        return $this->belongsToMany(Manufacturer::class, config('items.table_prefix') . 'products_manufacturers');
+        return $this->belongsToMany(Manufacturer::class, config('items.table_prefix').'products_manufacturers');
     }
 
     public function attributes(): HasMany
@@ -537,26 +535,26 @@ class Product extends Model implements TranslatableContract, HasMedia
 
     public function attributeValues(): BelongsToMany
     {
-        return $this->belongsToMany(AttributeValue::class, config('items.table_prefix') . 'product_attribute_value', 'product_id', 'attribute_id');
+        return $this->belongsToMany(AttributeValue::class, config('items.table_prefix').'product_attribute_value', 'product_id', 'attribute_id');
     }
 
     public function addons(): BelongsToMany
     {
-        return $this->belongsToMany(Addon::class, config('items.table_prefix') . 'addon_product', 'product_id', 'addon_id')
+        return $this->belongsToMany(Addon::class, config('items.table_prefix').'addon_product', 'product_id', 'addon_id')
             ->withPivot([
                 'id',
                 'is_required',
                 'min_selection',
                 'max_selection',
                 'max_quantity_per_option',
-                'created_by'
+                'created_by',
             ])
             ->withTimestamps();
     }
 
     public function addonOptions()
     {
-        return $this->hasMany(config('items.table_prefix') . 'product_addon_options', 'addon_product_id', 'id')
+        return $this->hasMany(config('items.table_prefix').'product_addon_options', 'addon_product_id', 'id')
             ->withPivot([
                 'id',
                 'price',
@@ -566,7 +564,7 @@ class Product extends Model implements TranslatableContract, HasMedia
 
     public function branches(): BelongsToMany
     {
-        return $this->belongsToMany(Branch::class, config('items.table_prefix') . 'branch_product', 'product_id', 'branch_id');
+        return $this->belongsToMany(Branch::class, config('items.table_prefix').'branch_product', 'product_id', 'branch_id');
     }
 
     public function offers(): MorphMany
@@ -580,15 +578,14 @@ class Product extends Model implements TranslatableContract, HasMedia
             ->where('is_active', true)
             ->where(function ($q) {
                 $q->whereNull('start_date')
-                  ->orWhere('start_date', '<=', now());
+                    ->orWhere('start_date', '<=', now());
             })
             ->where(function ($q) {
                 $q->whereNull('end_date')
-                  ->orWhere('end_date', '>=', now());
+                    ->orWhere('end_date', '>=', now());
             })
             ->orderBy('created_at', 'desc');
     }
-
 
     public function branchProducts(): HasMany
     {
@@ -600,6 +597,16 @@ class Product extends Model implements TranslatableContract, HasMedia
         $query->with(['branchProducts' => function ($q) use ($branchId) {
             $q->where('branch_id', $branchId);
         }]);
+    }
+
+    /**
+     * ترتيب بنية الاصناف، وهو الترتيب الافتراضي لكل قائمة اصناف في النظام: رقم الصنف مبني على
+     * رقم ابيه (ItemCode: 00015 ← 00015023 ← 00015023001)، فترتيبه نصاً يضع كل صنف تحت فئته
+     * وبين اخوته كما في شجرة الاصناف. الباركود رقم المورد فلا يصلح للترتيب.
+     */
+    public function scopeCatalogOrder(Builder $query): Builder
+    {
+        return $query->orderBy($query->qualifyColumn('sku'))->orderBy($query->qualifyColumn('id'));
     }
 
     /**

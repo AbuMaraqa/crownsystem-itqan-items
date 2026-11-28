@@ -7,10 +7,11 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
 use Modules\Accounting\Services\StockLedgerService;
+use Modules\Core\Support\Search\KeyboardLayout;
+use Modules\Core\Support\Search\SearchIndex;
 use Modules\Items\Entities\Product;
 use Modules\Items\Entities\ProductCuttingRecipe;
 use Modules\Items\Enums\ItemType;
-use Modules\Items\Support\Search\KeyboardLayout;
 use Modules\Items\Support\Search\MatchMode;
 use Modules\Items\Support\Search\SearchCapabilities;
 use Modules\Items\Support\Search\SearchFilters;
@@ -41,6 +42,12 @@ class ProductSearch
     private const BROAD_MATCHES = 25000;
 
     /**
+     * اكثر عدد من المطابقات يُجلب معرّفاته الى apply() (قائمة IN نحو 350KB). كلمة شائعة على 300 الف
+     * صنف تطابق نحو 40 الفاً؛ ما فوق الحد يبقى استعلاماً فرعياً.
+     */
+    private const FETCHED_MATCHES = 50000;
+
+    /**
      * @var array<int, string>
      */
     private static array $labelCache = [];
@@ -67,16 +74,60 @@ class ProductSearch
         $attempts[] = [$searchQuery, MatchMode::Contains];
 
         foreach ($attempts as $index => [$attempt, $mode]) {
+            $engineIds = $mode === MatchMode::Words ? self::engineIds($attempt, $mode, SearchIndex::MAX_HITS + 1) : null;
+
+            // محرك البحث يغني عن فهرس قاعدة البيانات اذا اعاد كل المطابقات (دون الحد)؛
+            // الرقم والباركود وبداية الاسم تبقى من قاعدة البيانات (فهارس BTREE سريعة).
+            if ($engineIds !== null && count($engineIds) <= SearchIndex::MAX_HITS) {
+                $ids = self::matchedIds(self::matchingIdQueries($attempt, $mode, withIndex: false));
+                $ids = $ids === null ? null : self::mergeIds($ids, $engineIds);
+
+                if ($ids === [] && $index !== array_key_last($attempts)) {
+                    continue;
+                }
+
+                if ($ids !== null) {
+                    return $query->whereIntegerInRaw($query->qualifyColumn('id'), $ids);
+                }
+            }
+
             $parts = self::matchingIdQueries($attempt, $mode);
+            $ids = self::matchedIds($parts);
 
             // المحاولة الاخيرة تُطبَّق ولو لم تطابق شيئاً، فيظهر الجدول فارغاً.
-            // والتحقق بأرخص الاجزاء اولاً (الرقم ثم الاسم ثم الفهرس)، ويتوقف عند اول مطابقة.
-            if ($index === array_key_last($attempts) || collect($parts)->contains(fn (QueryBuilder $part): bool => $part->exists())) {
-                return self::whereMatches($query, $parts);
+            if ($ids === [] && $index !== array_key_last($attempts)) {
+                continue;
             }
+
+            return $ids === null ? self::whereMatches($query, $parts) : $query->whereIntegerInRaw($query->qualifyColumn('id'), $ids);
         }
 
         return $query;
+    }
+
+    /**
+     * معرّفات المطابقات تُجلب مرة واحدة، فيعدّ الجدول صفوفه ويجلب صفحته منها دون أن يعيد البحث
+     * (LIKE وسط الكلمات يمر على الفهرس كله في كل مرة)، وتغني عن سؤال «هل طابق شيء؟» قبله.
+     * فوق FETCHED_MATCHES: null، فيبقى البحث استعلاماً فرعياً (whereMatches) بدل قائمة ضخمة.
+     *
+     * @param  array<int, QueryBuilder>  $parts
+     * @return list<int>|null
+     */
+    private static function matchedIds(array $parts): ?array
+    {
+        $union = clone $parts[0];
+
+        foreach (array_slice($parts, 1) as $part) {
+            $union->unionAll($part);
+        }
+
+        $ids = DB::query()->fromSub($union, 'matches')->limit(self::FETCHED_MATCHES + 1)->pluck('id');
+
+        if ($ids->count() > self::FETCHED_MATCHES) {
+            return null;
+        }
+
+        return $ids->map(fn (mixed $id): int => (int) $id)->unique()->values()->all();
     }
 
     /**
@@ -439,7 +490,7 @@ class ProductSearch
                     $query->orWhereIn($query->qualifyColumn('id'), $index);
                 }
             }))
-            ->orderBy('id')
+            ->catalogOrder()
             ->limit(max($limit, 1))
             ->get()
             ->mapWithKeys(fn (Product $product): array => [(int) $product->id => self::rememberLabel($product)])
@@ -580,7 +631,7 @@ class ProductSearch
      *
      * @return array<int, QueryBuilder>
      */
-    private static function matchingIdQueries(SearchQuery $searchQuery, MatchMode $mode): array
+    private static function matchingIdQueries(SearchQuery $searchQuery, MatchMode $mode, bool $withIndex = true): array
     {
         $prefix = config('items.table_prefix');
         $raw = $searchQuery->raw;
@@ -610,13 +661,36 @@ class ProductSearch
                 ->where('name', 'like', $like);
         }
 
-        if (SearchCapabilities::hasProductIndex()) {
+        if ($withIndex && SearchCapabilities::hasProductIndex()) {
             $index = DB::table(SearchCapabilities::productTable().' as search')->select('search.product_id');
             self::matchIndex($index, 'search.'.SearchCapabilities::DOCUMENT, $searchQuery, $mode);
             $parts[] = $index;
         }
 
         return $parts;
+    }
+
+    /**
+     * المرشحون من محرك البحث (Meilisearch: يتحمل الخطأ الاملائي ويرتب بالاقرب)، او null اذا
+     * لم يعمل المحرك، فيُبحث في فهرس قاعدة البيانات. «الكلمات»: كل الكلمات مطلوبة؛ «بعض
+     * الكلمات»: ما طابق اكثرها؛ «وسط الكلمة» لا يدعمها المحرك فتبقى لقاعدة البيانات.
+     *
+     * @return list<int>|null
+     */
+    private static function engineIds(SearchQuery $searchQuery, MatchMode $mode, int $limit, ?SearchFilters $filters = null): ?array
+    {
+        if ($mode === MatchMode::Contains) {
+            return null;
+        }
+
+        return SearchIndex::ids(
+            Product::class,
+            $searchQuery->normalized,
+            $limit,
+            $filters?->engineFilters() ?? [],
+            ['matchingStrategy' => $mode === MatchMode::Words ? 'all' : 'last'],
+            swapLayout: false,
+        );
     }
 
     /**
@@ -694,6 +768,13 @@ class ProductSearch
      */
     private static function indexIds(SearchQuery $searchQuery, MatchMode $mode, int $limit, SearchFilters $filters): array
     {
+        // المحرك اولاً؛ ان لم يجد شيئاً (او لم يعمل) فالفهرس في قاعدة البيانات كما كان.
+        $engineIds = self::engineIds($searchQuery, $mode, $limit, $filters);
+
+        if ($engineIds !== null && $engineIds !== []) {
+            return $engineIds;
+        }
+
         if (! SearchCapabilities::hasProductIndex()) {
             return [];
         }
@@ -841,7 +922,7 @@ class ProductSearch
 
         $ids = self::mergeIds($ids, Product::query()
             ->whereNull('parent_id')
-            ->where(function (Builder $query) use ($term, $like) {
+            ->where(function (Builder $query) use ($like) {
                 $query
                     ->where('sku', 'like', $like)
                     ->orWhere('barcode', 'like', $like);

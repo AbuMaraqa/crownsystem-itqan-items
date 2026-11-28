@@ -5,11 +5,18 @@ namespace Modules\Items\Support\Search;
 use Closure;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Support\Search\SearchIndex;
+use Modules\Core\Support\Search\TextNormalizer;
+use Modules\Items\Entities\Category;
+use Modules\Items\Entities\Product;
 
 /**
  * فهرس البحث في الاصناف والتصنيفات: لكل صنف مستند (في جدول items_product_search)
  * ولكل تصنيف مستند (في عمود search_text)، فيه كلماته موحَّدة ومحاطة بمسافتين
  * ليُطابَق اول الكلمة بـ LIKE '% كلمة%'.
+ *
+ * والمستند نفسه يُرسل الى محرك البحث (Scout + Meilisearch) من القراءة نفسها، مع حقول
+ * التصفية (النوع، التسعير، الحالة، التصنيفات)، فلا يُبنى مستند الصنف في مكانين.
  *
  * مستند الصنف: اسماؤه بكل اللغات، رقمه، باركوده وباركوداته الاضافية، رفّه، الصنف المرادف،
  * تصنيفاته (اسماً ورقماً)، العلامة التجارية والشركات المصنّعة.
@@ -31,6 +38,13 @@ final class ItemsSearchIndex
      * @var array<string, array<int, true>>
      */
     private array $pending = ['products' => [], 'categories' => [], 'brands' => [], 'manufacturers' => []];
+
+    /**
+     * مستندات محرك البحث المقروءة مسبقاً لدفعة يفهرسها Scout (prime).
+     *
+     * @var array{products: array<int, array<string, mixed>|null>, categories: array<int, array<string, mixed>|null>}
+     */
+    private array $primed = ['products' => [], 'categories' => []];
 
     public function markProduct(mixed $id): void
     {
@@ -70,7 +84,7 @@ final class ItemsSearchIndex
         $pending = array_map('array_keys', $this->pending);
         $this->pending = array_map(fn (): array => [], $this->pending);
 
-        if (! SearchCapabilities::hasProductIndex()) {
+        if (! SearchCapabilities::hasProductIndex() && ! SearchIndex::configured()) {
             return;
         }
 
@@ -93,6 +107,11 @@ final class ItemsSearchIndex
         if ($pending['products'] !== []) {
             // اسم الصنف جزء من مستند كل صنف جعله مرادفاً له.
             $productIds = [...$productIds, ...$this->pluckIds($prefix.'products', 'id', 'synonym_product_id', $pending['products'])];
+
+            // تصنيفات الصنف الرئيسي يُصفّى بها اصنافه الفرعية في محرك البحث.
+            if (SearchIndex::configured()) {
+                $productIds = [...$productIds, ...$this->pluckIds($prefix.'products', 'id', 'main_product_id', $pending['products'])];
+            }
         }
 
         $this->refreshProducts(array_values(array_unique($productIds)));
@@ -102,26 +121,34 @@ final class ItemsSearchIndex
      * اعادة بناء الفهرس كله، دفعة بعد دفعة.
      *
      * @param  (Closure(int): void)|null  $progress  يُستدعى بعدد الاصناف المفهرسة بعد كل دفعة
+     * @param  bool  $database  فهرس قاعدة البيانات (items_product_search)
+     * @param  bool  $engine  فهرس محرك البحث (Meilisearch)
      * @return int عدد الاصناف المفهرسة
      */
-    public function rebuild(?Closure $progress = null, int $chunk = self::CHUNK): int
+    public function rebuild(?Closure $progress = null, int $chunk = self::CHUNK, bool $database = true, bool $engine = true): int
     {
-        if (! SearchCapabilities::hasProductIndex()) {
+        $database = $database && SearchCapabilities::hasProductIndex();
+        $engine = $engine && SearchIndex::configured();
+
+        if (! $database && ! $engine) {
             return 0;
         }
 
-        $prefix = config('items.table_prefix');
+        $this->rebuildCategories($chunk, $database, $engine);
 
-        if (SearchCapabilities::hasCategoryIndex()) {
-            DB::table($prefix.'categories')->select('id')->orderBy('id')
-                ->chunkById($chunk, fn (Collection $rows) => $this->refreshCategories($rows->pluck('id')->all()));
-        }
+        return $this->rebuildProducts($progress, $chunk, $database, $engine);
+    }
 
+    /**
+     * @param  (Closure(int): void)|null  $progress
+     */
+    public function rebuildProducts(?Closure $progress = null, int $chunk = self::CHUNK, bool $database = true, bool $engine = true): int
+    {
         $count = 0;
 
-        DB::table($prefix.'products')->select('id')->orderBy('id')
-            ->chunkById($chunk, function (Collection $rows) use (&$count, $progress): void {
-                $this->refreshProducts($rows->pluck('id')->all());
+        DB::table(config('items.table_prefix').'products')->select('id')->orderBy('id')
+            ->chunkById($chunk, function (Collection $rows) use (&$count, $progress, $database, $engine): void {
+                $this->refreshProducts($rows->pluck('id')->all(), $database, $engine);
                 $count += $rows->count();
 
                 if ($progress) {
@@ -132,41 +159,176 @@ final class ItemsSearchIndex
         return $count;
     }
 
+    public function rebuildCategories(int $chunk = self::CHUNK, bool $database = true, bool $engine = true): int
+    {
+        $count = 0;
+
+        DB::table(config('items.table_prefix').'categories')->select('id')->orderBy('id')
+            ->chunkById($chunk, function (Collection $rows) use (&$count, $database, $engine): void {
+                $this->refreshCategories($rows->pluck('id')->all(), $database, $engine);
+                $count += $rows->count();
+            });
+
+        return $count;
+    }
+
     /**
+     * كتابة مستندات الاصناف في فهرس قاعدة البيانات وفي محرك البحث معاً، من قراءة واحدة.
+     *
      * @param  array<int, mixed>  $ids
      */
-    public function refreshProducts(array $ids): void
+    public function refreshProducts(array $ids, bool $database = true, bool $engine = true): void
     {
+        $database = $database && SearchCapabilities::hasProductIndex();
+        $engine = $engine && SearchIndex::configured();
+
         foreach (array_chunk($this->normalizeIds($ids), self::CHUNK) as $chunk) {
-            $this->writeProducts($chunk, $this->productDocuments($chunk));
+            $records = $this->productRecords($chunk);
+
+            if ($database) {
+                $this->writeProducts($chunk, array_map(fn (?array $record): ?string => $record['document'] ?? null, $records));
+            }
+
+            if ($engine) {
+                $this->send(Product::class, $chunk, $records);
+            }
         }
     }
 
     /**
      * @param  array<int, mixed>  $ids
      */
-    public function refreshCategories(array $ids): void
+    public function refreshCategories(array $ids, bool $database = true, bool $engine = true): void
     {
-        if (! SearchCapabilities::hasCategoryIndex()) {
+        $database = $database && SearchCapabilities::hasCategoryIndex();
+        $engine = $engine && SearchIndex::configured();
+
+        if (! $database && ! $engine) {
             return;
         }
 
         foreach (array_chunk($this->normalizeIds($ids), self::CHUNK) as $chunk) {
-            $this->writeCategories($this->categoryDocuments($chunk));
+            $records = $this->categoryRecords($chunk);
+
+            if ($database) {
+                $this->writeCategories(array_map(fn (?array $record): ?string => $record['document'] ?? null, $records));
+            }
+
+            if ($engine) {
+                $this->send(Category::class, $chunk, $records);
+            }
         }
     }
 
     /**
-     * @param  array<int, int>  $ids
-     * @return array<int, string|null>
+     * مستند السجل (صنف او تصنيف) في محرك البحث، لـ toSearchableArray: من دفعة مقروءة مسبقاً
+     * (prime) او بقراءة السجل وحده. فارغ لما لا يُبحث فيه (المتفرع، المحذوف)، فيتركه Scout.
+     *
+     * @param  class-string<Product|Category>  $model
+     * @return array<string, mixed>
      */
-    private function productDocuments(array $ids): array
+    public function engineDocument(string $model, int $id): array
+    {
+        $type = self::type($model);
+
+        if (! array_key_exists($id, $this->primed[$type])) {
+            $this->prime($model, [$id]);
+        }
+
+        return $this->primed[$type][$id] ?? [];
+    }
+
+    /**
+     * قراءة مستندات دفعة مرة واحدة قبل ان يطلبها Scout سجلاً سجلاً (makeSearchableUsing).
+     *
+     * @param  class-string<Product|Category>  $model
+     * @param  array<int, mixed>  $ids
+     */
+    public function prime(string $model, array $ids): void
+    {
+        $ids = $this->normalizeIds($ids);
+        $records = self::type($model) === 'products' ? $this->productRecords($ids) : $this->categoryRecords($ids);
+
+        $this->primed[self::type($model)] = array_map(fn (?array $record): ?array => $record['engine'] ?? null, $records);
+    }
+
+    /**
+     * بناء فهرس الجدول في محرك البحث وحده (search:sync)؛ فهرس قاعدة البيانات يبنيه items:search-index.
+     *
+     * @param  class-string<Product|Category>  $model
+     * @param  (Closure(int): void)|null  $progress
+     */
+    public function rebuildEngine(string $model, ?Closure $progress = null, int $chunk = self::CHUNK): int
+    {
+        return self::type($model) === 'products'
+            ? $this->rebuildProducts($progress, $chunk, database: false)
+            : $this->rebuildCategories($chunk, database: false);
+    }
+
+    /**
+     * اعدادات الفهرس في Meilisearch. الاصناف: الرمز ثم الاسم ثم باقي المستند، والرمز بلا
+     * تصحيح املائي، والتصفية بالنوع والتسعير والحالة والتصنيف. التصنيفات: الرقم ثم الاسم.
+     *
+     * @param  class-string<Product|Category>  $model
+     * @return array<string, mixed>
+     */
+    public static function indexSettings(string $model): array
+    {
+        $common = [
+            'proximityPrecision' => 'byAttribute',
+            'pagination' => ['maxTotalHits' => SearchIndex::MAX_HITS + 1],
+        ];
+
+        return self::type($model) === 'products' ? [
+            'searchableAttributes' => ['codes', 'names', 'document'],
+            'filterableAttributes' => ['is_active', 'pricing_type', 'item_type', 'category_ids'],
+            'typoTolerance' => ['disableOnAttributes' => ['codes'], 'disableOnNumbers' => true],
+            ...$common,
+        ] : [
+            'searchableAttributes' => ['code', 'names', 'document'],
+            'typoTolerance' => ['disableOnAttributes' => ['code'], 'disableOnNumbers' => true],
+            ...$common,
+        ];
+    }
+
+    /**
+     * @return 'products'|'categories'
+     */
+    private static function type(string $model): string
+    {
+        return is_a($model, Category::class, true) ? 'categories' : 'products';
+    }
+
+    /**
+     * ارسال مستندات دفعة الى محرك البحث، وحذف ما لا يُبحث فيه منها.
+     *
+     * @param  class-string<\Illuminate\Database\Eloquent\Model>  $model
+     * @param  array<int, int>  $ids
+     * @param  array<int, array{document: string, engine: array<string, mixed>}|null>  $records
+     */
+    private function send(string $model, array $ids, array $records): void
+    {
+        $documents = array_values(array_filter(array_map(fn (?array $record): ?array => $record['engine'] ?? null, $records)));
+        $indexed = array_map(fn (array $document): int => (int) $document['id'], $documents);
+
+        SearchIndex::put($model, $documents);
+        SearchIndex::forget($model, array_values(array_diff($ids, $indexed)));
+    }
+
+    /**
+     * مستند كل صنف: نص فهرس قاعدة البيانات، ومستند محرك البحث (الرموز، الاسماء، باقي
+     * المستند، وحقول التصفية). null للصنف المتفرع والمحذوف.
+     *
+     * @param  array<int, int>  $ids
+     * @return array<int, array{document: string, engine: array<string, mixed>}|null>
+     */
+    private function productRecords(array $ids): array
     {
         $prefix = config('items.table_prefix');
 
         $products = DB::table($prefix.'products')
             ->whereIn('id', $ids)
-            ->get(['id', 'sku', 'barcode', 'shelf', 'parent_id', 'deleted_at', 'synonym_product_id', 'brand_id']);
+            ->get(['id', 'sku', 'barcode', 'shelf', 'parent_id', 'deleted_at', 'synonym_product_id', 'brand_id', 'main_product_id', 'is_active', 'pricing_type', 'item_type']);
 
         $synonymIds = $products->pluck('synonym_product_id')->filter()->unique()->values()->all();
 
@@ -206,24 +368,34 @@ final class ItemsSearchIndex
             ? DB::table($prefix.'product_barcodes')->whereIn('product_id', $ids)->orderBy('sort_order')->get(['product_id', 'barcode'])->groupBy('product_id')
             : collect();
 
-        $documents = [];
+        // تصنيفات الصنف وتصنيفات صنفه الرئيسي، للتصفية في محرك البحث (كما في SearchFilters).
+        $mainIds = $products->pluck('main_product_id')->filter()->unique()->values()->all();
+        $categoryIds = DB::table($prefix.'products_categories')
+            ->whereIn('product_id', [...$ids, ...$mainIds])
+            ->get(['product_id', 'category_id'])
+            ->groupBy('product_id')
+            ->map(fn (Collection $rows): array => $rows->pluck('category_id')->map(fn (mixed $id): int => (int) $id)->all());
+
+        $records = [];
 
         foreach ($products as $product) {
             if ($product->parent_id !== null || $product->deleted_at !== null) {
-                $documents[(int) $product->id] = null;
+                $records[(int) $product->id] = null;
 
                 continue;
             }
 
             $synonymId = $product->synonym_product_id;
             $productCategories = $categories->get($product->id, collect());
+            $productNames = $names->get($product->id, collect())->pluck('name')->all();
+            $barcodes = $secondaryBarcodes->get($product->id, collect())->pluck('barcode')->all();
 
             // الترتيب بحسب الاهمية، فإن طال المستند سقط آخره.
-            $documents[(int) $product->id] = $this->document([
-                ...$names->get($product->id, collect())->pluck('name')->all(),
+            $document = $this->document([
+                ...$productNames,
                 ...$this->codeTexts($product->sku),
                 ...$this->codeTexts($product->barcode),
-                ...$secondaryBarcodes->get($product->id, collect())->flatMap(fn (object $row): array => $this->codeTexts($row->barcode))->all(),
+                ...array_merge([], ...array_map(fn (?string $barcode): array => $this->codeTexts($barcode), $barcodes)),
                 $product->shelf,
                 ...($synonymId ? $names->get($synonymId, collect())->pluck('name')->all() : []),
                 ...($synonymId ? $this->codeTexts($synonymSkus->get($synonymId)) : []),
@@ -232,16 +404,41 @@ final class ItemsSearchIndex
                 ...($product->brand_id ? $brands->get($product->brand_id, collect())->pluck('name')->all() : []),
                 ...$manufacturers->get($product->id, collect())->pluck('name')->all(),
             ]);
+
+            if ($document === null) {
+                $records[(int) $product->id] = null;
+
+                continue;
+            }
+
+            $records[(int) $product->id] = [
+                'document' => $document,
+                'engine' => [
+                    'id' => (int) $product->id,
+                    'codes' => SearchIndex::text($product->sku, $product->barcode, $barcodes, $synonymId ? $synonymSkus->get($synonymId) : null),
+                    'names' => SearchIndex::text($productNames),
+                    'document' => trim($document),
+                    'is_active' => (bool) $product->is_active,
+                    'pricing_type' => $product->pricing_type,
+                    'item_type' => $product->item_type,
+                    'category_ids' => array_values(array_unique([
+                        ...$categoryIds->get($product->id, []),
+                        ...($product->main_product_id ? $categoryIds->get($product->main_product_id, []) : []),
+                    ])),
+                ],
+            ];
         }
 
-        return $documents;
+        return $records;
     }
 
     /**
+     * مستند كل تصنيف: نص فهرس قاعدة البيانات (search_text)، ومستند محرك البحث. null للمحذوف.
+     *
      * @param  array<int, int>  $ids
-     * @return array<int, string|null>
+     * @return array<int, array{document: string, engine: array<string, mixed>}|null>
      */
-    private function categoryDocuments(array $ids): array
+    private function categoryRecords(array $ids): array
     {
         $prefix = config('items.table_prefix');
 
@@ -253,12 +450,23 @@ final class ItemsSearchIndex
         return DB::table($prefix.'categories')
             ->whereIn('id', $ids)
             ->get(['id', 'code', 'slug', 'deleted_at'])
-            ->mapWithKeys(fn (object $category): array => [
-                (int) $category->id => $category->deleted_at !== null ? null : $this->document([
-                    ...$names->get($category->id, collect())->pluck('name')->all(),
+            ->mapWithKeys(function (object $category) use ($names): array {
+                $categoryNames = $names->get($category->id, collect())->pluck('name')->all();
+                $document = $category->deleted_at !== null ? null : $this->document([
+                    ...$categoryNames,
                     ...$this->codeTexts($category->code),
-                ]),
-            ])
+                ]);
+
+                return [(int) $category->id => $document === null ? null : [
+                    'document' => $document,
+                    'engine' => [
+                        'id' => (int) $category->id,
+                        'code' => SearchIndex::text($category->code),
+                        'names' => SearchIndex::text($categoryNames),
+                        'document' => trim($document),
+                    ],
+                ]];
+            })
             ->all();
     }
 

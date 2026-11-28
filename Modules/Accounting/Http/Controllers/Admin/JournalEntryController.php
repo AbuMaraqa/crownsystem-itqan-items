@@ -41,7 +41,7 @@ class JournalEntryController extends Controller
     {
         return Inertia::render('Accounting/JournalEntry/Index', [
             'table' => AdminTable::for($this->entries->tableQuery())
-                ->search(['entry_number', 'reference_no'], null)
+                ->search()
                 ->filters(AdminFilter::exact('status'), AdminFilter::text('reference_no'), ...AdminFilter::dateRange('entry_date'))
                 ->sorts('entry_number', 'entry_date', 'id')
                 ->defaultSort('-entry_date')

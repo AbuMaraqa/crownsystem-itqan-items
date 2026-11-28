@@ -62,11 +62,13 @@ class StockBalanceController extends Controller
                 AllowedFilter::callback('with_stock', fn (Builder $query, mixed $value) => filter_var($value, FILTER_VALIDATE_BOOLEAN) ? $this->balances->applyWithStock($query, $warehouseId) : $query),
             )
             ->sorts(
+                AllowedSort::field('sku', (new Product)->getTable().'.sku'),
                 AllowedSort::field('barcode', (new Product)->getTable().'.barcode'),
                 AllowedSort::field('stock_on_hand'),
                 AllowedSort::field('stock_weight'),
             )
-            ->defaultSort('barcode')
+            // ترتيب بنية الاصناف (Product::scopeCatalogOrder): الباركود رقم المورد.
+            ->defaultSort('sku')
             ->rows(fn (Product $product) => ['id' => $product->id, 'product' => $product]);
 
         $table['data'] = $this->balances->rows(collect($table['data'])->pluck('product'), $warehouseId, $canSeeCost);

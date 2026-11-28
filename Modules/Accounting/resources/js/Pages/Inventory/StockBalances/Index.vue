@@ -25,6 +25,7 @@ defineOptions({ layout: AdminLayout });
 interface BalanceRow {
     id: number;
     image: string | null;
+    sku: string;
     barcode: string | null;
     name: string;
     detail: string | null;
@@ -59,7 +60,8 @@ const props = defineProps<{
 
 const columns = computed<TableColumn[]>(() => [
     { key: 'image', label: t('Section'), toggleable: true },
-    { key: 'barcode', label: t('Barcode'), sort: 'barcode' },
+    { key: 'sku', label: t('Item Number'), sort: 'sku' },
+    { key: 'barcode', label: t('Barcode'), sort: 'barcode', toggleable: true },
     { key: 'name', label: t('Item') },
     ...(props.warehouseId ? [{ key: 'location', label: t('Location') }] : []),
     { key: 'on_hand', label: t('On Hand'), sort: 'stock_on_hand', class: 'tabular' },
@@ -137,7 +139,8 @@ function labelsUrl(ids: (number | string)[]): string {
             <img v-if="row.image" :src="row.image" alt="" class="h-9 w-12 rounded border border-line object-contain" />
             <span v-else class="text-muted">-</span>
         </template>
-        <template #cell-barcode="{ row }"><bdi class="font-mono font-semibold" dir="ltr">{{ row.barcode ?? '-' }}</bdi></template>
+        <template #cell-sku="{ row }"><bdi class="font-mono font-semibold" dir="ltr">{{ row.sku }}</bdi></template>
+        <template #cell-barcode="{ row }"><bdi class="font-mono text-muted" dir="ltr">{{ row.barcode ?? '-' }}</bdi></template>
         <template #cell-name="{ row }">
             <div class="min-w-56">
                 <Link v-if="can('Stock Item Card View')" :href="cardUrl(row)" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white dark:hover:text-brand-400">{{ row.name }}</Link>

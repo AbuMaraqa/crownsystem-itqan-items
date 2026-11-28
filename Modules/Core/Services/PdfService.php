@@ -139,8 +139,18 @@ class PdfService
      */
     public function streamPdf(string $view, array $data, string $filename = 'file.pdf', array $config = [])
     {
-        return PDF::loadView($view, $data, [], $config)->stream($filename);
+        return PDF::loadView($view, $data, [], $config + self::DOCUMENT_CONFIG)->stream($filename);
     }
+
+    /**
+     * رأس الصفحة في قالب المطبوعات (core::pdf.document) يطول بعدد البيانات وطول قيمها،
+     * فيقيس mPDF ارتفاعه ويبدأ المحتوى تحته؛ هامش الصفحة في القالب حدّ ادنى فقط.
+     * ملفات بلا رأس صفحة (الملصقات) لا يؤثر فيها.
+     */
+    private const DOCUMENT_CONFIG = [
+        'setAutoTopMargin' => 'stretch',
+        'autoMarginPadding' => 4,
+    ];
 
     public function generateDirectPdf(string $view, array $data, string $filename, array $customPaperSize, string $orientation = 'P')
     {

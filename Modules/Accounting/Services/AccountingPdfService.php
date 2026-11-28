@@ -43,7 +43,7 @@ class AccountingPdfService extends PdfService
 
     public function salesOrder(SalesOrder $order)
     {
-        $order->loadMissing(['client', 'warehouse', 'currency', 'tax', 'items.product', 'items.pieces.product', 'customerMaterials']);
+        $order->loadMissing(['client', 'warehouse', 'currency', 'tax', 'createdBy', 'items.product', 'items.pieces.product', 'customerMaterials']);
 
         return $this->streamPdf(
             'accounting::pdf.sales-order',
@@ -132,10 +132,10 @@ class AccountingPdfService extends PdfService
             'docTitle' => $title,
             'discountColumn' => $discount['column'] ?? 'invoice_discount',
             'discountLabel' => $discount['label'] ?? __('Invoice Discount'),
+            'party' => ['name' => $document->client?->name, 'detail' => $partyLabel],
             'meta' => [
+                [$dateLabel, $document->{$dateColumn}?->format('d/m/Y')],
                 [__('Reference No'), $document->reference_no],
-                [$partyLabel, $document->client?->name],
-                [$dateLabel, $document->{$dateColumn}?->toDateString()],
                 [$sourceLabel, $sourceReference],
                 [__('Currency'), $document->currency?->code],
                 [__('Status'), $document->status?->getLabel()],

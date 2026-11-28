@@ -15,6 +15,7 @@ use Inertia\Response;
 use Modules\Core\Http\Controllers\Concerns\DeletesManyRecords;
 use Modules\Core\Support\AdminFilter;
 use Modules\Core\Support\AdminTable;
+use Modules\Core\Support\RecordInfo;
 use Modules\Items\Entities\Addon;
 use Modules\Items\Entities\Finish;
 use Modules\Items\Entities\Product;
@@ -29,7 +30,6 @@ use Modules\Items\Support\CategoryColours;
 use Modules\Items\Support\ItemCardRules;
 use Modules\Items\Support\ProductSearch;
 use Modules\Items\Support\ProductStockSummary;
-use Modules\Core\Support\RecordInfo;
 use Modules\Items\Support\TranslatedSort;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -82,6 +82,8 @@ class ProductController extends Controller
                     ...AdminFilter::dateRange('created_at'),
                 )
                 ->sorts(AllowedSort::custom('name', new TranslatedSort), 'sku', 'slug', 'is_active', 'base_price', 'id')
+                // بلا ترتيب يختاره المستخدم: ترتيب بنية الاصناف (Product::scopeCatalogOrder).
+                ->defaultSort('sku')
                 ->withCreator()
                 ->rows(fn (Product $product) => [
                     'id' => $product->id,

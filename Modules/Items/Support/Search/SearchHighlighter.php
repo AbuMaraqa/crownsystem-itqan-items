@@ -3,6 +3,7 @@
 namespace Modules\Items\Support\Search;
 
 use Illuminate\Support\HtmlString;
+use Modules\Core\Support\Search\TextNormalizer;
 
 /**
  * تمييز ما طابق البحث في النص المعروض بوسم <mark>. المطابقة على النص

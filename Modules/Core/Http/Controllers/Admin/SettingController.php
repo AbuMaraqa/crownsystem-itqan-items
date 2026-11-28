@@ -37,6 +37,10 @@ class SettingController extends Controller
                 'dashboard_font' => $general->dashboard_font,
                 'stock_min_1_color' => $theme->stockColors()['min_1'],
                 'stock_min_2_color' => $theme->stockColors()['min_2'],
+                'company_name' => $general->company_name,
+                'company_phone' => $general->company_phone,
+                'company_fax' => $general->company_fax,
+                'company_website' => $general->company_website,
             ],
             'currencyOptions' => $this->settings->currencies()
                 ->map(fn (Currency $currency) => ['value' => $currency->id, 'label' => $currency->code])

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Accounting\Entities\Concerns\IsInventoryDocument;
+use Modules\Core\Entities\Concerns\HasSearchIndex;
 use Modules\Core\Entities\User;
 use Spatie\Activitylog\Traits\LogsActivity;
 
@@ -15,9 +16,20 @@ use Spatie\Activitylog\Traits\LogsActivity;
  */
 class GoodsReceipt extends Model
 {
+    use HasSearchIndex;
     use IsInventoryDocument;
     use LogsActivity;
     use SoftDeletes;
+
+    /**
+     * البحث في سندات الاستلام: بالرقم المرجعي ورقم الحاوية ورقم مستند المورد.
+     *
+     * @return list<string>
+     */
+    public static function searchColumns(): array
+    {
+        return ['reference_no', 'container_no', 'supplier_document_no'];
+    }
 
     protected $fillable = [
         'reference_no',
