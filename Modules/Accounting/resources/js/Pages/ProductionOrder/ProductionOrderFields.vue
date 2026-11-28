@@ -18,7 +18,7 @@ import { getJson, postJson, withQuery } from '../parts/http';
 import type { Option } from '../parts/types';
 import CostSummary from './parts/CostSummary.vue';
 import LaborLines from './parts/LaborLines.vue';
-import MaterialLines from './parts/MaterialLines.vue';
+import MaterialsGrid from './parts/MaterialsGrid.vue';
 import ServiceLines from './parts/ServiceLines.vue';
 import type { CostPreview, MaterialLine, ProductionContext, ProductionOptions, ProductionOrderForm, ServiceLine } from './types';
 
@@ -232,7 +232,7 @@ onBeforeUnmount(() => {
             </template>
             <Tabs v-model="tab" :tabs="tabs">
                 <template #materials>
-                    <MaterialLines v-model="form.materials" :totals="preview.lines.materials" :editable="editable" :errors="errors" />
+                    <MaterialsGrid v-model="form.materials" :totals="preview.lines.materials" :editable="editable" :errors="errors" />
                 </template>
                 <template #labor>
                     <LaborLines v-model="form.labor" :totals="preview.lines.labor" :editable="editable" :errors="errors" :basis-options="options.laborBasisOptions" />
