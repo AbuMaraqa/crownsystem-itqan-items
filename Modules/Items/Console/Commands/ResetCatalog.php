@@ -3,8 +3,11 @@
 namespace Modules\Items\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Modules\Items\Entities\Category;
+use Modules\Items\Entities\CategoryFinish;
 use Modules\Items\Entities\Product;
 
 /**
@@ -54,7 +57,7 @@ class ResetCatalog extends Command
 
         $this->table(['Table', 'Rows'], $rows);
         $this->line('Journal entries of the documents: '.count($journals));
-        $this->line('Itqan item links (legacy_links, items): '.DB::table('legacy_links')->where('source_table', 'items')->count());
+        $this->line('Itqan links to items, categories and price groups: '.$this->catalogueLinks()->count());
 
         if (! $this->option('execute')) {
             $this->warn('Report only. Run with --execute to delete.');
@@ -64,14 +67,43 @@ class ResetCatalog extends Command
 
         DB::transaction(function () use ($journals): void {
             $this->deleteJournals($journals);
-            DB::table('legacy_links')->where('source_table', 'items')->delete();
+            $this->catalogueLinks()->delete();
             DB::table('media')->where('model_type', (new Product)->getMorphClass())->delete();
         });
 
         $this->truncate($tables);
+        $this->deleteImportedFinishes();
         $this->info('Catalogue emptied: '.count($tables).' tables, '.count($journals).' journal entries.');
 
         return self::SUCCESS;
+    }
+
+    /**
+     * الوان الاستيراد السابق مع قيم سمة «اللون» المرآة لها؛ يبقى «بلا لون» النظامي، والاستيراد ينشئ الوانه من جديد.
+     */
+    private function deleteImportedFinishes(): void
+    {
+        $finishes = config('items.table_prefix').'finishes';
+
+        if (! Schema::hasTable($finishes)) {
+            return;
+        }
+
+        $valueIds = DB::table($finishes)->where('is_system', false)->whereNotNull('attribute_value_id')->pluck('attribute_value_id')->all();
+        DB::table($finishes)->where('is_system', false)->delete();
+
+        foreach (array_chunk($valueIds, 1000) as $chunk) {
+            DB::table(config('items.table_prefix').'attribute_values')->whereIn('id', $chunk)->delete();
+        }
+    }
+
+    /**
+     * روابط اتقان التي تشير الى الكتالوج (اصناف، تصنيفات، مجموعات سعر) ايّاً كان جدولها المصدر؛ بقاؤها
+     * يجعل الاستيراد التالي يظن ان التصنيف المحذوف موجود.
+     */
+    private function catalogueLinks(): Builder
+    {
+        return DB::table('legacy_links')->whereIn('target_type', [(new Product)->getMorphClass(), (new Category)->getMorphClass(), (new CategoryFinish)->getMorphClass()]);
     }
 
     /**

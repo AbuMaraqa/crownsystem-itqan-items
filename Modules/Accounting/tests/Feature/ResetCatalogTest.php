@@ -32,6 +32,10 @@ class ResetCatalogTest extends TestCase
     public function test_the_report_deletes_nothing_and_execute_empties_the_catalogue_and_its_documents(): void
     {
         $this->postedInvoice();
+        // رابط اتقان لتصنيف (كما يحفظه الاستيراد) يجب ان يذهب معه، والا ظن الاستيراد التالي ان التصنيف موجود.
+        \Illuminate\Support\Facades\DB::table('legacy_links')->insert(['source' => 'itqan', 'source_table' => 'catalog-categories', 'source_key' => '00001', 'target_type' => Category::class, 'target_id' => 999, 'created_at' => now(), 'updated_at' => now()]);
+        \Illuminate\Support\Facades\DB::table('legacy_links')->insert(['source' => 'itqan', 'source_table' => 'customers', 'source_key' => 'C1', 'target_type' => User::class, 'target_id' => 1, 'created_at' => now(), 'updated_at' => now()]);
+        \Modules\Items\Entities\Finish::create(['name' => 'لون من استيراد سابق', 'is_active' => true]);
         $users = User::query()->count();
         $accounts = Account::query()->count();
         $products = Product::query()->count();
@@ -51,5 +55,10 @@ class ResetCatalogTest extends TestCase
         $this->assertSame(0, JournalEntry::query()->where('source_type', 'SalesInvoice')->count());
         $this->assertSame($users, User::query()->count());
         $this->assertSame($accounts, Account::query()->count());
+        $this->assertSame(0, \Illuminate\Support\Facades\DB::table('legacy_links')->where('target_type', Category::class)->count());
+        $this->assertSame(1, \Illuminate\Support\Facades\DB::table('legacy_links')->where('target_type', User::class)->count());
+        // الوان الاستيراد السابق تُحذف، ويبقى «بلا لون» النظامي.
+        $this->assertSame(0, \Modules\Items\Entities\Finish::query()->where('is_system', false)->count());
+        $this->assertSame(1, \Modules\Items\Entities\Finish::query()->where('is_system', true)->count());
     }
 }
